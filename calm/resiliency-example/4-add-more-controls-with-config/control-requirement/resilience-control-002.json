@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/calm/resilience-control-002.json",
+  "title": "High Availability Requirement",
+  "description": "Ensure that the system is highly available and can tolerate failures without significant downtime.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "https://raw.githubusercontent.com/finos/architecture-as-code/main/calm/draft/2024-08/meta/control-requirement.json"
+    }
+  ],
+  "properties": {
+    "control-id": {
+      "const": "resilience-002"
+    },
+    "name": {
+      "const": "High Availability"
+    },
+    "description": {
+      "const": "The system must be designed to be highly available with failover mechanisms in place."
+    },
+    "scope-text": {
+      "const": "Applicable to all trading systems with critical uptime requirements."
+    },
+    "availability-target": {
+      "type": "string",
+      "description": "The target availability percentage the system must meet.",
+      "default": "99.99%"
+    },
+    "failover-time": {
+      "type": "string",
+      "description": "Maximum time allowed for a failover to occur.",
+      "default": "1 minute"
+    },
+    "responsible-team": {
+      "type": "string",
+      "description": "The team responsible for maintaining the system's high availability.",
+      "default": "Infrastructure Team"
+    },
+    "evidence-type": {
+      "type": "string",
+      "description": "Type of evidence required to demonstrate compliance.",
+      "default": "System uptime reports, failover test results."
+    }
+  },
+  "required": [
+    "control-id",
+    "name",
+    "description",
+    "scope-text",
+    "availability-target",
+    "failover-time",
+    "responsible-team",
+    "evidence-type"
+  ]
+}

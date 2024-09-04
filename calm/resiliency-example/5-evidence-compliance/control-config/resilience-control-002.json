@@ -1,0 +1,12 @@
+{
+  "$schema": "https://example.com/calm/resilience-control-002.json",
+  "title": "TraderX High Availability Configuration",
+  "control-id": "resilience-002",
+  "name": "High Availability",
+  "description": "TraderX is configured with active-passive failover to ensure high availability.",
+  "scope-text": "Applicable to all trading systems with critical uptime requirements.",
+  "availability-target": "99.99%",
+  "failover-time": "1 minute",
+  "responsible-team": "Infrastructure Team",
+  "evidence-type": "Monthly system uptime reports showing 99.99% availability, quarterly failover test results with failover time documented."
+}

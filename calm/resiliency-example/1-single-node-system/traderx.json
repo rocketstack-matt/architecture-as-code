@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/finos/architecture-as-code/main/calm/draft/2024-08/meta/calm.json",
+  "$id": "https://example.com/calm/traderx-system.json",
+  "title": "TraderX System Definition",
+  "description": "TraderX is a trading system.",
+  "nodes": [
+    {
+      "unique-id": "traderx-system",
+      "node-type": "system",
+      "name": "TraderX",
+      "description": "A trading system defined as a single node."
+    }
+  ],
+  "relationships": [],
+  "metadata": []
+}

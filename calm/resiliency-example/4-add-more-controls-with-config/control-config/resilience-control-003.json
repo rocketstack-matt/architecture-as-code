@@ -1,0 +1,12 @@
+{
+  "$schema": "https://example.com/calm/resilience-control-003.json",
+  "title": "TraderX Data Backup and Restore Configuration",
+  "control-id": "resilience-003",
+  "name": "Data Backup and Restore",
+  "description": "TraderX performs nightly backups with weekly restoration tests to ensure data integrity.",
+  "scope-text": "Critical systems where data integrity is essential.",
+  "backup-frequency": "Nightly",
+  "restore-test-frequency": "Weekly",
+  "responsible-team": "Database Administration Team",
+  "evidence-type": "Daily backup logs, weekly restore test results verifying data integrity."
+}

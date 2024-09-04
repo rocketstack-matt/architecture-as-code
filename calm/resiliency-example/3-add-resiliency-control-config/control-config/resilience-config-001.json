@@ -1,0 +1,12 @@
+{
+  "$schema": "https://example.com/calm/resilience-control-001.json",
+  "title": "TraderX Disaster Recovery Configuration",
+  "control-id": "resilience-001",
+  "name": "Disaster Recovery Plan",
+  "description": "TraderX has a documented disaster recovery plan that is tested annually.",
+  "scope-text": "All critical trading systems must comply.",
+  "test-procedure": "TraderX performs a full failover to the backup site annually, verifying all critical functions are operational.",
+  "frequency": "Annually",
+  "responsible-team": "IT Operations",
+  "evidence-type": "Annual test report documenting the failover process, success rate, and any issues encountered."
+}

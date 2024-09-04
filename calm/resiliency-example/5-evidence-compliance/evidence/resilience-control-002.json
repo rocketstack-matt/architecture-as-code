@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/finos/architecture-as-code/main/calm/draft/2024-08/meta/evidence.json",
+  "evidence": {
+    "unique-id": "evidence-002",
+    "evidence-paths": [
+      "https://example.com/calm/traderx/evidence/files/uptime-report-2024.pdf",
+      "https://example.com/calm/traderx/evidence/files/failover-test-logs-2024.txt"
+    ],
+    "control-configuration-url": "https://example.com/calm/traderx/resilience-config-002.json"
+  },
+  "availability-metrics": "TraderX achieved 99.99% availability for the period, with all failover tests completed within 1 minute."
+}

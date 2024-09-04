@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/finos/architecture-as-code/main/calm/draft/2024-08/meta/calm.json",
+  "$id": "https://example.com/calm/traderx-system.json",
+  "title": "TraderX System Definition",
+  "description": "TraderX is a trading system with resilience controls applied.",
+  "nodes": [
+    {
+      "unique-id": "traderx-system",
+      "node-type": "system",
+      "name": "TraderX",
+      "description": "A trading system defined as a single node.",
+      "controls": {
+        "resilience": {
+          "description": "Resilience controls applied to TraderX.",
+          "requirements": [
+            {
+              "control-requirement-url": "./control-requirement/resilience-control-001.json",
+              "control-config-url": "./control-config/resilience-config-001.json"
+            },
+            {
+              "control-requirement-url": "https://example.com/calm/resilience-control-002.json",
+              "control-config-url": "https://example.com/calm/traderx/resilience-config-002.json"
+            },
+            {
+              "control-requirement-url": "https://example.com/calm/resilience-control-003.json",
+              "control-config-url": "https://example.com/calm/traderx/resilience-config-003.json"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "relationships": [],
+  "metadata": []
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/calm/resilience-control-001.json",
+  "title": "Disaster Recovery Plan Requirement",
+  "description": "Ensure that the system has a documented and tested disaster recovery plan.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "https://raw.githubusercontent.com/finos/architecture-as-code/main/calm/draft/2024-08/meta/control-requirement.json"
+    }
+  ],
+  "properties": {
+    "control-id": {
+      "const": "resilience-001"
+    },
+    "name": {
+      "const": "Disaster Recovery Plan"
+    },
+    "description": {
+      "const": "The system must have a documented and regularly tested disaster recovery plan."
+    },
+    "scope-text": {
+      "const": "All critical trading systems must comply."
+    },
+    "test-procedure": {
+      "type": "string",
+      "description": "Detailed procedure on how the disaster recovery plan should be tested.",
+      "default": "Perform a full failover to the backup site annually."
+    },
+    "frequency": {
+      "type": "string",
+      "description": "Frequency at which the disaster recovery plan must be tested.",
+      "default": "Annually"
+    },
+    "responsible-team": {
+      "type": "string",
+      "description": "The team responsible for ensuring the disaster recovery plan is documented and tested.",
+      "default": "IT Operations"
+    },
+    "evidence-type": {
+      "type": "string",
+      "description": "Type of evidence required to demonstrate compliance.",
+      "default": "Test report including failover success metrics."
+    }
+  },
+  "required": [
+    "control-id",
+    "name",
+    "description",
+    "scope-text",
+    "test-procedure",
+    "frequency",
+    "responsible-team",
+    "evidence-type"
+  ]
+}

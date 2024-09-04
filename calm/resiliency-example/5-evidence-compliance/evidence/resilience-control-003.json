@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/finos/architecture-as-code/main/calm/draft/2024-08/meta/evidence.json",
+  "evidence": {
+    "unique-id": "evidence-003",
+    "evidence-paths": [
+      "https://example.com/calm/traderx/evidence/files/backup-logs-2024.txt",
+      "https://example.com/calm/traderx/evidence/files/restore-test-report-2024.pdf"
+    ],
+    "control-configuration-url": "https://example.com/calm/traderx/resilience-config-003.json"
+  },
+  "restore-test-summary": "TraderX successfully restored data from backup during the weekly test on 2024-03-01. No data was lost, and the restoration process completed within 30 minutes."
+}

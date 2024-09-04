@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/finos/architecture-as-code/main/calm/draft/2024-08/meta/evidence.json",
+  "evidence": {
+    "unique-id": "evidence-001",
+    "evidence-paths": [
+      "https://example.com/calm/traderx/evidence/files/dr-test-report-2024.pdf",
+      "https://example.com/calm/traderx/evidence/files/dr-test-logs-2024.txt"
+    ],
+    "control-configuration-url": "https://example.com/calm/traderx/resilience-config-001.json"
+  },
+  "evidence-date": "2024-03-01",
+  "test-results": "The disaster recovery test on 2024-03-01 was successful, with a complete failover to the backup site in 45 minutes. No critical issues were encountered."
+}

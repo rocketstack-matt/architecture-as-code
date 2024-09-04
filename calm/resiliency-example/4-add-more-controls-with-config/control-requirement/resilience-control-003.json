@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/calm/resilience-control-003.json",
+  "title": "Data Backup and Restore Requirement",
+  "description": "Ensure that the system has regular data backups and a tested restore process.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "https://raw.githubusercontent.com/finos/architecture-as-code/main/calm/draft/2024-08/meta/control-requirement.json"
+    }
+  ],
+  "properties": {
+    "control-id": {
+      "const": "resilience-003"
+    },
+    "name": {
+      "const": "Data Backup and Restore"
+    },
+    "description": {
+      "const": "The system must perform regular backups and have a verified process for data restoration."
+    },
+    "scope-text": {
+      "const": "Critical systems where data integrity is essential."
+    },
+    "backup-frequency": {
+      "type": "string",
+      "description": "How often backups should be performed.",
+      "default": "Nightly"
+    },
+    "restore-test-frequency": {
+      "type": "string",
+      "description": "How often the restore process should be tested.",
+      "default": "Weekly"
+    },
+    "responsible-team": {
+      "type": "string",
+      "description": "The team responsible for ensuring data backups and restore processes are conducted.",
+      "default": "Database Administration Team"
+    },
+    "evidence-type": {
+      "type": "string",
+      "description": "Type of evidence required to demonstrate compliance.",
+      "default": "Backup logs, restore test results."
+    }
+  },
+  "required": [
+    "control-id",
+    "name",
+    "description",
+    "scope-text",
+    "backup-frequency",
+    "restore-test-frequency",
+    "responsible-team",
+    "evidence-type"
+  ]
+}
