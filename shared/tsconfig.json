@@ -3,9 +3,9 @@
     "compilerOptions": {
         "outDir": "./dist",
         "rootDir": "src",
-        "module": "commonjs",
+        "module": "NodeNext",
         "target": "es2021",
-        "moduleResolution": "node",
+        "moduleResolution": "NodeNext",
         "esModuleInterop": true,
         "declaration": true,
         "declarationMap": true,

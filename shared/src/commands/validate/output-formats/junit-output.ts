@@ -1,11 +1,13 @@
 import junitReportBuilder, { TestSuite } from 'junit-report-builder';
-import { ValidationOutcome } from '../validation.output';
+import { ValidationOutcome } from '../validation.output.js';
 
 export default function createJUnitReport(
     validationOutcome: ValidationOutcome,
     spectralRuleNames: string[]
 ): string {
-    const builder = junitReportBuilder.newBuilder();
+    // Create a fresh builder for each report to avoid accumulating test results
+    // @ts-expect-error - Using the builder directly
+    const builder = junitReportBuilder.newBuilder ? junitReportBuilder.newBuilder() : junitReportBuilder;
 
     const jsonSchemaSuite = createTestSuite(builder, 'JSON Schema Validation');
     const jsonSchemaValidationOutput = validationOutcome.jsonSchemaValidationOutputs;
@@ -32,6 +34,7 @@ export default function createJUnitReport(
         });
     }
 
+    // The build method exists on the runtime object
     return builder.build();
 }
 
