@@ -290,7 +290,7 @@ function prettifyJson(json) {
 }
 
 export function stripRefs(obj: object): string {
-    return JSON.stringify(obj).replaceAll('$ref', 'ref');
+    return JSON.stringify(obj).replace(/\$ref/g, 'ref');
 }
 
 export function sortSpectralIssueBySeverity(issues: ISpectralDiagnostic[]): void {
