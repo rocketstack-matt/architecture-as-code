@@ -7,7 +7,7 @@ declare module 'fetch-mock' {
     // v10 methods
     route: (matcher: MatcherType, response: ResponseType, options?: OptionsType) => unknown;
     reset: () => unknown;
-    mockGlobal: (matcher: MatcherType, response: ResponseType, options?: OptionsType) => unknown;
+    mockGlobal: (matcher?: MatcherType, response?: ResponseType, options?: OptionsType) => unknown;
     resetBehavior: () => unknown;
     resetHistory: () => unknown;
     called: (name?: string) => boolean;

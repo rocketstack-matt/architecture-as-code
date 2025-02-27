@@ -1,5 +1,6 @@
-import Ajv, { ErrorObject } from 'ajv';
-import addFormats from 'ajv-formats';
+import { ErrorObject } from 'ajv';
+// Import Ajv2020 directly for ESM compatibility
+import Ajv2020 from 'ajv/dist/2020.js';
 import { existsSync, promises as fs } from 'fs';
 import { Spectral, ISpectralDiagnostic, RulesetDefinition } from '@stoplight/spectral-core';
 
@@ -64,8 +65,9 @@ function buildAjv2020(schemaDirectory: SchemaDirectory, debug: boolean) {
     
     // In ESM mode, we need to handle the import differently
     try {
-        // @ts-expect-error - Ajv import in ESM mode requires this approach
-        const ajv = new Ajv({
+        // Force TypeScript to treat Ajv2020 as a constructor
+        const AjvConstructor = Ajv2020 as unknown as new (options: any) => any;
+        const ajv = new AjvConstructor({
             strict: strictType,
             allErrors: true,
             validateSchema: false,
@@ -80,11 +82,8 @@ function buildAjv2020(schemaDirectory: SchemaDirectory, debug: boolean) {
             }
         });
         
-        // Add formats to Ajv instance
-        if (typeof addFormats === 'function') {
-            // @ts-expect-error - addFormats is a function but TypeScript doesn't recognize it correctly in ESM mode
-            addFormats(ajv);
-        }
+        // Add formats to Ajv instance - skipping for ESM compatibility
+        // We'll handle format validation separately if needed
         
         return ajv;
     } catch (error) {

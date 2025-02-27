@@ -2,7 +2,7 @@ import request from 'supertest';
 import * as fs from 'fs';
 
 import express, { Application } from 'express';
-import { ValidationRouter } from './validation-route';
+import { ValidationRouter } from './validation-route.js';
 import path from 'path';
 
 const schemaDirectory : string = __dirname + '/../../../../calm';

@@ -1,6 +1,6 @@
 import express, { Application } from 'express';
-import { CLIServerRoutes } from './routes/routes';
-import { initLogger } from '@finos/calm-shared';
+import { CLIServerRoutes } from './routes/routes.js';
+import { initLogger } from '@finos/calm-shared/logger.js';
 
 export function startServer(options: { port: string, schemaDirectory: string, verbose: boolean }) {
     const app: Application = express();

@@ -1,11 +1,13 @@
-import { validate, SchemaDirectory, initLogger } from '@finos/calm-shared';
+import { validate } from '@finos/calm-shared/commands/validate/validate.js';
+import { SchemaDirectory } from '@finos/calm-shared/schema-directory.js';
+import { initLogger } from '@finos/calm-shared/logger.js';
 import { Router, Request, Response } from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import winston from 'winston';
-import { ValidationOutcome } from '@finos/calm-shared/commands/validate/validation.output';
+import { ValidationOutcome } from '@finos/calm-shared/commands/validate/validation.output.js';
 import rateLimit from 'express-rate-limit';
 
 export class ValidationRouter {

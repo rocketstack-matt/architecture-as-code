@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { CLIServerRoutes } from './routes';
-import { ValidationRouter } from './validation-route';
-import { HealthRouter } from './health-route';
+import { CLIServerRoutes } from './routes.js';
+import { ValidationRouter } from './validation-route.js';
+import { HealthRouter } from './health-route.js';
 
 const mockUse = jest.fn();
 const mockRouter = {
@@ -12,13 +12,13 @@ jest.mock('express', () => ({
     Router: jest.fn(() => mockRouter)
 }));
 
-jest.mock('./validation-route', () => {
+jest.mock('./validation-route.js', () => {
     return {
         ValidationRouter: jest.fn()
     };
 });
 
-jest.mock('./health-route', () => {
+jest.mock('./health-route.js', () => {
     return {
         HealthRouter: jest.fn()
     };

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { ValidationRouter } from './validation-route';
-import { HealthRouter } from './health-route';
+import { ValidationRouter } from './validation-route.js';
+import { HealthRouter } from './health-route.js';
 
 const HEALTH_ROUTE_PATH = '/health';
 const VALIDATE_ROUTE_PATH = '/calm/validate';

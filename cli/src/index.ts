@@ -1,13 +1,20 @@
 #! /usr/bin/env node
 
-import { CALM_META_SCHEMA_DIRECTORY, getFormattedOutput, runGenerate, validate, exitBasedOffOfValidationOutcome, TemplateProcessor } from '@finos/calm-shared';
+import { 
+    CALM_META_SCHEMA_DIRECTORY,
+    getFormattedOutput,
+    runGenerate,
+    validate,
+    exitBasedOffOfValidationOutcome,
+    TemplateProcessor
+} from '@finos/calm-shared/index.js';
 import { Option, program } from 'commander';
 import path from 'path';
 import { mkdirp } from 'mkdirp';
 import { writeFileSync } from 'fs';
 import { version } from '../package.json';
-import { initLogger } from '@finos/calm-shared/logger';
-import { startServer } from './server/cli-server';
+import { initLogger } from '@finos/calm-shared/logger.js';
+import { startServer } from './server/cli-server.js';
 
 const FORMAT_OPTION = '-f, --format <format>';
 const ARCHITECTURE_OPTION = '-a, --architecture <file>';

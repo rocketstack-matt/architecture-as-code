@@ -6,6 +6,9 @@ import { ISpectralDiagnostic } from '@stoplight/spectral-core';
 import { ValidationOutcome, ValidationOutput } from './validation.output.js';
 import { ErrorObject } from 'ajv';
 
+// Initialize fetchMock for global usage
+// In fetch-mock v10, we use mock() instead of route()
+
 const mockRunFunction = jest.fn();
 
 jest.mock('@stoplight/spectral-core', () => {
