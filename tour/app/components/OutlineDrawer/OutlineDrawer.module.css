@@ -1,0 +1,4 @@
+.chapterItemsList {
+  display: flex;
+  flex-direction: column;
+}

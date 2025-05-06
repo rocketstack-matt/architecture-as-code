@@ -1,0 +1,39 @@
+---
+title: Multiple of a Number
+description: "Learn how to define a numeric property in JSON Schema that is a multiple of another number using the multipleOf keyword, with constraints on minimum and maximum values."
+keywords: "integer, JSON Schema, multiple, multipleOf, minimum, maximum"
+---
+
+# Multiple of a Number
+
+Let's say you want to define a numeric property that should be a multiple of another number. We have added a new property, `hourlyWage`, in the JSON object.
+
+
+```json highlightLineStart={4}
+{
+  "name":"John Doe",
+  "age": 25,
+  "hourlyWage": 10
+}
+```
+
+## multipleOf Keyword 
+
+The `multipleOf` [keyword](https://json-schema.org/learn/glossary#keyword) is used to define a number which is a multiple of another number. The value of the `multipleOf` keyword **must be a number, strictly greater than 0**
+
+**Example**
+
+```json
+{
+  "type": "number",
+  "multipleOf": 5
+}
+```
+
+Now, try to modify the JSON schema given in the <SideEditorLink/> such that `hourlyWage` property follows the given constraints. 
+
+**Constraints**
+- `hourlyWage` should be a **multiple of 0.25**
+- `hourlyWage` should have **minimum value of 0** and **maximum value of 100**
+
+

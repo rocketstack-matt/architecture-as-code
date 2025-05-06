@@ -1,0 +1,65 @@
+---
+title: Understanding Architecture Patterns
+description: "Architecture patterns in CALM define reusable templates for common architectural structures. They help ensure consistency and best practices across your organization."
+keywords: "patterns, architecture patterns, templates, reusable architectures"
+---
+
+# Understanding Architecture Patterns
+
+In CALM, **architecture patterns** define reusable templates for common architectural structures. They're like blueprints that you can apply to ensure consistency and best practices across your organization's systems.
+
+## Pattern Structure
+
+A CALM pattern is defined using a special variant of the CALM schema:
+
+```json
+{
+  "$schema": "https://calm.finos.org/draft/2025-03/meta/calm.json",
+  "$id": "https://example.com/patterns/api-gateway",
+  "title": "API Gateway Pattern",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "$ref": "https://calm.finos.org/draft/2025-03/meta/core.json#/defs/node",
+          "properties": {
+            "node-type": { "const": "system" },
+            "name": { "const": "API Gateway" },
+            "unique-id": { "const": "api-gateway" }
+          }
+        },
+        // Additional node definitions
+      ]
+    },
+    "relationships": {
+      // Pattern relationship definitions
+    }
+  },
+  "required": ["nodes", "relationships"]
+}
+```
+
+## How Patterns Work
+
+Patterns define a structure that implementations must follow. They can:
+
+1. Require specific nodes and relationships
+2. Define constraints on properties
+3. Set minimum requirements for components
+4. Allow for customization within constraints
+
+## Common Patterns
+
+Some common architecture patterns include:
+
+- API Gateway Pattern
+- Microservice Architecture Pattern
+- Event-Driven Architecture Pattern
+- Layered Architecture Pattern
+
+<br/>
+### Explore the API Gateway pattern on the <SideEditorLink text="right side!"/> 
+This is an example pattern definition. You don't need to modify it, just review the structure.

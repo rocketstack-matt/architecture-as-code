@@ -1,0 +1,32 @@
+---
+title: Defining Relationships
+description: "Relationships in CALM define how nodes interact, connect, or depend on each other. They represent the connections, data flows, and dependencies within your architecture."
+keywords: "relationships, connections, dependencies, architecture connections"
+---
+
+# Defining Relationships
+
+In CALM, **relationships** define how nodes interact with each other. These connections are what bring your architecture to life, showing how data and control flow through the system.
+
+## Relationship Types
+
+CALM supports several primary relationship types:
+
+1. **connects**: Represents a connection between components, typically for communication
+2. **deployed-in**: Shows that a component is deployed within another (like a container or network)
+3. **composed-of**: Indicates that a component contains or is made up of other components
+4. **interacts**: Used when actors (like users) interact with system components
+
+## Relationship Structure
+
+A basic relationship has the following properties:
+
+- **unique-id**: A unique identifier for the relationship
+- **relationship-type**: The type of relationship (connects, deployed-in, etc.)
+- **description**: A text explanation of the relationship
+
+The `relationship-type` property defines which nodes are involved and how they're connected.
+
+<br/>
+### Add a relationship on the <SideEditorLink text="right side!"/> 
+Create a 'connects' relationship showing that the hello-service connects to the user-database.

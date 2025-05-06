@@ -1,0 +1,60 @@
+---
+title: Flow Basics
+description: "Flows in CALM represent processes and data flows through your architecture. They help document how components interact to achieve specific business outcomes."
+keywords: "flows, process flows, data flows, sequence, architecture flows"
+---
+
+# Flow Basics
+
+In CALM, **flows** represent processes and data flows through your architecture. They document how components interact to achieve specific business outcomes or technical processes.
+
+## Flow Structure
+
+A basic flow definition looks like this:
+
+```json
+{
+  "$schema": "https://calm.finos.org/draft/2025-03/meta/flow.json",
+  "unique-id": "order-processing-flow",
+  "name": "Order Processing Flow",
+  "description": "Process an order from submission to fulfillment",
+  "participants": [
+    "customer",
+    "order-service",
+    "payment-service",
+    "fulfillment-service"
+  ],
+  "steps": [
+    {
+      "unique-id": "submit-order",
+      "name": "Submit Order",
+      "description": "Customer submits an order",
+      "from": "customer",
+      "to": "order-service",
+      "sequence": 1
+    },
+    // Additional steps
+  ]
+}
+```
+
+## Key Flow Components
+
+- **participants**: The nodes involved in the flow
+- **steps**: The individual actions or interactions in the flow
+- **sequence**: The order of steps in the flow
+
+## Flow Steps
+
+Each step in a flow represents an interaction between components and includes:
+
+- **unique-id**: A unique identifier for the step
+- **name**: A human-readable name for the step
+- **description**: A description of what happens in this step
+- **from**: The source node for this interaction
+- **to**: The destination node for this interaction
+- **sequence**: The step's position in the flow
+
+<br/>
+### Create a basic flow on the <SideEditorLink text="right side!"/> 
+Define a simple flow with at least two steps.

@@ -1,0 +1,38 @@
+---
+title: Your First Architecture
+description: "CALM (Common Architecture Language Model) is a specification for defining system architectures in a machine and human-readable format. A CALM document enables a consistent way to describe architecture that can be validated, visualized, and shared across teams. CALM is particularly useful when architecture needs to align with implementation and evolve over time alongside your code."
+keywords: "architecture, nodes, relationships, services, system design"
+---
+
+# CALM Tour
+Welcome to the CALM Tour! In this interactive tour, you'll learn how to use the **Common Architecture Language Model (CALM)** to define and document software architectures as code.
+
+## Are there any prerequisites?
+**No!** You just need basic familiarity with JSON and an interest in software architecture.
+
+## What is CALM?
+
+CALM is a specification developed by the Architecture as Code (AasC) community under FINOS. It provides a standardized, machine-readable format for defining software architectures. By capturing architecture as code, CALM enables a consistent, version-controlled approach that aligns design intent with implementation.
+
+## Your First Architecture
+Let's start with a simple example.
+Consider you have a basic system with a web service:
+
+```json
+{
+  "unique-id": "hello-service",
+  "node-type": "service",
+  "name": "Hello Service",
+  "description": "A simple hello world web service"
+}
+```
+
+This CALM node represents a service in your architecture with:
+- A `unique-id` that identifies the component
+- A `node-type` indicating it's a service
+- A `name` providing a human-readable identifier
+- A `description` explaining its purpose
+
+<br/>
+### Complete your first CALM document on the <SideEditorLink text="right side!"/> 
+Add a service node to the empty nodes array. Your node must include these required properties: `unique-id`, `node-type`, `name`, and `description`. The document already has the correct $schema reference.

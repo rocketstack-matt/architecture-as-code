@@ -1,0 +1,47 @@
+---
+title: Deployed-in Relationships
+description: "The 'deployed-in' relationship type shows containment and deployment contexts. It indicates that nodes are deployed or contained within another node like a network or container."
+keywords: "deployed-in relationship, deployment context, containers, networks, hosting"
+---
+
+# Deployed-in Relationships
+
+The **deployed-in** relationship type in CALM represents that nodes are deployed or contained within another node. This is commonly used to show deployment contexts, like services running in a network or container.
+
+## Deployed-in Relationship Structure
+
+A deployed-in relationship has the following structure:
+
+```json
+{
+  "unique-id": "services-in-network",
+  "description": "Services deployed in the internal network",
+  "relationship-type": {
+    "deployed-in": {
+      "container": "network-node-id",
+      "nodes": [
+        "service1-id",
+        "service2-id"
+      ]
+    }
+  }
+}
+```
+
+## Key Properties
+
+- **container**: The node that contains or hosts the other nodes
+- **nodes**: An array of node IDs that are deployed in the container
+
+## Common Use Cases
+
+Deployed-in relationships are typically used to show:
+
+- Services deployed in a network
+- Components running in a container platform
+- Services hosted in a cloud environment
+- Applications installed on a server
+
+<br/>
+### Create a deployed-in relationship on the <SideEditorLink text="right side!"/> 
+Define a relationship showing services deployed in a network.

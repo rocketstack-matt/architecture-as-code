@@ -1,0 +1,52 @@
+---
+title: Connects Relationships
+description: "The 'connects' relationship type defines how components connect to and communicate with each other. It's one of the most common relationship types in CALM architectures."
+keywords: "connects relationship, service connections, APIs, communication, interfaces"
+---
+
+# Connects Relationships
+
+The **connects** relationship type in CALM represents connections between components, typically showing how services communicate with each other or with databases and other components.
+
+## Connects Relationship Structure
+
+A connects relationship has the following structure:
+
+```json
+{
+  "unique-id": "service-to-database",
+  "description": "Service connects to the database to store data",
+  "relationship-type": {
+    "connects": {
+      "source": {
+        "node": "source-node-id"
+      },
+      "destination": {
+        "node": "destination-node-id"
+      }
+    }
+  },
+  "protocol": "HTTPS",  // Optional but recommended
+  "authentication": "OAuth2"  // Optional
+}
+```
+
+## Key Properties
+
+- **source**: The node that initiates the connection
+- **destination**: The node that receives the connection
+- **protocol**: (Optional) The communication protocol used (HTTPS, JDBC, etc.)
+- **authentication**: (Optional) The authentication method used
+
+## Common Use Cases
+
+Connects relationships are typically used to show:
+
+- API calls between services
+- Database connections
+- External service integrations
+- Message queue connections
+
+<br/>
+### Create a connects relationship on the <SideEditorLink text="right side!"/> 
+Define a connection between an API service and a database, specifying protocol and authentication.

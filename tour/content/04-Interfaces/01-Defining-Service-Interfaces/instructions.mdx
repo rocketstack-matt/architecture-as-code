@@ -1,0 +1,63 @@
+---
+title: Defining Service Interfaces
+description: "Interfaces in CALM define how nodes expose their functionality to other nodes. They represent the connection points that services and other components use to communicate."
+keywords: "interfaces, service interfaces, APIs, connection points, ports"
+---
+
+# Defining Service Interfaces
+
+In CALM, **interfaces** define how nodes expose their functionality to other nodes. They represent the specific connection points that services and other components expose for communication.
+
+## Interface Structure
+
+Interfaces are defined as part of a node definition using the `interfaces` property:
+
+```json
+{
+  "unique-id": "api-service",
+  "node-type": "service",
+  "name": "API Service",
+  "description": "REST API service",
+  "interfaces": [
+    {
+      "unique-id": "api-endpoint",
+      "interface-type": "host-port",
+      "host": "api.example.com",
+      "port": 443
+    }
+  ]
+}
+```
+
+## Interface Types
+
+CALM supports several interface types:
+
+- **host-port**: A network interface defined by a host and port
+- **url**: A specific URL endpoint
+- **queue**: A message queue interface
+- **file**: A file-based interface
+
+## Connecting to Interfaces
+
+When defining a `connects` relationship, you can specify which interface the connection is made to:
+
+```json
+{
+  "relationship-type": {
+    "connects": {
+      "source": {
+        "node": "source-node-id"
+      },
+      "destination": {
+        "node": "destination-node-id",
+        "interfaces": ["interface-id"]
+      }
+    }
+  }
+}
+```
+
+<br/>
+### Add an interface on the <SideEditorLink text="right side!"/> 
+Define a host-port interface for the API service and update the connection to use it.

@@ -1,0 +1,49 @@
+---
+title: Adding Metadata
+description: "Metadata in CALM allows you to add additional context and information to your architecture. It can include security classifications, compliance tags, operational data, and custom attributes."
+keywords: "metadata, custom attributes, security classification, compliance tags"
+---
+
+# Adding Metadata
+
+In CALM, **metadata** allows you to add context and custom information to your architecture. This can include security classifications, compliance tags, operational data, and any other information that helps describe or categorize your components.
+
+## Where to Add Metadata
+
+Metadata can be added to:
+
+- Individual nodes
+- Relationships
+- The entire architecture
+- Flows and steps
+
+## Common Metadata Properties
+
+Some common metadata properties include:
+
+- **data-classification**: The security classification of data (e.g., "Public", "Confidential", "PII")
+- **run-as**: The security context a service runs as
+- **owner**: The team or person responsible for a component
+- **version**: The version of a component
+- **status**: The lifecycle status of a component (e.g., "planned", "active", "deprecated")
+
+## Custom Metadata
+
+You can add any custom metadata properties to your nodes and relationships as needed. This allows you to extend CALM with organization-specific information.
+
+```json
+{
+  "unique-id": "order-service",
+  "node-type": "service",
+  "name": "Order Service",
+  "description": "Handles order processing",
+  "data-classification": "Confidential",
+  "owner": "Order Team",
+  "status": "active",
+  "custom-attribute": "custom value"
+}
+```
+
+<br/>
+### Add metadata on the <SideEditorLink text="right side!"/> 
+Enhance the service definition with metadata about security, ownership, and lifecycle status.

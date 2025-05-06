@@ -1,0 +1,52 @@
+---
+title: Additional Properties
+description: "Learn how to handle additional properties in JSON Schema using the additionalProperties keyword, including disallowing extra properties and defining schemas for them."
+keywords: "additional properties, object, JSON Schema, properties, type, required, patternProperties, schema, keyword"
+---
+
+# Additional Properties
+
+In the previous lesson, we have set `additionalProperties` to `false`. What does it mean? 
+
+So far, we have seen how to define the properties of an object in a [schema](https://json-schema.org/learn/glossary#schema). But **what if you want to specify constraints for the properties which you have not defined in the schema?**
+
+The `additionalProperties` [keyword](https://json-schema.org/learn/glossary#keyword) is used to control the handling of extra stuff, that is, properties whose names are not listed in the `properties` keyword or match any of the regular expressions in the `patternProperties` keyword. 
+
+## Example I
+
+By default any additional properties are allowed. you can set `additionalProperties` to `false` to disallow any additional properties.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {...},
+    "age": {...}
+  },
+  "additionalProperties": false
+}
+```
+
+The above schema will allow only `name` and `age` properties in the object. If any other property is present in the object, it will be considered invalid.
+
+## Example II
+
+
+You can also set `additionalProperties` to a schema to define the schema for the additional properties.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {...},
+    "age": {...}
+  },
+  "additionalProperties": {
+    "type": "string"
+  }
+}
+```
+
+The above schema will allow only `name` and `age` properties in the object. If any other property is present in the object, it should be of type `string`.
+
+Now, try to modify the schema provided in the <SideEditorLink/> on the right to allow any additional properties of type `integer`.

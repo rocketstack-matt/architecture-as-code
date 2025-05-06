@@ -1,0 +1,46 @@
+---
+title: Control Fundamentals
+description: "Controls in CALM define requirements and validation rules for your architecture. They help ensure compliance, security, and other critical aspects of your system design."
+keywords: "controls, compliance, security, validation, requirements"
+---
+
+# Control Fundamentals
+
+In CALM, **controls** define requirements and validation rules that your architecture must meet. They help ensure compliance with security standards, regulatory requirements, and organizational policies.
+
+## Control Types
+
+CALM supports several types of controls:
+
+- **Flow Controls**: Applied to specific flows in your architecture
+- **Security Controls**: Focused on security aspects like authentication and encryption
+- **Compliance Controls**: Ensure adherence to specific standards and regulations
+
+## Control Structure
+
+A basic control definition looks like this:
+
+```json
+{
+  "$schema": "https://calm.finos.org/draft/2025-03/meta/control.json",
+  "unique-id": "data-encryption-control",
+  "name": "Data Encryption Control",
+  "description": "Ensures sensitive data is encrypted in transit",
+  "control-type": "security",
+  "requirements": [
+    {
+      "unique-id": "https-requirement",
+      "description": "All connections must use HTTPS",
+      "severity": "high"
+    }
+  ]
+}
+```
+
+## Control Application
+
+Controls can be applied to specific flows or relationships in your architecture. This is typically done through a control configuration that maps control requirements to specific architectural elements.
+
+<br/>
+### Create a basic control on the <SideEditorLink text="right side!"/> 
+Define a security control with a requirement for data encryption.

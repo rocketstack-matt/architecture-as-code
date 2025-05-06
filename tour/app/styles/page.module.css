@@ -1,0 +1,88 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  height: inherit;
+
+  align-items: center;
+}
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+}
+
+.backgroundClipWrapper {
+  display: flex;
+  flex-direction: column;
+  background: hsl(var(--primary));
+  clip-path: polygon(0 0, 0 100%, 0% 100%, 100% 75%, 100% 0);
+  color: white;
+  height: max-content;
+  width: 100%;
+  padding-top: 64px;
+  padding-bottom: 96px;
+  align-items: center;
+}
+
+.titleWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.title {
+  font-size: 5rem;
+  font-weight: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+}
+
+.title > div {
+  line-height: 115%;
+  letter-spacing: -2px;
+}
+.jsonSchemaTitle {
+  text-decoration: underline;
+  text-decoration-thickness: 0.075em;
+  /* add some gap between the underline and text */
+  text-underline-offset: 0.15em;
+}
+.subtitle1 {
+  font-size: x-large;
+  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+}
+.subtitle2 {
+  font-size: 1.3rem;
+}
+.subtitleWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  justify-content: center;
+}
+.homePageLinksWrapper {
+  display: flex;
+  align-items: center;
+}
+.continueBtnWrapper {
+  position: absolute;
+  margin-left: 500px;
+}
+.footer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.footerText {
+  font-weight: 700;
+}

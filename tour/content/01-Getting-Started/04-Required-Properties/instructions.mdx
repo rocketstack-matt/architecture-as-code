@@ -1,0 +1,41 @@
+---
+title: Required Properties
+description: "CALM has specific requirements for what properties must be included in your architecture definition. Understanding these required properties ensures your CALM documents are valid and complete."
+keywords: "required properties, validation, architecture definition, schema compliance"
+---
+
+# Required Properties
+
+Every CALM document must follow certain rules to be valid. Let's look at the core properties that are required in any CALM architecture.
+
+## Top-Level Required Properties
+
+A minimal valid CALM document must include:
+
+- **$schema**: Reference to the CALM schema version being used
+- **nodes**: An array of node definitions (at least one node)
+
+Relationships aren't strictly required if you're just defining standalone components, but most practical architectures will include them.
+
+## Required Node Properties
+
+Every node must include the following properties:
+
+- **unique-id**: A unique identifier for the node
+- **node-type**: The type of the node (service, database, etc.)
+- **name**: A human-readable name
+
+Description is highly recommended but not strictly required.
+
+## Required Relationship Properties
+
+Every relationship must include:
+
+- **unique-id**: A unique identifier for the relationship
+- **relationship-type**: The type and structure of the relationship
+
+Description is recommended but not strictly required for relationships as well.
+
+<br/>
+### Complete the example on the <SideEditorLink text="right side!"/> 
+Add the missing required properties to make this a valid CALM document.

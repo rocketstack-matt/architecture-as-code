@@ -1,0 +1,35 @@
+---
+title: System Nodes
+description: "System nodes represent higher-level components in your architecture. They can contain other nodes and act as containers to organize your architecture into logical units."
+keywords: "system nodes, higher-level components, containers, architecture organization"
+---
+
+# System Nodes
+
+In CALM, **system nodes** represent higher-level containers or complete systems that can contain other nodes. System nodes help you organize your architecture into logical units and show system boundaries.
+
+## System Node Properties
+
+System nodes have the standard node properties:
+
+- **unique-id**: A unique identifier for the system
+- **node-type**: Always set to `"system"` for system nodes
+- **name**: A human-readable name for the system
+- **description**: A description of what the system does or represents
+
+## System Composition
+
+A key aspect of system nodes is that they can have a composition relationship with other nodes through the `"composed-of"` relationship type. This allows you to create hierarchical architectures where systems contain subsystems or components.
+
+## Example Use Cases
+
+System nodes are ideal for representing:
+
+- A complete application
+- A business domain boundary
+- A logical grouping of microservices
+- A deployable unit that contains multiple components
+
+<br/>
+### Define a system node on the <SideEditorLink text="right side!"/> 
+Create a system that contains two services.

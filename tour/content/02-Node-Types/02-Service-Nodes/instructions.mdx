@@ -1,0 +1,37 @@
+---
+title: Service Nodes
+description: "Service nodes represent individual services, APIs, or applications in your architecture. They are the workhorses of most software systems, processing data and providing functionality."
+keywords: "service nodes, microservices, APIs, applications"
+---
+
+# Service Nodes
+
+In CALM, **service nodes** represent individual services, APIs, applications, or processes that perform specific functions in your architecture. Services are typically the most common components in modern system designs.
+
+## Service Node Properties
+
+Service nodes have the standard node properties plus some additional attributes:
+
+- **unique-id**: A unique identifier for the service
+- **node-type**: Set to `"service"` for service nodes
+- **name**: A human-readable name for the service
+- **description**: A description of what the service does
+- **run-as**: (Optional) The security context the service runs as (e.g., "systemId")
+- **data-classification**: (Optional) The classification of data handled by the service
+
+## Service Interfaces
+
+Services often expose interfaces that other components can connect to. These can be defined using the `interfaces` property, which we'll explore in a later lesson.
+
+## Example Use Cases
+
+Service nodes are used to represent:
+
+- Microservices in a distributed system
+- API endpoints or gateways
+- Backend processes and daemons
+- Frontend applications
+
+<br/>
+### Define a service node on the <SideEditorLink text="right side!"/> 
+Create a detailed service node with run-as and data-classification properties.
