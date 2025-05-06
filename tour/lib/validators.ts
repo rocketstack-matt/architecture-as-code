@@ -22,7 +22,7 @@ export async function hyperjumpValidate(
   if (!("$schema" in schema)) {
     // Add a temporary schema property for validation but don't modify the original
     const schemaWithRef = {...schema};
-    schemaWithRef["$schema"] = "https://calm.finos.org/draft/2023-05/meta/calm.json";
+    schemaWithRef["$schema"] = "https://calm.finos.org/draft/2025-03/meta/calm.json";
     schema = schemaWithRef;
   }
   
@@ -78,6 +78,9 @@ function validateCalmSchema(schema: any): string[] {
       }
       if (!node.name) {
         errors.push(`Node at index ${index} is missing required 'name' property.`);
+      }
+      if (!node.description) {
+        errors.push(`Node at index ${index} is missing required 'description' property.`);
       }
     });
   }
@@ -137,10 +140,13 @@ function validateCalmSchema(schema: any): string[] {
     }
     // For the second lesson (Understanding Nodes), we'll check for a database node
     else if (path.includes('01-Getting-Started/02-Understanding-Nodes')) {
-      const hasDbNode = schema.nodes && schema.nodes.some((node: any) => 
-        node["node-type"] === "database");
-      if (!hasDbNode) {
-        errors.push("Missing database node. Please add a database node to the nodes array.");
+      const hasValidDbNode = schema.nodes && schema.nodes.some((node: any) => 
+        node["node-type"] === "database" &&
+        node["unique-id"] &&
+        node.name &&
+        node.description);
+      if (!hasValidDbNode) {
+        errors.push("Missing or invalid database node. Please add a database node with required properties (unique-id, node-type, name, and description).");
       }
     }
   } catch (error) {

@@ -215,14 +215,49 @@ export default function CodeEditor({
       validate: true,
       schemas: [
         {
-          uri: "https://calm.finos.org/draft/2023-05/meta/calm.json",
+          uri: "https://calm.finos.org/draft/2025-03/meta/calm.json",
           fileMatch: ["*"],
           schema: {
             type: "object",
             properties: {
               "$schema": { type: "string" },
-              "nodes": { type: "array" },
-              "relationships": { type: "array" }
+              "nodes": { 
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    "unique-id": { type: "string", description: "Unique identifier for the node" },
+                    "node-type": { 
+                      type: "string", 
+                      description: "Type of node (service, database, system, etc.)",
+                      enum: ["service", "database", "system", "actor", "network", "ui", "component"]
+                    },
+                    "name": { type: "string", description: "Human-readable name for the node" },
+                    "description": { type: "string", description: "Description of the node's purpose" },
+                    "version": { type: "string", description: "Optional version information" },
+                    "tags": { type: "array", description: "Optional tags for categorization" }
+                  },
+                  required: ["unique-id", "node-type", "name", "description"]
+                }
+              },
+              "relationships": { 
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    "unique-id": { type: "string", description: "Unique identifier for the relationship" },
+                    "relationship-type": { 
+                      type: "string", 
+                      description: "Type of relationship",
+                      enum: ["connects", "deployed-in", "composed-of", "interacts"]
+                    },
+                    "source": { type: "string", description: "Source node unique-id" },
+                    "target": { type: "string", description: "Target node unique-id" },
+                    "description": { type: "string", description: "Description of the relationship" }
+                  },
+                  required: ["unique-id", "relationship-type", "source", "target"]
+                }
+              }
             }
           }
         }

@@ -45,7 +45,7 @@ export function getCodeFileExports(fullFilePath: string) {
     
     // Ensure $schema exists for CALM documents
     if (!code.$schema && fullFilePath.includes('01-Getting-Started/01-Your-First-Architecture')) {
-      code.$schema = "https://calm.finos.org/draft/2023-05/meta/calm.json";
+      code.$schema = "https://calm.finos.org/draft/2025-03/meta/calm.json";
     }
     
     // Add test cases based on the lesson
@@ -60,7 +60,7 @@ export function getCodeFileExports(fullFilePath: string) {
     // Return a default object with schema reference if there's an error
     return {
       code: { 
-        "$schema": "https://calm.finos.org/draft/2023-05/meta/calm.json", 
+        "$schema": "https://calm.finos.org/draft/2025-03/meta/calm.json", 
         "nodes": [] 
       },
       testCases: []

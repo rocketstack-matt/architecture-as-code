@@ -1,4 +1,4 @@
 {
-  "$schema": "https://calm.finos.org/draft/2023-05/meta/calm.json",
+  "$schema": "https://calm.finos.org/draft/2025-03/meta/calm.json",
   "nodes": []
 }
