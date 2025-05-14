@@ -16,6 +16,6 @@
   ],
   "relationships": [
     // Add a relationship here showing the hello-service connects to the user-database
-    // Include unique-id, description, and relationship-type
+    // Include unique-id, relationship-type, source, target, and description
   ]
 }

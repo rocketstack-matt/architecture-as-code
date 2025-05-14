@@ -94,6 +94,15 @@ function validateCalmSchema(schema: any): string[] {
       if (!rel["relationship-type"]) {
         errors.push(`Relationship at index ${index} is missing required 'relationship-type' property.`);
       }
+      if (!rel.source) {
+        errors.push(`Relationship at index ${index} is missing required 'source' property.`);
+      }
+      if (!rel.target) {
+        errors.push(`Relationship at index ${index} is missing required 'target' property.`);
+      }
+      if (!rel.description) {
+        errors.push(`Relationship at index ${index} is missing required 'description' property.`);
+      }
     });
   }
   
@@ -147,6 +156,18 @@ function validateCalmSchema(schema: any): string[] {
         node.description);
       if (!hasValidDbNode) {
         errors.push("Missing or invalid database node. Please add a database node with required properties (unique-id, node-type, name, and description).");
+      }
+    }
+    // For the third lesson (Defining Relationships), we'll check for a connects relationship
+    else if (path.includes('01-Getting-Started/03-Defining-Relationships')) {
+      const hasValidRelationship = schema.relationships && schema.relationships.some((rel: any) => 
+        rel["relationship-type"] === "connects" &&
+        rel["unique-id"] &&
+        rel.source && 
+        rel.target &&
+        rel.description);
+      if (!hasValidRelationship) {
+        errors.push("Missing or invalid 'connects' relationship. Please create a relationship with required properties (unique-id, relationship-type, source, target, and description).");
       }
     }
   } catch (error) {

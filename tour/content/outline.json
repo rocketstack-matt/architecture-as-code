@@ -42,83 +42,6 @@
     ]
   },
   {
-    "title": "Primitive Types",
-    "folderName": "02-Primitive-Types",
-    "steps": [
-      {
-        "title": "Constraining String Length",
-        "fileName": "01-Constraining-String-Length",
-        "fullPath": "02-Primitive-Types/01-Constraining-String-Length"
-      },
-      {
-        "title": "Regular Expressions in Strings",
-        "fileName": "02-Regular-Expressions-in-Strings",
-        "fullPath": "02-Primitive-Types/02-Regular-Expressions-in-Strings"
-      },
-      {
-        "title": "Constraining Number",
-        "fileName": "03-Constraining-Number",
-        "fullPath": "02-Primitive-Types/03-Constraining-Number"
-      },
-      {
-        "title": "Exclusively Constraining Number",
-        "fileName": "04-Exclusively-Constraining-Number",
-        "fullPath": "02-Primitive-Types/04-Exclusively-Constraining-Number"
-      },
-      {
-        "title": "Multiple of a Number",
-        "fileName": "05-Multiple-of-a-Number",
-        "fullPath": "02-Primitive-Types/05-Multiple-of-a-Number"
-      },
-      {
-        "title": "Decimal Numbers",
-        "fileName": "06-Decimal-Numbers",
-        "fullPath": "02-Primitive-Types/06-Decimal-Numbers"
-      },
-      {
-        "title": "Enumerated Values II",
-        "fileName": "07-Enumerated-Values-II",
-        "fullPath": "02-Primitive-Types/07-Enumerated-Values-II"
-      },
-      {
-        "title": "Defining Constant Values",
-        "fileName": "08-Defining-Constant-Values",
-        "fullPath": "02-Primitive-Types/08-Defining-Constant-Values"
-      },
-      {
-        "title": "Combining Types - Boolean and Null",
-        "fileName": "09-Combining-Types",
-        "fullPath": "02-Primitive-Types/09-Combining-Types"
-      }
-    ]
-  },
-  {
-    "title": "Objects",
-    "folderName": "03-Objects",
-    "steps": [
-      {
-        "title": "Pattern Properties",
-        "fileName": "01-Pattern-Properties",
-        "fullPath": "03-Objects/01-Pattern-Properties"
-      },
-      {
-        "title": "Additional Properties",
-        "fileName": "02-Additional-Properties",
-        "fullPath": "03-Objects/02-Additional-Properties"
-      },
-      {
-        "title": "Constraining Number of Properties",
-        "fileName": "03-Constraining-Number-of-Properties",
-        "fullPath": "03-Objects/03-Constraining-Number-of-Properties"
-      },
-      {
-        "title": "Applying Schema to Property Names",
-        "fileName": "04-Applying-Schema-to-Property-Names",
-        "fullPath": "03-Objects/04-Applying-Schema-to-Property-Names"
-      }
-    ]
-  },
-  {
     "title": "Relationships",
     "folderName": "03-Relationships",
     "steps": [
@@ -135,47 +58,6 @@
     ]
   },
   {
-    "title": "Arrays",
-    "folderName": "04-Arrays",
-    "steps": [
-      {
-        "title": "Specifying Length of an Array",
-        "fileName": "01-Specifying-Length-of-an-Array",
-        "fullPath": "04-Arrays/01-Specifying-Length-of-an-Array"
-      },
-      {
-        "title": "Unique Array Items",
-        "fileName": "02-Unique-Items",
-        "fullPath": "04-Arrays/02-Unique-Items"
-      },
-      {
-        "title": "Tuple Validation",
-        "fileName": "03-Tuple-Validation",
-        "fullPath": "04-Arrays/03-Tuple-Validation"
-      },
-      {
-        "title": "Additional Items in Tuples",
-        "fileName": "04-Additional-Items-in-Tuples",
-        "fullPath": "04-Arrays/04-Additional-Items-in-Tuples"
-      },
-      {
-        "title": "Enumerated Array Items",
-        "fileName": "05-Enumerated-Array-Items",
-        "fullPath": "04-Arrays/05-Enumerated-Array-Items"
-      },
-      {
-        "title": "Ensuring Array Content with the 'contains' keyword",
-        "fileName": "06-Ensuring-Array-Content-With-Contains",
-        "fullPath": "04-Arrays/06-Ensuring-Array-Content-With-Contains"
-      },
-      {
-        "title": "minContains and maxContains",
-        "fileName": "07-minContains-and-maxContains",
-        "fullPath": "04-Arrays/07-minContains-and-maxContains"
-      }
-    ]
-  },
-  {
     "title": "Interfaces",
     "folderName": "04-Interfaces",
     "steps": [
@@ -187,42 +69,6 @@
     ]
   },
   {
-    "title": "Conditional Validation",
-    "folderName": "05-Conditional-Validation",
-    "steps": [
-      {
-        "title": "Ensuring Conditional Property Presence",
-        "fileName": "01-Ensuring-Conditional-Property-Presence",
-        "fullPath": "05-Conditional-Validation/01-Ensuring-Conditional-Property-Presence"
-      },
-      {
-        "title": "Ensuring Mutual Dependency",
-        "fileName": "02-Ensuring-Mutual-Dependency",
-        "fullPath": "05-Conditional-Validation/02-Ensuring-Mutual-Dependency"
-      },
-      {
-        "title": "Conditionally Apply a Subschema",
-        "fileName": "03-Conditionally-Apply-a-Subschema",
-        "fullPath": "05-Conditional-Validation/03-Conditionally-Apply-a-Subschema"
-      },
-      {
-        "title": "If-Then Keyword",
-        "fileName": "04-if-then-keyword",
-        "fullPath": "05-Conditional-Validation/04-if-then-keyword"
-      },
-      {
-        "title": "If-Then-Else",
-        "fileName": "05-if-then-else",
-        "fullPath": "05-Conditional-Validation/05-if-then-else"
-      },
-      {
-        "title": "Expanding If-Then-Else",
-        "fileName": "06-Expanding-If-then-else",
-        "fullPath": "05-Conditional-Validation/06-Expanding-If-then-else"
-      }
-    ]
-  },
-  {
     "title": "Controls",
     "folderName": "05-Controls",
     "steps": [
@@ -230,47 +76,6 @@
         "title": "Control Fundamentals",
         "fileName": "01-Control-Fundamentals",
         "fullPath": "05-Controls/01-Control-Fundamentals"
-      }
-    ]
-  },
-  {
-    "title": "Combining Subschemas",
-    "folderName": "06-Combining-Subschemas",
-    "steps": [
-      {
-        "title": "Reusing and Referencing with $defs and $ref",
-        "fileName": "01-Reusing-and-Referencing-with-defs-and-ref",
-        "fullPath": "06-Combining-Subschemas/01-Reusing-and-Referencing-with-defs-and-ref"
-      },
-      {
-        "title": "$id and $schema",
-        "fileName": "02-id-and-schema",
-        "fullPath": "06-Combining-Subschemas/02-id-and-schema"
-      },
-      {
-        "title": "Valid Against allOf the Subschemas (AND)",
-        "fileName": "03-Valid-Against-allOf-the-Subschemas(AND)",
-        "fullPath": "06-Combining-Subschemas/03-Valid-Against-allOf-the-Subschemas(AND)"
-      },
-      {
-        "title": "Valid Against oneOf the Subschemas (XOR)",
-        "fileName": "04-Valid-Against-oneOf-the-Subschemas(XOR)",
-        "fullPath": "06-Combining-Subschemas/04-Valid-Against-oneOf-the-Subschemas(XOR)"
-      },
-      {
-        "title": "Valid Against anyOf the Subschemas (OR)",
-        "fileName": "05-Valid-Against-anyOf-the-Subschemas(OR)",
-        "fullPath": "06-Combining-Subschemas/05-Valid-Against-anyOf-the-Subschemas(OR)"
-      },
-      {
-        "title": "Inverting Validation with not",
-        "fileName": "06-inverting-validation-with-not",
-        "fullPath": "06-Combining-Subschemas/06-inverting-validation-with-not"
-      },
-      {
-        "title": "Recursive Schemas",
-        "fileName": "07-Recursive-Schemas",
-        "fullPath": "06-Combining-Subschemas/07-Recursive-Schemas"
       }
     ]
   },
@@ -297,17 +102,6 @@
     ]
   },
   {
-    "title": "Miscellaneous",
-    "folderName": "07-Miscellaneous",
-    "steps": [
-      {
-        "title": "Extending Closed Schemas with unevaluatedProperties",
-        "fileName": "01-Extending-Closed-Schemas-with-unevaluatedProperties",
-        "fullPath": "07-Miscellaneous/01-Extending-Closed-Schemas-with-unevaluatedProperties"
-      }
-    ]
-  },
-  {
     "title": "Advanced Topics",
     "folderName": "08-Advanced-Topics",
     "steps": [
@@ -315,32 +109,6 @@
         "title": "Adding Metadata",
         "fileName": "01-Adding-Metadata",
         "fullPath": "08-Advanced-Topics/01-Adding-Metadata"
-      }
-    ]
-  },
-  {
-    "title": "Annotating JSON Schemas",
-    "folderName": "08-Annotating-JSON-Schemas",
-    "steps": [
-      {
-        "title": "title and description",
-        "fileName": "01-title-and-description",
-        "fullPath": "08-Annotating-JSON-Schemas/01-title-and-description"
-      },
-      {
-        "title": "deprecated, readOnly, and writeOnly",
-        "fileName": "02-deprecated-readOnly-and-writeOnly",
-        "fullPath": "08-Annotating-JSON-Schemas/02-deprecated-readOnly-and-writeOnly"
-      },
-      {
-        "title": "comment and default",
-        "fileName": "03-comment-and-default",
-        "fullPath": "08-Annotating-JSON-Schemas/03-comment-and-default"
-      },
-      {
-        "title": "format and examples",
-        "fileName": "04-format-and-examples",
-        "fullPath": "08-Annotating-JSON-Schemas/04-format-and-examples"
       }
     ]
   }

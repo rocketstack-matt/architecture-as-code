@@ -19,7 +19,7 @@ export default function Home() {
             </div>
             <div className={styles.subtitleWrapper}>
               <div className={styles.subtitle1}>
-                Build more. Break less. Empower others.
+                Your Architecture Super Power
               </div>
               <div className={styles.subtitle2}>
                 Define architecture consistently with the Common Architecture Language Model
