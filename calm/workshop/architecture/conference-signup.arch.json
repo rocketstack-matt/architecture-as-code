@@ -132,5 +132,127 @@
       }
     }
   ],
+  "flows": [
+    {
+      "unique-id": "conference-registration-flow",
+      "name": "Conference Registration Flow",
+      "description": "Complete user journey for registering for the conference, from initial web access through data persistence",
+      "transitions": [
+        {
+          "relationship-unique-id": "conference-website-load-balancer",
+          "sequence-number": 1,
+          "summary": "User submits conference registration form via the website",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "load-balancer-attendees",
+          "sequence-number": 2,
+          "summary": "Load balancer forwards registration request to attendees service",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "attendees-attendees-store",
+          "sequence-number": 3,
+          "summary": "Attendees service validates and stores registration data in database",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "attendees-attendees-store",
+          "sequence-number": 4,
+          "summary": "Database confirms successful registration and returns attendee ID",
+          "direction": "destination-to-source"
+        },
+        {
+          "relationship-unique-id": "load-balancer-attendees",
+          "sequence-number": 5,
+          "summary": "Attendees service returns registration confirmation to load balancer",
+          "direction": "destination-to-source"
+        },
+        {
+          "relationship-unique-id": "conference-website-load-balancer",
+          "sequence-number": 6,
+          "summary": "Load balancer returns success response with confirmation details to website",
+          "direction": "destination-to-source"
+        }
+      ],
+      "metadata": [
+        {
+          "business-owner": "Conference Operations Team",
+          "sla-target": "< 2 seconds end-to-end",
+          "business-value": "Primary revenue-generating process",
+          "peak-usage": "Registration opening day"
+        }
+      ]
+    },
+    {
+      "unique-id": "attendee-lookup-flow",
+      "name": "Attendee Information Lookup Flow",
+      "description": "Process for retrieving existing attendee information, used for login verification, profile updates, and administrative queries",
+      "transitions": [
+        {
+          "relationship-unique-id": "conference-website-load-balancer",
+          "sequence-number": 1,
+          "summary": "User or admin requests attendee information lookup via website",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "load-balancer-attendees",
+          "sequence-number": 2,
+          "summary": "Load balancer routes lookup request to attendees service",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "attendees-attendees-store",
+          "sequence-number": 3,
+          "summary": "Attendees service queries database for attendee records",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "attendees-attendees-store",
+          "sequence-number": 4,
+          "summary": "Database returns matching attendee information",
+          "direction": "destination-to-source"
+        },
+        {
+          "relationship-unique-id": "load-balancer-attendees",
+          "sequence-number": 5,
+          "summary": "Attendees service formats and returns attendee data to load balancer",
+          "direction": "destination-to-source"
+        },
+        {
+          "relationship-unique-id": "conference-website-load-balancer",
+          "sequence-number": 6,
+          "summary": "Load balancer returns attendee information to website for display",
+          "direction": "destination-to-source"
+        }
+      ],
+      "controls": {
+        "security": {
+          "description": "Data privacy and access controls for attendee information",
+          "requirements": [
+            {
+              "control-requirement-url": "https://calm.finos.org/workshop/controls/data-privacy.requirement.json",
+              "control-config-url": "https://calm.finos.org/workshop/controls/data-privacy.config.json"
+            }
+          ]
+        }
+      },
+      "metadata": [
+        {
+          "business-owner": "Conference Operations Team",
+          "sla-target": "< 1 second response time",
+          "business-value": "User experience and administrative efficiency",
+          "data-sensitivity": "PII - Personal Identifiable Information"
+        }
+      ]
+    }
+  ],
+  "metadata": [
+    {
+      "kubernetes": {
+        "namespace": "conference"
+      }
+    }
+  ],
   "$schema": "https://calm.finos.org/workshop/conference-signup.pattern.json"
 }
