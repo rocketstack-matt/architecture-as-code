@@ -1,0 +1,235 @@
+# {{getArchitectureName architecture}}
+
+> **Solution Architecture Description**
+
+## Executive Summary
+
+{{getArchitectureDescription architecture}}
+
+### Architecture Metadata
+{{#if architecture.metadata}}
+{{table architecture.metadata}}
+{{else}}
+_No architecture metadata available_
+{{/if}}
+
+---
+
+## System Overview
+
+### Components Architecture
+{{table architecture.nodes columns="unique-id,name,node-type,description"}}
+
+### Service Components
+{{table (extract architecture "nodes[node-type==service]") columns="unique-id,name,description"}}
+
+### Data Stores
+{{table (extract architecture "nodes[node-type==database]") columns="unique-id,name,description"}}
+
+### Network Components
+{{table (extract architecture "nodes[node-type==network]") columns="unique-id,name,description"}}
+
+### External Systems
+{{table (extract architecture "nodes[node-type==webclient]") columns="unique-id,name,description"}}
+
+---
+
+## Business Processes & Flows
+
+{{#if (hasData architecture.flows)}}
+### Business Flow Overview
+{{table architecture.flows columns="unique-id,name,description"}}
+
+{{#each architecture.flows}}
+### {{name}}
+
+**Description:** {{description}}
+
+{{#if requirement-url}}
+**Requirements:** [{{requirement-url}}]({{requirement-url}})
+{{/if}}
+
+#### Process Steps
+| Step | Component | Action | Direction |
+|------|-----------|---------|-----------|
+{{#each transitions}}
+| {{sequence-number}} | {{../this.summary}} | {{summary}} | {{direction}} |
+{{/each}}
+
+{{#if controls}}
+#### Process Controls
+{{> controls data=controls}}
+{{/if}}
+
+{{#if metadata}}
+#### Process Metadata
+{{> metadata data=metadata}}
+{{/if}}
+
+{{/each}}
+{{else}}
+_No business flows defined in this architecture._
+{{/if}}
+
+---
+
+## Integration Architecture
+
+### System Relationships
+{{table architecture.relationships columns="unique-id,relationship-type,protocol"}}
+
+### API Connections
+{{table (extract architecture "relationships[protocol==HTTPS]") columns="unique-id,parties.source.node,parties.destination.node,protocol"}}
+
+### Database Connections
+{{table (extract architecture "relationships[protocol==JDBC]") columns="unique-id,parties.source.node,parties.destination.node,protocol"}}
+
+### Secure Connections
+{{table (extract architecture "relationships[protocol==mTLS]") columns="unique-id,parties.source.node,parties.destination.node,protocol"}}
+
+---
+
+## Component Details
+
+{{#each architecture.nodes}}
+### {{name}}
+
+**Type:** {{node-type}}  
+**Description:** {{description}}
+
+{{#if interfaces}}
+#### Interfaces
+{{table interfaces}}
+{{/if}}
+
+{{#if controls}}
+#### Security & Compliance Controls
+{{> controls data=controls}}
+
+{{#each controls}}
+##### {{@key}} Controls
+{{> controls data=this}}
+
+{{#each requirements}}
+###### Requirement {{@index}}
+{{> metadata data=this}}
+{{/each}}
+
+{{/each}}
+{{/if}}
+
+{{#if metadata}}
+#### Component Metadata
+{{> metadata data=metadata}}
+{{/if}}
+
+---
+
+{{/each}}
+
+## Security Architecture
+
+### Security Controls Overview
+
+{{#if (hasData architecture.nodes)}}
+{{#each architecture.nodes}}
+{{#if controls}}
+#### {{name}} Security Controls
+{{> controls data=controls}}
+{{/if}}
+{{/each}}
+{{/if}}
+
+### Connection Security
+{{table (extract architecture "relationships[protocol==HTTPS]") columns="unique-id,protocol,parties.source.node,parties.destination.node"}}
+{{table (extract architecture "relationships[protocol==mTLS]") columns="unique-id,protocol,parties.source.node,parties.destination.node"}}
+
+---
+
+## Deployment Architecture
+
+### Deployment Relationships
+{{table (extract architecture "relationships[relationship-type.deployed-in==true]") columns="unique-id,parties.source.node,parties.destination.node"}}
+
+### Infrastructure Components
+{{table (extract architecture "nodes[node-type==system]") columns="unique-id,name,description"}}
+
+---
+
+## Non-Functional Requirements
+
+### Performance Requirements
+{{#each architecture.flows}}
+{{#if metadata}}
+#### {{name}} Performance
+{{> metadata data=metadata}}
+{{/if}}
+{{/each}}
+
+### Component SLAs
+{{#each architecture.nodes}}
+{{#if metadata}}
+#### {{name}} Requirements
+{{> metadata data=metadata}}
+{{/if}}
+{{/each}}
+
+---
+
+## Technical Specifications
+
+### Service Configurations
+{{#each architecture.nodes}}
+{{#if (eq node-type 'service')}}
+#### {{name}}
+{{#if interfaces}}
+{{table interfaces}}
+{{/if}}
+{{/if}}
+{{/each}}
+
+### Database Configurations
+{{#each architecture.nodes}}
+{{#if (eq node-type 'database')}}
+#### {{name}}
+{{#if interfaces}}
+{{table interfaces}}
+{{/if}}
+{{/if}}
+{{/each}}
+
+### Network Configurations
+{{#each architecture.nodes}}
+{{#if (eq node-type 'network')}}
+#### {{name}}
+{{#if interfaces}}
+{{table interfaces}}
+{{/if}}
+{{/if}}
+{{/each}}
+
+---
+
+## Appendices
+
+### All Architecture Nodes
+{{table architecture.nodes}}
+
+### All Relationships
+{{table architecture.relationships}}
+
+{{#if (hasData architecture.flows)}}
+### All Business Flows
+{{table architecture.flows}}
+{{/if}}
+
+### Complete Architecture Metadata
+{{#if architecture.metadata}}
+{{table architecture.metadata}}
+{{else}}
+_No architecture metadata available_
+{{/if}}
+
+---
+
+*Generated using CALM Widgets - {{ new Date().toISOString() }}*

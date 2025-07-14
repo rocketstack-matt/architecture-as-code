@@ -369,8 +369,14 @@ export async function processSimpleTemplate(
         // Import Handlebars
         const Handlebars = await import('handlebars');
         
+        // Import and register CALM widgets
+        const { registerCalmWidgetsWithInstance } = await import('@finos/calm-widgets');
+        
         // Create a new Handlebars instance
         const handlebars = Handlebars.create();
+        
+        // Register CALM widgets with this instance
+        registerCalmWidgetsWithInstance(handlebars);
         
         // Add utility helper for current date
         handlebars.registerHelper('currentDate', () => {

@@ -247,12 +247,5 @@
       ]
     }
   ],
-  "metadata": [
-    {
-      "kubernetes": {
-        "namespace": "conference"
-      }
-    }
-  ],
   "$schema": "https://calm.finos.org/workshop/conference-signup.pattern.json"
 }
