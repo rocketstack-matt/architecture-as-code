@@ -241,7 +241,7 @@ export const DiagramWidget: CalmWidget<
     validateContext: (context): context is CalmModelContext => {
         if (typeof context !== 'object' || context === null) return false;
         
-        const ctx = context as any;
+        const ctx = context as Record<string, unknown>;
         
         // Check nodes array if present
         if (ctx.nodes !== undefined) {
