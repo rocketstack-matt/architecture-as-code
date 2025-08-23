@@ -7,6 +7,7 @@ import {registerGlobalTemplateHelpers} from './widget-helpers';
 import { TableWidget } from './widgets/table';
 import { ListWidget } from './widgets/list';
 import { JsonViewerWidget } from './widgets/json-viewer';
+import { DiagramWidget } from './widgets/diagram';
 
 export class WidgetEngine {
     constructor(
@@ -59,6 +60,10 @@ export class WidgetEngine {
             {
                 widget: JsonViewerWidget,
                 folder: __dirname + '/widgets/json-viewer',
+            },
+            {
+                widget: DiagramWidget as CalmWidget<unknown, object, unknown>,
+                folder: __dirname + '/widgets/diagram',
             },
         ];
         this.setupWidgets(widgets);

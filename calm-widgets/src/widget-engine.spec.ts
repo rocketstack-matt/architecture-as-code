@@ -122,13 +122,14 @@ describe('WidgetEngine', () => {
     });
 
     describe('registerDefaultWidgets', () => {
-        it('registers the default widgets (list, table, json-viewer)', () => {
+        it('registers the default widgets (list, table, json-viewer, diagram)', () => {
             engine.registerDefaultWidgets();
 
-            expect(registerMock).toHaveBeenCalledTimes(3);
+            expect(registerMock).toHaveBeenCalledTimes(4);
             expect(localHandlebars.registerHelper).toHaveBeenCalledWith('list', expect.any(Function));
             expect(localHandlebars.registerHelper).toHaveBeenCalledWith('table', expect.any(Function));
             expect(localHandlebars.registerHelper).toHaveBeenCalledWith('json-viewer', expect.any(Function));
+            expect(localHandlebars.registerHelper).toHaveBeenCalledWith('diagram', expect.any(Function));
         });
     });
 });

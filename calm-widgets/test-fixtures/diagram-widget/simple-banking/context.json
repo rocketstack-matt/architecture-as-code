@@ -1,0 +1,84 @@
+{
+  "data": {
+    "nodes": [
+      {
+        "unique-id": "auth-service",
+        "node-type": "service",
+        "name": "Authentication Service",
+        "description": "Handles user authentication and authorization"
+      },
+      {
+        "unique-id": "account-service",
+        "node-type": "service",
+        "name": "Account Service",
+        "description": "Manages customer accounts and balances"
+      },
+      {
+        "unique-id": "transaction-service",
+        "node-type": "service",
+        "name": "Transaction Service",
+        "description": "Processes financial transactions"
+      },
+      {
+        "unique-id": "bank-customer",
+        "node-type": "actor",
+        "name": "Bank Customer",
+        "description": "Digital banking customer"
+      }
+    ],
+    "relationships": [
+      {
+        "unique-id": "customer-auth",
+        "relationship-type": {
+          "interacts": {
+            "actor": "bank-customer",
+            "nodes": [
+              "auth-service"
+            ]
+          }
+        },
+        "description": "Customer authenticates with system"
+      },
+      {
+        "unique-id": "auth-account",
+        "relationship-type": {
+          "connects": {
+            "source": {
+              "node": "auth-service",
+              "interfaces": []
+            },
+            "destination": {
+              "node": "account-service",
+              "interfaces": []
+            }
+          }
+        },
+        "description": "Auth Service validates access to Account Service"
+      },
+      {
+        "unique-id": "account-transaction",
+        "relationship-type": {
+          "connects": {
+            "source": {
+              "node": "account-service",
+              "interfaces": []
+            },
+            "destination": {
+              "node": "transaction-service",
+              "interfaces": []
+            }
+          }
+        },
+        "description": "Account Service initiates transactions"
+      }
+    ],
+    "flows": [
+      {
+        "unique-id": "payment-flow",
+        "source": "transaction-service",
+        "target": "account-service",
+        "description": "Transaction updates account balance"
+      }
+    ]
+  }
+}

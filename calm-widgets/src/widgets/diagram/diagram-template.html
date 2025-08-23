@@ -1,0 +1,208 @@
+<div class="diagram-container">
+    <svg class="diagram-svg" width="100%" height="400" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <style>
+                .node { fill: #e8f4fd; stroke: #0066cc; stroke-width: 2; }
+                .node-actor { fill: #fff2cc; stroke: #d6b656; }
+                .node-system { fill: #dae8fc; stroke: #6c8ebf; }
+                .node-service { fill: #d5e8d4; stroke: #82b366; }
+                .node-database { fill: #f8cecc; stroke: #b85450; }
+                .node-container { fill: #ffe6cc; stroke: #d79b00; }
+                .edge { stroke: #666; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+                .edge-flow { stroke: #0066cc; stroke-dasharray: 5,5; }
+                .edge-interacts { stroke: #008000; }
+                .edge-connects { stroke: #666; }
+                .node-label { font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; fill: #333; }
+                .edge-label { font-family: Arial, sans-serif; font-size: 10px; text-anchor: middle; fill: #666; }
+                .container-group { stroke: #999; stroke-width: 1; stroke-dasharray: 3,3; fill: none; }
+            </style>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+            </marker>
+        </defs>
+        
+        <!-- Draw nodes -->
+        {{#each nodes}}
+        {{#unless parent}}
+        <!-- Top-level nodes (not contained in others) -->
+        {{#if (eq type "actor")}}
+        <ellipse cx="{{add (multiply @index 120) 60}}" cy="80" rx="40" ry="30" class="node node-actor" />
+        <text x="{{add (multiply @index 120) 60}}" y="85" class="node-label">{{label}}</text>
+        {{else if (eq type "system")}}
+        <rect x="{{add (multiply @index 150) 20}}" y="50" width="120" height="60" rx="5" class="node node-system" />
+        <text x="{{add (multiply @index 150) 80}}" y="85" class="node-label">{{label}}</text>
+        {{else if (eq type "service")}}
+        <rect x="{{add (multiply @index 140) 30}}" y="200" width="100" height="50" rx="3" class="node node-service" />
+        <text x="{{add (multiply @index 140) 80}}" y="230" class="node-label">{{label}}</text>
+        {{else if (eq type "database")}}
+        <rect x="{{add (multiply @index 130) 40}}" y="300" width="80" height="40" rx="8" class="node node-database" />
+        <text x="{{add (multiply @index 130) 80}}" y="325" class="node-label">{{label}}</text>
+        {{else}}
+        <rect x="{{add (multiply @index 120) 50}}" y="150" width="90" height="40" rx="2" class="node" />
+        <text x="{{add (multiply @index 120) 95}}" y="175" class="node-label">{{label}}</text>
+        {{/if}}
+        {{/unless}}
+        {{/each}}
+        
+        <!-- Draw contained nodes -->
+        {{#each nodes}}
+        {{#if parent}}
+        <rect x="{{add (multiply @index 80) 100}}" y="{{add (multiply @index 25) 160}}" width="70" height="30" rx="2" class="node node-service" />
+        <text x="{{add (multiply @index 80) 135}}" y="{{add (multiply @index 25) 180}}" class="node-label" style="font-size: 10px;">{{label}}</text>
+        {{/if}}
+        {{/each}}
+        
+        <!-- Draw edges with simple positioning -->
+        {{#each edges}}
+        {{#if (eq type "flow")}}
+        <line x1="100" y1="100" x2="200" y2="200" class="edge edge-flow" />
+        {{else if (eq type "interacts")}}
+        <line x1="120" y1="120" x2="220" y2="220" class="edge edge-interacts" />
+        {{else}}
+        <line x1="140" y1="140" x2="240" y2="240" class="edge edge-connects" />
+        {{/if}}
+        {{#if label}}
+        <text x="150" y="150" class="edge-label">{{label}}</text>
+        {{/if}}
+        {{/each}}
+    </svg>
+    
+    {{#if filteredNodeIds}}
+    <div class="diagram-info">
+        <p><small>Filtered diagram showing specific nodes and their relationships</small></p>
+    </div>
+    {{/if}}
+    
+    <div class="diagram-summary">
+        <p><strong>Nodes:</strong> {{nodes.length}} | <strong>Relationships:</strong> {{edges.length}}</p>
+        {{#if nodes}}
+        <div class="node-list">
+            <h4>Nodes:</h4>
+            <ul>
+            {{#each nodes}}
+            <li><strong>{{label}}</strong> ({{type}}){{#if description}} - {{description}}{{/if}}</li>
+            {{/each}}
+            </ul>
+        </div>
+        {{/if}}
+        {{#if edges}}
+        <div class="edge-list">
+            <h4>Relationships:</h4>
+            <ul>
+            {{#each edges}}
+            <li><strong>{{source}}</strong> → <strong>{{target}}</strong>{{#if label}} ({{label}}){{/if}}</li>
+            {{/each}}
+            </ul>
+        </div>
+        {{/if}}
+    </div>
+    
+    <div class="diagram-legend">
+        <h4>Legend</h4>
+        <div class="legend-items">
+            <div class="legend-item">
+                <svg width="20" height="15"><ellipse cx="10" cy="7.5" rx="8" ry="6" class="node node-actor" /></svg>
+                <span>Actor</span>
+            </div>
+            <div class="legend-item">
+                <svg width="20" height="15"><rect x="2" y="2" width="16" height="11" class="node node-system" /></svg>
+                <span>System</span>
+            </div>
+            <div class="legend-item">
+                <svg width="20" height="15"><rect x="2" y="2" width="16" height="11" class="node node-service" /></svg>
+                <span>Service</span>
+            </div>
+            <div class="legend-item">
+                <svg width="20" height="15"><rect x="2" y="2" width="16" height="11" class="node node-database" /></svg>
+                <span>Database</span>
+            </div>
+            <div class="legend-item">
+                <svg width="20" height="15"><line x1="2" y1="7.5" x2="18" y2="7.5" class="edge edge-connects" /></svg>
+                <span>Connection</span>
+            </div>
+            <div class="legend-item">
+                <svg width="20" height="15"><line x1="2" y1="7.5" x2="18" y2="7.5" class="edge edge-interacts" /></svg>
+                <span>Interaction</span>
+            </div>
+            <div class="legend-item">
+                <svg width="20" height="15"><line x1="2" y1="7.5" x2="18" y2="7.5" class="edge edge-flow" /></svg>
+                <span>Flow</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.diagram-container {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 16px;
+    margin: 16px 0;
+    background: #fafafa;
+}
+
+.diagram-svg {
+    border: 1px solid #e0e0e0;
+    background: white;
+    border-radius: 2px;
+}
+
+.diagram-info {
+    margin-top: 8px;
+    padding: 8px;
+    background: #f0f8ff;
+    border-radius: 3px;
+}
+
+.diagram-summary {
+    margin-top: 16px;
+    padding: 12px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+}
+
+.diagram-summary h4 {
+    margin: 12px 0 8px 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.node-list ul, .edge-list ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.node-list li, .edge-list li {
+    margin: 4px 0;
+    font-size: 12px;
+}
+
+.diagram-legend {
+    margin-top: 16px;
+    padding: 12px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+}
+
+.diagram-legend h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #666;
+}
+</style>
