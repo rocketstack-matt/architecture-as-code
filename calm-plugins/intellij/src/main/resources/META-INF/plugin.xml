@@ -25,15 +25,10 @@
         <toolWindow id="CALM" secondary="true" icon="/icons/calm.svg" anchor="right"
                     factoryClass="org.finos.calm.intellij.toolwindow.CalmToolWindowFactory"/>
 
-        <!-- File Type -->
-        <fileType name="CALM JSON" implementationClass="org.finos.calm.intellij.filetype.CalmJsonFileType"
-                  fieldName="INSTANCE" language="JSON" extensions="json"/>
-        <fileType name="CALM YAML" implementationClass="org.finos.calm.intellij.filetype.CalmYamlFileType"
-                  fieldName="INSTANCE" language="yaml" extensions="yaml;yml"/>
-
         <!-- Settings -->
         <applicationConfigurable parentId="tools" instance="org.finos.calm.intellij.settings.CalmSettingsConfigurable"
                                  id="org.finos.calm.intellij.settings" displayName="CALM"/>
+        <applicationService serviceImplementation="org.finos.calm.intellij.settings.CalmSettings"/>
 
         <!-- File Editor Provider -->
         <fileEditorProvider implementation="org.finos.calm.intellij.editor.CalmPreviewEditorProvider"/>
