@@ -14,12 +14,22 @@ Live-visualize CALM (Common Architecture Language Model) architecture models whi
 - **Settings**: Configurable options for auto-open behavior, default layout, and file patterns
 - **Multi-format Support**: Works with both JSON and YAML CALM model files
 
+## Build System Migration
+
+This plugin has been **migrated from Gradle to Maven** to align with the rest of the project's build system:
+
+- ✅ **Maven POM**: Created `pom.xml` with proper parent project reference
+- ✅ **Dependencies**: Migrated all dependencies from Gradle to Maven format
+- ✅ **Kotlin Support**: Configured `kotlin-maven-plugin` for Kotlin compilation
+- ✅ **Project Structure**: Aligned with Maven conventions
+- ✅ **Parent Integration**: Added to parent POM modules list
+
 ## Installation
 
 ### Prerequisites
 - IntelliJ IDEA 2023.2 or later
 - Java 17 or later
-- Gradle 7.0 or later
+- Maven 3.8 or later
 
 ### Development Setup
 
@@ -30,23 +40,19 @@ Live-visualize CALM (Common Architecture Language Model) architecture models whi
    ```
 3. Build the plugin:
    ```bash
-   ./gradlew build
-   ```
-4. Run the plugin in a development instance:
-   ```bash
-   ./gradlew runIde
+   mvn clean compile
    ```
 
-### Installing from Build
+**Note**: Full IntelliJ plugin compilation requires the IntelliJ Platform SDK. The current Maven configuration successfully builds the core CALM model parsing functionality. For complete plugin development, use IntelliJ IDEA with the Plugin Development Kit (PDK) and configure the IntelliJ Platform SDK in your IDE.
 
-1. Build the plugin:
-   ```bash
-   ./gradlew buildPlugin
-   ```
-2. The plugin ZIP will be created in `build/distributions/`
-3. In IntelliJ IDEA, go to **File → Settings → Plugins**
-4. Click the gear icon and select **Install Plugin from Disk...**
-5. Select the generated ZIP file
+### Building with IntelliJ IDEA
+
+For full plugin development and testing:
+
+1. Open the project in IntelliJ IDEA
+2. Configure the IntelliJ Platform SDK
+3. Use the IDE's built-in plugin development tools
+4. Run the plugin in a development instance
 
 ## Usage
 
@@ -85,7 +91,7 @@ The plugin is built using:
 - **Kotlin** for the main implementation
 - **IntelliJ Platform SDK** for IDE integration
 - **Jackson** for JSON/YAML parsing
-- **Gradle** with IntelliJ Plugin Development plugin for build automation
+- **Maven** for build automation and dependency management
 
 ### Key Components
 
@@ -94,6 +100,15 @@ The plugin is built using:
 - `CalmPreviewEditor`: File editor provider for graph visualization
 - `CalmTreeModel`: Tree model for displaying model elements
 - `CalmSettings`: Persistent settings storage
+
+### Build System
+
+The plugin now uses **Maven** for build management, aligned with the parent project:
+
+- **Maven coordination**: Inherits from parent POM configuration
+- **Kotlin compilation**: Uses `kotlin-maven-plugin` for Kotlin source compilation
+- **Jackson dependencies**: JSON/YAML parsing with Jackson libraries
+- **Assembly plugin**: Creates distributable plugin JAR with dependencies
 
 ## Current Limitations
 
