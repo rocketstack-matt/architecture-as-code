@@ -1,0 +1,85 @@
+{
+  "nodes": [
+    {
+      "unique-id": "web-frontend",
+      "node-type": "webclient",
+      "name": "Web Frontend",
+      "description": "React-based user interface for the application"
+    },
+    {
+      "unique-id": "api-gateway",
+      "node-type": "service",
+      "name": "API Gateway",
+      "description": "Central entry point for all API requests with authentication and routing"
+    },
+    {
+      "unique-id": "user-service",
+      "node-type": "service",
+      "name": "User Service",
+      "description": "Microservice handling user management, authentication, and profiles"
+    },
+    {
+      "unique-id": "order-service",
+      "node-type": "service",
+      "name": "Order Service",
+      "description": "Microservice for order processing and management"
+    },
+    {
+      "unique-id": "database",
+      "node-type": "datastore",
+      "name": "PostgreSQL Database",
+      "description": "Primary database for storing application data"
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "frontend-to-gateway",
+      "relationship-type": "connects",
+      "source": "web-frontend",
+      "target": "api-gateway",
+      "description": "Frontend makes API calls through the gateway"
+    },
+    {
+      "unique-id": "gateway-to-user-service",
+      "relationship-type": "connects",
+      "source": "api-gateway",
+      "target": "user-service",
+      "description": "Gateway routes user-related requests to user service"
+    },
+    {
+      "unique-id": "gateway-to-order-service",
+      "relationship-type": "connects",
+      "source": "api-gateway",
+      "target": "order-service",
+      "description": "Gateway routes order-related requests to order service"
+    },
+    {
+      "unique-id": "user-service-to-db",
+      "relationship-type": "connects",
+      "source": "user-service",
+      "target": "database",
+      "description": "User service reads/writes user data to database"
+    },
+    {
+      "unique-id": "order-service-to-db",
+      "relationship-type": "connects",
+      "source": "order-service",
+      "target": "database",
+      "description": "Order service reads/writes order data to database"
+    }
+  ],
+  "flows": [
+    {
+      "unique-id": "user-registration-flow",
+      "source": "web-frontend",
+      "target": "user-service",
+      "description": "New user registration process through API gateway"
+    },
+    {
+      "unique-id": "order-placement-flow",
+      "source": "web-frontend",
+      "target": "order-service",
+      "description": "Customer placing an order through the system"
+    }
+  ]
+}
