@@ -127,6 +127,50 @@ export default class DocusaurusTransformer implements CalmTemplateTransformer {
                     }
                 }
                 return result;
+            },
+            renderC4Node: (nodeId: string, elements: Record<string, any>, depth: number, options?: any): string => {
+                // Handle Handlebars options object if passed
+                const actualDepth = typeof depth === 'number' ? depth : 0;
+
+                const node = elements[nodeId];
+                if (!node) return '';
+
+                const indent = '    '.repeat(actualDepth + 2); // Base indent is 2 (inside deployment node)
+                let result = '';
+
+                // Helper function for recursive rendering
+                const renderNode = (id: string, currentDepth: number): string => {
+                    const currentNode = elements[id];
+                    if (!currentNode) return '';
+
+                    const currentIndent = '    '.repeat(currentDepth + 2);
+                    let output = '';
+
+                    // Render Person nodes
+                    if (currentNode.elementType === 'Person') {
+                        output += `${currentIndent}Person(${currentNode.uniqueId}, "${currentNode.name}", "${currentNode.description}")\n`;
+                    }
+                    // Render nodes with children as Deployment_Node
+                    else if (currentNode.children && currentNode.children.length > 0) {
+                        output += `${currentIndent}Deployment_Node(${currentNode.uniqueId}, "${currentNode.name}", "${currentNode.description}"){\n`;
+
+                        // Recursively render children
+                        for (const childId of currentNode.children) {
+                            output += renderNode(childId, currentDepth + 1);
+                        }
+
+                        output += `${currentIndent}}\n`;
+                    }
+                    // Render leaf nodes as Container
+                    else {
+                        output += `${currentIndent}Container(${currentNode.uniqueId}, "${currentNode.name}", "", "${currentNode.description}")\n`;
+                    }
+
+                    return output;
+                };
+
+                result = renderNode(nodeId, actualDepth);
+                return result;
             }
         };
     }
