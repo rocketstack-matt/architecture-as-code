@@ -30,10 +30,32 @@
         "onStartupFinished"
     ],
     "contributes": {
+        "customEditors": [
+            {
+                "viewType": "calm.hybridEditor",
+                "displayName": "CALM Hybrid Editor",
+                "selector": [
+                    {
+                        "filenamePattern": "**/calm/**/*.json"
+                    },
+                    {
+                        "filenamePattern": "**/calm/**/*.yaml"
+                    },
+                    {
+                        "filenamePattern": "**/calm/**/*.yml"
+                    }
+                ],
+                "priority": "option"
+            }
+        ],
         "commands": [
             {
                 "command": "calm.openPreview",
                 "title": "CALM: Open Preview"
+            },
+            {
+                "command": "calm.openHybridEditor",
+                "title": "CALM: Open in Hybrid Editor"
             },
             {
                 "command": "calm.searchTreeView",
