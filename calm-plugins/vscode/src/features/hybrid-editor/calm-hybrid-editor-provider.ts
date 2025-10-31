@@ -1,5 +1,4 @@
 import * as vscode from 'vscode'
-import { HtmlBuilder } from '../../cli/html-builder'
 import { Logger } from '../../core/ports/logger'
 import { ModelService } from '../../core/services/model-service'
 
@@ -13,7 +12,6 @@ export class CalmHybridEditorProvider implements vscode.CustomTextEditorProvider
 
     constructor(
         private readonly context: vscode.ExtensionContext,
-        private readonly htmlBuilder: HtmlBuilder,
         private readonly log: Logger
     ) {
         this.modelService = new ModelService()
@@ -21,10 +19,9 @@ export class CalmHybridEditorProvider implements vscode.CustomTextEditorProvider
 
     public static register(
         context: vscode.ExtensionContext,
-        htmlBuilder: HtmlBuilder,
         log: Logger
     ): vscode.Disposable {
-        const provider = new CalmHybridEditorProvider(context, htmlBuilder, log)
+        const provider = new CalmHybridEditorProvider(context, log)
         const providerRegistration = vscode.window.registerCustomEditorProvider(
             CalmHybridEditorProvider.viewType,
             provider,
@@ -85,10 +82,6 @@ export class CalmHybridEditorProvider implements vscode.CustomTextEditorProvider
     }
 
     private getHybridEditorHtml(webview: vscode.Webview): string {
-        const styleUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.context.extensionUri, 'media', 'hybrid-editor.css')
-        )
-
         const nonce = this.getNonce()
 
         return `<!DOCTYPE html>
@@ -101,7 +94,6 @@ export class CalmHybridEditorProvider implements vscode.CustomTextEditorProvider
         script-src 'nonce-${nonce}';
         font-src ${webview.cspSource};">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="${styleUri}" rel="stylesheet">
     <title>CALM Hybrid Editor</title>
     <style>
         body {
@@ -298,52 +290,30 @@ export class CalmHybridEditorProvider implements vscode.CustomTextEditorProvider
                 
                 // Show nodes
                 if (modelData?.nodes && Array.isArray(modelData.nodes)) {
-                    previewHtml += '<h4>Nodes (' + modelData.nodes.length + ')</h4>'
-                    previewHtml += '<ul style="list-style: none; padding-left: 0;">'
-                    for (const node of modelData.nodes.slice(0, 10)) {
+                    previewHtml += this.renderArraySection('Nodes', modelData.nodes, 10, (node) => {
                         const nodeId = node['unique-id'] || node.name || 'Unknown'
                         const nodeType = node['node-type'] || 'unknown'
-                        previewHtml += `<li style="margin-bottom: 8px;">
-                            <strong>${this.escapeHtml(nodeId)}</strong> 
-                            <span style="color: var(--vscode-descriptionForeground); font-size: 0.9em;">(${this.escapeHtml(nodeType)})</span>
-                        </li>`
-                    }
-                    if (modelData.nodes.length > 10) {
-                        previewHtml += `<li style="color: var(--vscode-descriptionForeground);">... and ${modelData.nodes.length - 10} more</li>`
-                    }
-                    previewHtml += '</ul>'
+                        return `<strong>${this.escapeHtml(nodeId)}</strong> 
+                            <span style="color: var(--vscode-descriptionForeground); font-size: 0.9em;">(${this.escapeHtml(nodeType)})</span>`
+                    })
                 }
                 
                 // Show relationships
                 if (modelData?.relationships && Array.isArray(modelData.relationships)) {
-                    previewHtml += '<h4>Relationships (' + modelData.relationships.length + ')</h4>'
-                    previewHtml += '<ul style="list-style: none; padding-left: 0;">'
-                    for (const rel of modelData.relationships.slice(0, 5)) {
+                    previewHtml += this.renderArraySection('Relationships', modelData.relationships, 5, (rel) => {
                         const relId = rel['unique-id'] || 'Unknown'
                         const relType = rel['relationship-type']?.connects || 'unknown'
-                        previewHtml += `<li style="margin-bottom: 8px;">
-                            <strong>${this.escapeHtml(relId)}</strong>
-                            <span style="color: var(--vscode-descriptionForeground); font-size: 0.9em;">(${this.escapeHtml(relType)})</span>
-                        </li>`
-                    }
-                    if (modelData.relationships.length > 5) {
-                        previewHtml += `<li style="color: var(--vscode-descriptionForeground);">... and ${modelData.relationships.length - 5} more</li>`
-                    }
-                    previewHtml += '</ul>'
+                        return `<strong>${this.escapeHtml(relId)}</strong>
+                            <span style="color: var(--vscode-descriptionForeground); font-size: 0.9em;">(${this.escapeHtml(relType)})</span>`
+                    })
                 }
                 
                 // Show flows
                 if (modelData?.flows && Array.isArray(modelData.flows)) {
-                    previewHtml += '<h4>Flows (' + modelData.flows.length + ')</h4>'
-                    previewHtml += '<ul style="list-style: none; padding-left: 0;">'
-                    for (const flow of modelData.flows.slice(0, 5)) {
+                    previewHtml += this.renderArraySection('Flows', modelData.flows, 5, (flow) => {
                         const flowId = flow['unique-id'] || 'Unknown'
-                        previewHtml += `<li style="margin-bottom: 8px;"><strong>${this.escapeHtml(flowId)}</strong></li>`
-                    }
-                    if (modelData.flows.length > 5) {
-                        previewHtml += `<li style="color: var(--vscode-descriptionForeground);">... and ${modelData.flows.length - 5} more</li>`
-                    }
-                    previewHtml += '</ul>'
+                        return `<strong>${this.escapeHtml(flowId)}</strong>`
+                    })
                 }
                 
                 // Add a note about using the classic preview for full visualization
@@ -365,6 +335,30 @@ export class CalmHybridEditorProvider implements vscode.CustomTextEditorProvider
         } catch (error) {
             this.log.error?.(`[hybrid-editor] Error generating preview: ${String(error)}`)
         }
+    }
+
+    /**
+     * Helper function to render an array section with a title and item renderer
+     */
+    private renderArraySection<T>(
+        title: string,
+        items: T[],
+        maxItems: number,
+        renderItem: (item: T) => string
+    ): string {
+        let html = `<h4>${title} (${items.length})</h4>`
+        html += '<ul style="list-style: none; padding-left: 0;">'
+        
+        for (const item of items.slice(0, maxItems)) {
+            html += `<li style="margin-bottom: 8px;">${renderItem(item)}</li>`
+        }
+        
+        if (items.length > maxItems) {
+            html += `<li style="color: var(--vscode-descriptionForeground);">... and ${items.length - maxItems} more</li>`
+        }
+        
+        html += '</ul>'
+        return html
     }
 
     private escapeHtml(text: string): string {

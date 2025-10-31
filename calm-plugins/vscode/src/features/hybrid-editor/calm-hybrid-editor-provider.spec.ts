@@ -20,16 +20,11 @@ vi.mock('vscode', () => ({
 
 describe('CalmHybridEditorProvider', () => {
     let mockContext: any
-    let mockHtmlBuilder: any
     let mockLogger: any
 
     beforeEach(() => {
         mockContext = {
             extensionUri: { fsPath: '/test/extension' },
-        }
-
-        mockHtmlBuilder = {
-            getHtml: vi.fn(),
         }
 
         mockLogger = {
@@ -44,7 +39,7 @@ describe('CalmHybridEditorProvider', () => {
         it('should register the custom editor provider', () => {
             const registerSpy = vi.spyOn(vscode.window, 'registerCustomEditorProvider')
 
-            CalmHybridEditorProvider.register(mockContext, mockHtmlBuilder, mockLogger)
+            CalmHybridEditorProvider.register(mockContext, mockLogger)
 
             expect(registerSpy).toHaveBeenCalledWith(
                 'calm.hybridEditor',
@@ -62,7 +57,7 @@ describe('CalmHybridEditorProvider', () => {
             const mockDisposable = { dispose: vi.fn() }
             vi.spyOn(vscode.window, 'registerCustomEditorProvider').mockReturnValue(mockDisposable)
 
-            const result = CalmHybridEditorProvider.register(mockContext, mockHtmlBuilder, mockLogger)
+            const result = CalmHybridEditorProvider.register(mockContext, mockLogger)
 
             expect(result).toBe(mockDisposable)
         })
@@ -70,7 +65,7 @@ describe('CalmHybridEditorProvider', () => {
 
     describe('provider instance', () => {
         it('should create instance with provided dependencies', () => {
-            const provider = new CalmHybridEditorProvider(mockContext, mockHtmlBuilder, mockLogger)
+            const provider = new CalmHybridEditorProvider(mockContext, mockLogger)
 
             expect(provider).toBeDefined()
             expect(provider).toBeInstanceOf(CalmHybridEditorProvider)

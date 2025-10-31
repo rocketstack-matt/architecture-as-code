@@ -14,7 +14,6 @@ import { CommandRegistrar } from './commands/command-registrar'
 import { DiagnosticsService } from './core/services/diagnostics-service'
 import { createApplicationStore, type ApplicationStoreApi } from './application-store'
 import { CalmHybridEditorProvider } from './features/hybrid-editor/calm-hybrid-editor-provider'
-import { HtmlBuilder } from './cli/html-builder'
 
 /**
  * Main extension controller that orchestrates all VS Code extension functionality
@@ -70,8 +69,7 @@ export class CalmExtensionController {
     storeReactionMediator.setupReactions()
 
     // Register the hybrid editor provider
-    const htmlBuilder = new HtmlBuilder(context)
-    const hybridEditorProvider = CalmHybridEditorProvider.register(context, htmlBuilder, log)
+    const hybridEditorProvider = CalmHybridEditorProvider.register(context, log)
     this.disposables.push(hybridEditorProvider)
 
     this.disposables.push(
