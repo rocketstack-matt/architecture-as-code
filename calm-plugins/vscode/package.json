@@ -30,10 +30,32 @@
         "onStartupFinished"
     ],
     "contributes": {
+        "customEditors": [
+            {
+                "viewType": "calm.hybridEditor",
+                "displayName": "CALM Hybrid Editor",
+                "selector": [
+                    {
+                        "filenamePattern": "**/calm/**/*.json"
+                    },
+                    {
+                        "filenamePattern": "**/calm/**/*.yaml"
+                    },
+                    {
+                        "filenamePattern": "**/calm/**/*.yml"
+                    }
+                ],
+                "priority": "option"
+            }
+        ],
         "commands": [
             {
                 "command": "calm.openPreview",
                 "title": "CALM: Open Preview"
+            },
+            {
+                "command": "calm.openHybridEditor",
+                "title": "CALM: Open in Hybrid Editor"
             },
             {
                 "command": "calm.searchTreeView",
@@ -68,6 +90,19 @@
         "configuration": {
             "title": "CALM",
             "properties": {
+                "calm.editor.defaultMode": {
+                    "type": "string",
+                    "enum": [
+                        "classic",
+                        "hybrid"
+                    ],
+                    "default": "classic",
+                    "enumDescriptions": [
+                        "Classic mode: Opens preview in a separate panel beside the editor",
+                        "Hybrid mode: Opens a custom editor with Source and Preview tabs"
+                    ],
+                    "markdownDescription": "Choose the default editor mode for CALM files. **Classic** opens preview in a separate panel, **Hybrid** uses a tabbed editor with Source and Preview."
+                },
                 "calm.cli.path": {
                     "type": "string",
                     "default": "./cli",
@@ -105,6 +140,12 @@
                 "key": "ctrl+shift+c",
                 "mac": "cmd+shift+c",
                 "when": "editorTextFocus"
+            },
+            {
+                "command": "calm.openHybridEditor",
+                "key": "ctrl+shift+h",
+                "mac": "cmd+shift+h",
+                "when": "editorTextFocus && resourceFilename =~ /\\.(json|yaml|yml)$/"
             }
         ],
         "menus": {
@@ -124,6 +165,11 @@
                 {
                     "command": "calm.openPreview",
                     "group": "navigation@9"
+                },
+                {
+                    "command": "calm.openHybridEditor",
+                    "group": "navigation@10",
+                    "when": "resourceFilename =~ /\\.(json|yaml|yml)$/"
                 }
             ]
         }
