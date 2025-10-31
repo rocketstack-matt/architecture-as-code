@@ -127,6 +127,12 @@
                 "key": "ctrl+shift+c",
                 "mac": "cmd+shift+c",
                 "when": "editorTextFocus"
+            },
+            {
+                "command": "calm.openHybridEditor",
+                "key": "ctrl+shift+h",
+                "mac": "cmd+shift+h",
+                "when": "editorTextFocus && resourceFilename =~ /\\.(json|yaml|yml)$/"
             }
         ],
         "menus": {
@@ -146,6 +152,11 @@
                 {
                     "command": "calm.openPreview",
                     "group": "navigation@9"
+                },
+                {
+                    "command": "calm.openHybridEditor",
+                    "group": "navigation@10",
+                    "when": "resourceFilename =~ /\\.(json|yaml|yml)$/"
                 }
             ]
         }

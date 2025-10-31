@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import { HtmlBuilder } from '../../cli/html-builder'
 import { Logger } from '../../core/ports/logger'
+import { ModelService } from '../../core/services/model-service'
 
 /**
  * Custom Text Editor Provider for CALM files that provides a hybrid view
@@ -8,12 +9,15 @@ import { Logger } from '../../core/ports/logger'
  */
 export class CalmHybridEditorProvider implements vscode.CustomTextEditorProvider {
     private static readonly viewType = 'calm.hybridEditor'
+    private modelService: ModelService
 
     constructor(
         private readonly context: vscode.ExtensionContext,
         private readonly htmlBuilder: HtmlBuilder,
         private readonly log: Logger
-    ) {}
+    ) {
+        this.modelService = new ModelService()
+    }
 
     public static register(
         context: vscode.ExtensionContext,
@@ -282,17 +286,76 @@ export class CalmHybridEditorProvider implements vscode.CustomTextEditorProvider
 
     private async generatePreview(document: vscode.TextDocument, webview: vscode.Webview) {
         try {
-            // For now, just show a formatted JSON view
-            // In the future, this will integrate with the existing preview functionality
             const content = document.getText()
-            let previewHtml = '<h3>Preview</h3>'
+            let previewHtml = '<div style="padding: 16px;">'
             
             try {
-                const parsed = JSON.parse(content)
-                previewHtml += `<pre style="background: var(--vscode-textCodeBlock-background); padding: 16px; border-radius: 4px; overflow: auto;">${JSON.stringify(parsed, null, 2)}</pre>`
+                // Parse the CALM model
+                const modelData = this.modelService.readModel(document.uri.fsPath)
+                
+                // Create a simple preview showing the model structure
+                previewHtml += '<h3>CALM Model Preview</h3>'
+                
+                // Show nodes
+                if (modelData?.nodes && Array.isArray(modelData.nodes)) {
+                    previewHtml += '<h4>Nodes (' + modelData.nodes.length + ')</h4>'
+                    previewHtml += '<ul style="list-style: none; padding-left: 0;">'
+                    for (const node of modelData.nodes.slice(0, 10)) {
+                        const nodeId = node['unique-id'] || node.name || 'Unknown'
+                        const nodeType = node['node-type'] || 'unknown'
+                        previewHtml += `<li style="margin-bottom: 8px;">
+                            <strong>${this.escapeHtml(nodeId)}</strong> 
+                            <span style="color: var(--vscode-descriptionForeground); font-size: 0.9em;">(${this.escapeHtml(nodeType)})</span>
+                        </li>`
+                    }
+                    if (modelData.nodes.length > 10) {
+                        previewHtml += `<li style="color: var(--vscode-descriptionForeground);">... and ${modelData.nodes.length - 10} more</li>`
+                    }
+                    previewHtml += '</ul>'
+                }
+                
+                // Show relationships
+                if (modelData?.relationships && Array.isArray(modelData.relationships)) {
+                    previewHtml += '<h4>Relationships (' + modelData.relationships.length + ')</h4>'
+                    previewHtml += '<ul style="list-style: none; padding-left: 0;">'
+                    for (const rel of modelData.relationships.slice(0, 5)) {
+                        const relId = rel['unique-id'] || 'Unknown'
+                        const relType = rel['relationship-type']?.connects || 'unknown'
+                        previewHtml += `<li style="margin-bottom: 8px;">
+                            <strong>${this.escapeHtml(relId)}</strong>
+                            <span style="color: var(--vscode-descriptionForeground); font-size: 0.9em;">(${this.escapeHtml(relType)})</span>
+                        </li>`
+                    }
+                    if (modelData.relationships.length > 5) {
+                        previewHtml += `<li style="color: var(--vscode-descriptionForeground);">... and ${modelData.relationships.length - 5} more</li>`
+                    }
+                    previewHtml += '</ul>'
+                }
+                
+                // Show flows
+                if (modelData?.flows && Array.isArray(modelData.flows)) {
+                    previewHtml += '<h4>Flows (' + modelData.flows.length + ')</h4>'
+                    previewHtml += '<ul style="list-style: none; padding-left: 0;">'
+                    for (const flow of modelData.flows.slice(0, 5)) {
+                        const flowId = flow['unique-id'] || 'Unknown'
+                        previewHtml += `<li style="margin-bottom: 8px;"><strong>${this.escapeHtml(flowId)}</strong></li>`
+                    }
+                    if (modelData.flows.length > 5) {
+                        previewHtml += `<li style="color: var(--vscode-descriptionForeground);">... and ${modelData.flows.length - 5} more</li>`
+                    }
+                    previewHtml += '</ul>'
+                }
+                
+                // Add a note about using the classic preview for full visualization
+                previewHtml += `<div style="margin-top: 24px; padding: 12px; background: var(--vscode-textBlockQuote-background); border-left: 4px solid var(--vscode-textLink-foreground);">
+                    <strong>💡 Tip:</strong> Use <code>CALM: Open Preview</code> command for full diagram visualization with Mermaid rendering.
+                </div>`
+                
+                previewHtml += '</div>'
             } catch (e) {
-                previewHtml += `<p style="color: var(--vscode-errorForeground);">Invalid JSON: ${e instanceof Error ? e.message : String(e)}</p>`
+                previewHtml += `<p style="color: var(--vscode-errorForeground);">Error parsing CALM model: ${e instanceof Error ? this.escapeHtml(e.message) : String(e)}</p>`
                 previewHtml += `<pre style="background: var(--vscode-textCodeBlock-background); padding: 16px; border-radius: 4px; overflow: auto;">${this.escapeHtml(content)}</pre>`
+                previewHtml += '</div>'
             }
             
             webview.postMessage({
