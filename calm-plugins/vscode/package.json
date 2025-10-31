@@ -90,6 +90,19 @@
         "configuration": {
             "title": "CALM",
             "properties": {
+                "calm.editor.defaultMode": {
+                    "type": "string",
+                    "enum": [
+                        "classic",
+                        "hybrid"
+                    ],
+                    "default": "classic",
+                    "enumDescriptions": [
+                        "Classic mode: Opens preview in a separate panel beside the editor",
+                        "Hybrid mode: Opens a custom editor with Source and Preview tabs"
+                    ],
+                    "markdownDescription": "Choose the default editor mode for CALM files. **Classic** opens preview in a separate panel, **Hybrid** uses a tabbed editor with Source and Preview."
+                },
                 "calm.cli.path": {
                     "type": "string",
                     "default": "./cli",

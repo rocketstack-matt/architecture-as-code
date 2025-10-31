@@ -6,6 +6,13 @@ Live-visualize CALM architecture models while you edit them. Features an interac
 
 ## Features
 
+### 🔀 Hybrid Editor Mode (New!)
+- **Tabbed Interface**: Edit source and preview in the same editor with tabs
+- **Seamless Switching**: Toggle between Source and Preview views
+- **Integrated Experience**: No need for side-by-side panels
+- **Keyboard Shortcut**: Press `Ctrl+Shift+H` (or `Cmd+Shift+H` on Mac) to open
+- **Context Menu**: Right-click any CALM file to "Open in Hybrid Editor"
+
 ### 🎯 Interactive Preview Panel
 - **Live Architecture Visualization**: Real-time diagram generation as you edit
 - **Smart Layout**: Automatic positioning with multiple layout options
@@ -34,6 +41,33 @@ Live-visualize CALM architecture models while you edit them. Features an interac
 
 ![Live Docify Mode](https://raw.githubusercontent.com/finos/architecture-as-code/main/calm-plugins/vscode/docs/LiveDocifyMode.png)
 *Live templating mode with real-time documentation generation*
+
+## Usage
+
+### Opening CALM Files
+
+You can work with CALM files in two modes:
+
+1. **Classic Mode** (Default): 
+   - Open a CALM file normally in VS Code
+   - Use `Ctrl+Shift+C` (or `Cmd+Shift+C` on Mac) to open the preview panel beside the editor
+   - Preview appears in a separate panel with tabs for Docify, Template, and Model views
+
+2. **Hybrid Mode** (New!):
+   - Right-click a CALM file and select "CALM: Open in Hybrid Editor"
+   - Or use `Ctrl+Shift+H` (or `Cmd+Shift+H` on Mac) while editing a CALM file
+   - Editor opens with Source and Preview tabs in the same window
+   - Switch between tabs to edit or view your architecture model
+
+### Configuration
+
+You can configure the default editor mode in VS Code settings:
+
+```json
+{
+  "calm.editor.defaultMode": "hybrid"  // or "classic"
+}
+```
 
 ## Getting Involved
 
