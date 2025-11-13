@@ -1,4 +1,5 @@
 .DS_Store
+.vscode-server
 
 # Docusaurus generated folders
 website/translated_docs/
