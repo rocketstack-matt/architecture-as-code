@@ -122,24 +122,12 @@ Look at your architecture in the diagram:
 - Can you explain this architecture to someone using the diagram?
 - What would you change to make it clearer?
 
-### 10. Validate Your Architecture
-
-The extension helps visualize, but use the CLI for validation:
-
-```bash
-calm validate -a architectures/my-first-architecture.json
-```
-
-The extension and CLI work together - visualize with the extension, validate with the CLI.
-
-### 11. Document Your Tools
+### 10. Document Your Tools
 
 Update your README with the extension information.
 
 **Prompt:**
-```
-@workspace
-
+```text
 Update my README.md to add a "Tools" section that documents:
 
 1. CALM CLI (installed Day 1)
@@ -154,15 +142,7 @@ Update my README.md to add a "Tools" section that documents:
 3. How these tools work together (CLI for validation, extension for visualization)
 ```
 
-### 12. Commit Your Work
-
-```bash
-mkdir -p docs/screenshots
-# Save your visualization screenshot as docs/screenshots/day-4-visualization.png
-git add docs/screenshots/day-4-visualization.png README.md
-git commit -m "Day 4: Install CALM VSCode extension and visualize architecture"
-git tag day-4
-```
+### 11. Commit Your Work
 
 Update your README.md progress:
 ```markdown
@@ -170,6 +150,15 @@ Update your README.md progress:
 - [x] Day 2: Create Your First Node
 - [x] Day 3: Connect Nodes with Relationships
 - [x] Day 4: Install CALM VSCode Extension
+```
+
+Commit your work:
+```bash
+mkdir -p docs/screenshots
+# Save your visualization screenshot as docs/screenshots/day-4-visualization.png
+git add docs/screenshots/day-4-visualization.png README.md
+git commit -m "Day 4: Install CALM VSCode extension and visualize architecture"
+git tag day-4
 ```
 
 ## Deliverables / Validation Criteria
