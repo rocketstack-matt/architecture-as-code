@@ -40,9 +40,7 @@ You'll create a pattern for a standard 3-tier web app:
 **File:** `patterns/web-app-pattern.json`
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create a new file at patterns/web-app-pattern.json
 
 This pattern defines a standard 3-tier web application architecture.
@@ -85,7 +83,7 @@ calm generate -p patterns/web-app-pattern.json -o architectures/generated-webapp
 Open `architectures/generated-webapp.json` and observe:
 - ✅ Has exactly 3 nodes with the IDs, names, descriptions from your pattern
 - ✅ Has exactly 2 relationships connecting them
-- ✅ Some properties have placeholders (`[[ HOST ]]`, `-1`)
+- ✅ Ready for enhancement with interfaces and metadata
 
 ### 4. Visualize the Generated Architecture
 
@@ -97,18 +95,16 @@ Open `architectures/generated-webapp.json` and observe:
 
 This shows how patterns create instant, visual architectures!
 
-### 5. Customize the Generated Architecture
+### 5. Enhance the Generated Architecture
 
-Fill in the placeholders:
+The generated architecture has the basic structure, but you can enhance it:
 
 **Prompt:**
-```
-@workspace /CALM
-
-Update architectures/generated-webapp.json to replace placeholders:
-- Add interfaces to the service and database nodes with realistic host, port values
-- Add metadata at the architecture level with owner, version, created date
-- Replace any [[ PLACEHOLDER ]] values with realistic data
+```text
+Update architectures/generated-webapp.json to add:
+- Interfaces to the service and database nodes with realistic host, port values
+- Metadata at the architecture level with owner, version, created date
+- Any additional properties that make it production-ready
 
 Keep the unique-ids, names, and core descriptions as they are (from the pattern).
 ```
@@ -121,12 +117,10 @@ calm validate -p patterns/web-app-pattern.json -a architectures/generated-webapp
 
 Should pass! ✅
 
-### 7. Test Governance by Breaking Rules
+**Test Governance by Breaking Rules**
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create architectures/broken-webapp.json by copying generated-webapp.json and changing the unique-id of "web-frontend" to "my-custom-frontend"
 ```
 
@@ -147,9 +141,7 @@ rm architectures/broken-webapp.json
 **File:** `patterns/README.md`
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create patterns/README.md explaining:
 
 1. The Dual Superpower: Patterns both generate AND validate
