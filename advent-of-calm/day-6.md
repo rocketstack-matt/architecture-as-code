@@ -57,9 +57,7 @@ Metadata in CALM can be added at three levels:
 Open `architectures/my-first-architecture.json` in VSCode.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update architectures/my-first-architecture.json to add top-level metadata.
 
 The metadata should include:
@@ -105,9 +103,7 @@ Ensure the file still validates against CALM 1.0.
 Add metadata to your service node to document technical ownership.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update the service node in architectures/my-first-architecture.json to add metadata.
 
 The node metadata should include:
@@ -146,9 +142,7 @@ Use the object format for metadata.
 Add metadata to a relationship to document SLA or monitoring information.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update the connects relationship in architectures/my-first-architecture.json to add metadata.
 
 The relationship metadata should include:
@@ -181,9 +175,7 @@ Use the object format for metadata.
 Ask Copilot about best practices:
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 What are common metadata properties used in enterprise architectures? Give me examples for:
 - Ownership and governance
 - Deployment and infrastructure
@@ -196,9 +188,7 @@ What are common metadata properties used in enterprise architectures? Give me ex
 Experiment with the array format to understand the difference.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Show me how the metadata on my service node would look using the array format instead of the object format. Explain when I would choose one over the other.
 ```
 
@@ -210,13 +200,7 @@ calm validate -a architectures/my-first-architecture.json
 
 You should see validation succeed with metadata at multiple levels.
 
-### 8. Commit Your Work
-
-```bash
-git add architectures/my-first-architecture.json README.md
-git commit -m "Day 6: Add metadata at architecture, node, and relationship levels"
-git tag day-6
-```
+### 8. Update Your README
 
 Update your README.md progress:
 ```markdown
@@ -226,6 +210,14 @@ Update your README.md progress:
 - [x] Day 4: Install CALM VSCode Extension
 - [x] Day 5: Add Interfaces to Nodes
 - [x] Day 6: Document with Metadata
+```
+
+### 9. Commit Your Work
+
+```bash
+git add architectures/my-first-architecture.json README.md
+git commit -m "Day 6: Add metadata at architecture, node, and relationship levels"
+git tag day-6
 ```
 
 ## Deliverables / Validation Criteria
