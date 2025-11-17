@@ -37,9 +37,7 @@ This gives you a realistic microservice architecture with multiple interaction p
 Start fresh to practice everything from scratch.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create a new file at architectures/ecommerce-platform.json
 
 This should be a complete CALM architecture for an e-commerce order processing system with:
@@ -76,15 +74,22 @@ Each node should have:
 Use the CALM 1.0 schema and ensure it validates.
 ```
 
-### 3. Add the Relationships
+**Note:** CALM Chat mode is smart and will likely add some relationships automatically based on the node structure, even though you didn't explicitly ask for them. This is helpful AI assistance that saves time, but we want to review what it created before proceeding.
 
-Now connect everything together.
+**Visualize what was created:**
+1. Save the file (Ctrl+S / Cmd+S)
+2. Open preview (Ctrl+Shift+C / Cmd+Shift+C)
+3. Look at what relationships were automatically added
+
+This gives you a starting point, but you'll verify and adjust them in the next step.
+
+### 3. Verify and Adjust the Relationships
+
+Now verify the relationships match what we want.
 
 **Prompt:**
-```
-@workspace /CALM
-
-Update architectures/ecommerce-platform.json to add relationships:
+```text
+Update architectures/ecommerce-platform.json to ensure it has exactly these relationships:
 
 1. Interacts relationships (actor to service):
    - Customer interacts with API Gateway
@@ -100,11 +105,13 @@ Update architectures/ecommerce-platform.json to add relationships:
 3. Composed-of relationship:
    - E-Commerce Platform is composed of: API Gateway, Order Service, Inventory Service, Payment Service
 
-Each relationship should:
-- Have a unique-id and description
-- Use the appropriate relationship type
-- Reference specific interfaces in connects relationships
-- Include metadata where relevant (SLAs, monitoring, etc.)
+Check the existing relationships and:
+- Add any that are missing from the list above
+- Remove any that don't match the requirements
+- Ensure each relationship has a unique-id and description
+- Ensure the appropriate relationship type is used
+- Ensure connects relationships reference specific interfaces
+- Add metadata where relevant (SLAs, monitoring, etc.)
 
 Ensure the file validates.
 ```
@@ -141,9 +148,7 @@ Use the tree view to explore:
 As you look at the visualization, you might notice improvements:
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Looking at the visualization of my e-commerce architecture, suggest improvements:
 - Are there missing connections?
 - Should any relationships use different types?
@@ -172,18 +177,19 @@ Get a quick documentation preview:
 
 ```bash
 calm docify -a architectures/ecommerce-platform.json -o docs/ecommerce
+cd docs/ecommerce
+npm install
+npm run start
 ```
 
-Open `docs/ecommerce/index.html` in a browser to see your architecture as documentation.
+This will open your architecture documentation in a browser. You'll see a professional-looking site with all your nodes, relationships, interfaces, and metadata beautifully formatted.
 
 ### 9. Compare Architectures
 
 You now have two complete architectures. Compare them:
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Compare my two architectures:
 - architectures/my-first-architecture.json (Days 2-6, built incrementally)
 - architectures/ecommerce-platform.json (Day 7, built all at once)
@@ -191,18 +197,18 @@ Compare my two architectures:
 What did I learn? Which approach (incremental vs all-at-once) works better for different scenarios?
 ```
 
-### 10. Commit Your Work
-
-```bash
-git add architectures/ecommerce-platform.json docs/ecommerce docs/screenshots/day-7-ecommerce.png README.md
-git commit -m "Day 7: Build complete e-commerce microservice architecture with visualization"
-git tag day-7
-```
+### 10. Update Your README
 
 Update your README.md progress:
 ```markdown
 - [x] Day 6: Document with Metadata
 - [x] Day 7: Build Complete E-Commerce Architecture
+```
+
+```bash
+git add architectures/ecommerce-platform.json docs/ecommerce docs/screenshots/day-7-ecommerce.png README.md
+git commit -m "Day 7: Build complete e-commerce microservice architecture with visualization"
+git tag day-7
 ```
 
 ## Deliverables / Validation Criteria
