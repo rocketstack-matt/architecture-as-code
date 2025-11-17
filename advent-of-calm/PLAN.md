@@ -5,37 +5,37 @@ A structured learning journey that takes participants from zero CALM knowledge t
 
 ## Progress Tracker
 
-### Week 1: Foundation & First Steps (Days 1-6)
+### Week 1: Foundation & First Steps (Days 1-7)
 - [x] Day 1: Install CALM CLI and Initialize Your Architecture Repository
 - [x] Day 2: Create Your First Node
 - [x] Day 3: Connect Nodes with Relationships
-- [ ] Day 4: Add an Interface to a Node
-- [ ] Day 5: Document with Metadata
-- [ ] Day 6: Create a Complete Microservice Architecture
+- [x] Day 4: Install the CALM VSCode Extension
+- [x] Day 5: Add Interfaces to Nodes
+- [x] Day 6: Document with Metadata
+- [x] Day 7: Build a Complete E-Commerce Microservice Architecture
 
-### Week 2: Patterns, Controls & Flows (Days 7-12)
-- [ ] Day 7: Validate Against a Pattern
-- [ ] Day 8: Create Your Own Pattern
-- [ ] Day 9: Add a Security Control
-- [ ] Day 10: Model a Business Flow
-- [ ] Day 11: Add Multiple Interface Types
-- [ ] Day 12: Link to an ADR
+### Week 2: Patterns, Controls & Flows (Days 8-13)
+- [x] Day 8: Create Your First Pattern - CALM's Superpower
+- [x] Day 9: Reverse-Engineer a Pattern from Your Architecture
+- [x] Day 10: Add a Security Control
+- [x] Day 11: Model a Business Flow
+- [x] Day 12: Add Multiple Interface Types
+- [x] Day 13: Link to an ADR
 
-### Week 3: Tooling & Automation (Days 13-18)
-- [ ] Day 13: Generate Documentation with Docify
-- [ ] Day 14: Create a Custom Template
-- [ ] Day 15: Set Up CALM Hub Locally
-- [ ] Day 16: Install the VSCode Extension
-- [ ] Day 17: Enable AI Assistance with Copilot Chatmode
-- [ ] Day 18: Automate Validation in CI/CD
+### Week 3: Tooling & Automation (Days 14-18)
+- [x] Day 14: Generate Documentation with Docify
+- [x] Day 15: Create a Custom Template
+- [x] Day 16: Set Up CALM Hub Locally
+- [x] Day 17: Advanced AI-Powered Architecture Refactoring
+- [x] Day 18: Automate Validation in CI/CD
 
 ### Week 4: Real-World Application & Community (Days 19-24)
-- [ ] Day 19: Model Your Actual System Architecture
-- [ ] Day 20: Add Deployment Topology
-- [ ] Day 21: Model Data Lineage
-- [ ] Day 22: Create a Migration from Existing Documentation
-- [ ] Day 23: Contribute to the CALM Community
-- [ ] Day 24: Present Your CALM Journey
+- [x] Day 19: Model Your Actual System Architecture
+- [x] Day 20: Add Deployment Topology
+- [x] Day 21: Model Data Lineage
+- [x] Day 22: Create a Migration from Existing Documentation
+- [x] Day 23: Contribute to the CALM Community
+- [x] Day 24: Present Your CALM Journey
 
 ---
 
@@ -57,20 +57,20 @@ A structured learning journey that takes participants from zero CALM knowledge t
 **Rationale:** Learn when to use each relationship type. Understand the oneOf constraint pattern. Architectures are about connections, not just components.
 **Deliverable:** Architecture with 4 nodes and 3 different relationship types, commit tagged `day-3`
 
-### Day 4: Add an Interface to a Node
-**Challenge:** Define an interface with a protocol (HTTP/HTTPS) for one of your nodes
-**Rationale:** Interfaces are critical for integration mapping. Learn host/port/protocol patterns.
-**Deliverable:** Node with properly defined interface, commit tagged `day-4`
+### Day 4: Add Interfaces to Nodes ✅
+**Challenge:** Add interfaces to service and database nodes using both inline and external definition approaches, then reference specific interfaces in connections
+**Rationale:** Interfaces make architecture actionable. Learn inline vs external definitions, understand node-interface structure for precise connections, and see how organizations can create interface catalogs.
+**Deliverable:** Nodes with interfaces, updated connects relationship with interface references, optional external interface schema, commit tagged `day-4`
 
-### Day 5: Document with Metadata
-**Challenge:** Add metadata to your architecture including description, owner, and version
-**Rationale:** Make architectures discoverable and maintainable. Practice top-level schema properties.
-**Deliverable:** Architecture with comprehensive metadata, commit tagged `day-5`
+### Day 5: Document with Metadata ✅
+**Challenge:** Add metadata at multiple levels (architecture, nodes, relationships) to document ownership, versioning, and operational information
+**Rationale:** Metadata transforms architecture files into living documentation. Critical for governance, discoverability, and long-term maintenance.
+**Deliverable:** Architecture with metadata at all three levels, commit tagged `day-5`
 
-### Day 6: Create a Complete Microservice Architecture
-**Challenge:** Build a small architecture with 3-5 nodes representing a simple system (e.g., API Gateway → Service → Database)
-**Rationale:** Consolidate Week 1 learning into something coherent and recognizable.
-**Deliverable:** Complete, validated architecture of a real or hypothetical system, commit tagged `day-6`
+### Day 6: Build a Complete E-Commerce Microservice Architecture ✅
+**Challenge:** Create a comprehensive e-commerce order processing system with 6-8 nodes, multiple relationship types, interfaces, and rich metadata
+**Rationale:** Week 1 synthesis - combine all concepts (nodes, relationships, interfaces, metadata) into a realistic, production-quality architecture.
+**Deliverable:** Complete e-commerce architecture with 8 nodes, 8+ relationships, generated documentation, commit tagged `day-6`
 
 ---
 

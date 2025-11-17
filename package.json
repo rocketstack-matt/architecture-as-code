@@ -35,6 +35,7 @@
         "link:cli": "npm link --workspace cli",
         "calm-hub-ui:run": "npm run start --workspace calm-hub-ui",
         "calm-hub-ui:prod": "npm run prod --workspace calm-hub-ui",
+        "advent": "cd advent-of-calm/website && npm run build",
         "prepare": "husky"
     },
     "devDependencies": {
