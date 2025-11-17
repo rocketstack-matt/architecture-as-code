@@ -51,9 +51,7 @@ The `definition-url` points to a JSON schema that defines what properties the in
 Open `architectures/my-first-architecture.json` in VSCode.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update architectures/my-first-architecture.json to add an inline interface to my service node.
 
 The interface should:
@@ -71,9 +69,7 @@ Ensure the file still validates against CALM 1.0.
 ### 3. Add a Database Interface
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update architectures/my-first-architecture.json to add an inline interface to my database node.
 
 The interface should:
@@ -103,9 +99,7 @@ Now see your interfaces in the diagram:
 The `connects` relationship references interfaces using the `node-interface` structure.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update the "connects" relationship between my service and database to use the node-interface structure.
 
 The relationship should specify:
@@ -131,9 +125,7 @@ Create a reusable interface schema:
 **File:** `patterns/rest-api-interface.json`
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create a new file at patterns/rest-api-interface.json
 
 This should be a JSON Schema that defines a standard REST API interface with these required properties:
@@ -149,7 +141,23 @@ And these optional properties:
 Use JSON Schema draft 2020-12.
 ```
 
-### 8. Validate Your Architecture
+### 8. Use the External Interface Definition
+
+Now update your service interface to reference this schema:
+
+**Prompt:**
+```text
+Update the service node interface in architectures/my-first-architecture.json to use an external interface definition.
+
+Replace the inline interface properties with:
+- Keep the unique-id
+- Add a definition-url property pointing to "file://./patterns/rest-api-interface.json"
+- Move the existing properties (host, port, path, authentication) into a "config" object
+
+This demonstrates how to use external interface definitions for standardization.
+```
+
+### 9. Validate Your Architecture
 
 ```bash
 calm validate -a architectures/my-first-architecture.json
@@ -157,13 +165,7 @@ calm validate -a architectures/my-first-architecture.json
 
 You should see validation succeed with interfaces properly defined.
 
-### 9. Commit Your Work
-
-```bash
-git add architectures/my-first-architecture.json patterns/rest-api-interface.json docs/screenshots/day-5-interfaces.png README.md
-git commit -m "Day 5: Add inline and external interface definitions with visualization"
-git tag day-5
-```
+### 10. Update Your README
 
 Update your README.md progress:
 ```markdown
@@ -171,13 +173,21 @@ Update your README.md progress:
 - [x] Day 5: Add Interfaces to Nodes
 ```
 
+### 11. Commit Your Work
+
+```bash
+git add architectures/my-first-architecture.json patterns/rest-api-interface.json docs/screenshots/day-5-interfaces.png README.md
+git commit -m "Day 5: Add inline and external interface definitions with visualization"
+git tag day-5
+```
+
 ## Deliverables / Validation Criteria
 
 Your Day 5 submission should include a commit tagged `day-5` containing:
 
 ✅ **Required Files:**
-- `architectures/my-first-architecture.json` - With interfaces on service and database nodes
-- `patterns/rest-api-interface.json` - Example interface schema (optional)
+- `architectures/my-first-architecture.json` - With interfaces on service and database nodes (service using external definition)
+- `patterns/rest-api-interface.json` - Interface schema referenced by service
 - `docs/screenshots/day-5-interfaces.png` - Visualization showing interfaces
 - Updated `README.md` - Day 5 marked as complete
 
