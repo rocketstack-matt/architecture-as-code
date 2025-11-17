@@ -23,9 +23,7 @@ Your Day 7 architecture has actual values - to make it a pattern, wrap structura
 Open `architectures/ecommerce-platform.json` from Day 7.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Analyze architectures/ecommerce-platform.json and tell me:
 
 1. How many nodes does it have and what are their unique-ids?
@@ -39,9 +37,7 @@ Analyze architectures/ecommerce-platform.json and tell me:
 **File:** `patterns/ecommerce-platform-pattern.json`
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create patterns/ecommerce-platform-pattern.json based on architectures/ecommerce-platform.json
 
 Follow the same pattern structure as web-app-pattern.json but with all the nodes and relationships from my e-commerce architecture.
@@ -77,20 +73,7 @@ Compare the original and generated:
 4. **Take a screenshot**
 5. Compare - structure should be identical, some values will be placeholders
 
-### 6. Customize the Variation
-
-**Prompt:**
-```
-@workspace /CALM
-
-Update architectures/ecommerce-variation.json for a different deployment:
-- Update metadata: different owner, version "1.0.0"
-- Replace [[ HOST ]] placeholders with eu-region hosts
-- Replace -1 ports with realistic values
-- Keep structure identical (same IDs, relationships)
-```
-
-### 7. Validate Both Against the Pattern
+### 6. Validate Both Against the Pattern
 
 ```bash
 calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
@@ -99,11 +82,7 @@ calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecomm
 
 Both should pass! ✅
 
-### 8. Visualize Your Pattern Library
-
-You now have two patterns! Use the tree view to explore them.
-
-### 9. Commit Your Work
+### 7. Commit Your Work
 
 ```bash
 git add patterns/ecommerce-platform-pattern.json architectures/ecommerce-variation.json patterns/README.md docs/screenshots README.md
