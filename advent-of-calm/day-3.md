@@ -26,12 +26,8 @@ We'll build up your architecture in stages, adding different relationship types.
 
 #### Step 2a: Add a Database and Connect It
 
-Open `architectures/my-first-architecture.json` in VSCode with the Copilot Chat panel active.
-
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update architectures/my-first-architecture.json to add:
 
 1. A database node (node-type: "database") that stores data for my service
@@ -55,9 +51,7 @@ Ensure the file still validates against CALM 1.0.
 Now add a human actor who uses your service.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update architectures/my-first-architecture.json to add:
 
 1. An actor node (node-type: "actor") representing an end user or customer who uses my service
@@ -82,14 +76,12 @@ Ensure the file still validates.
 Finally, create a system-level view showing your service is part of a larger system.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update architectures/my-first-architecture.json to add:
 
-1. A system node (node-type: "system") representing the overall system that contains my service
+1. A system node (node-type: "system") representing the overall system that contains my service and database
 
-2. A "composed-of" relationship showing that this system is composed of my service
+2. A "composed-of" relationship showing that this system is composed of both my service and database
 
 The relationship should use the "composed-of" relationship type with container and nodes properties.
 
@@ -100,7 +92,7 @@ Ensure the file still validates.
 - ✅ New system node added
 - ✅ Relationship uses `composed-of`
 - ✅ `container` references the system node
-- ✅ `nodes` array contains your service node
+- ✅ `nodes` array contains both your service node and database node
 
 ### 3. Understand Your Architecture
 
@@ -109,13 +101,11 @@ You should now have:
 - **3 relationships**: 
   - Actor **interacts** with Service
   - Service **connects** to Database  
-  - System **composed-of** Service
+  - System **composed-of** Service and Database
 
 Ask Copilot to explain what you built:
 
-```
-@workspace /CALM
-
+```text
 Explain the three different relationship types I just created and why each one is appropriate for its use case.
 ```
 
@@ -124,9 +114,7 @@ Explain the three different relationship types I just created and why each one i
 Try this to understand the constraint:
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 What would happen if I tried to add both "interacts" and "connects" to the same relationship? Show me an example and explain why it would fail validation.
 ```
 
@@ -163,7 +151,7 @@ Your Day 3 submission should include a commit tagged `day-3` containing:
   - At least 3 relationships demonstrating different types
   - One "interacts" relationship (actor → service)
   - One "connects" relationship (service → database)
-  - One "composed-of" relationship (system contains service)
+  - One "composed-of" relationship (system contains service and database)
 - Updated `README.md` - Day 3 marked as complete
 
 ✅ **Validation:**
@@ -242,7 +230,7 @@ git tag | grep -q "day-3"
   "relationship-type": {
     "composed-of": {
       "container": "system-id",
-      "nodes": ["service-id"]
+      "nodes": ["service-id", "database-id"]
     }
   }
 }
