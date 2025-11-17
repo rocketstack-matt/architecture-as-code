@@ -36,6 +36,7 @@
         "link:cli": "npm link --workspace cli",
         "calm-hub-ui:run": "npm run start --workspace calm-hub-ui",
         "calm-hub-ui:prod": "npm run prod --workspace calm-hub-ui",
+        "advent": "cd advent-of-calm/website && npm run build",
         "build:calm-explorer": "npm run build --workspace experimental/calm-explorer",
         "test:calm-explorer": "npm run test:run --workspace experimental/calm-explorer",
         "lint:calm-explorer": "npm run lint --workspace experimental/calm-explorer",

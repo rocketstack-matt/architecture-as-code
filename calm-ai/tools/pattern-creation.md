@@ -6,7 +6,31 @@
 
 ## Overview
 
-Patterns in CALM are JSON schemas that provide reusable, instantiable architecture templates. They define repeatable architectural solutions with configurable options that can be generated using the `calm generate` command.
+Patterns in CALM are JSON schemas that serve a dual purpose - **CALM's superpower**:
+
+1. **Productivity Booster (Generation)**: Create architecture scaffolds in seconds using `calm generate -p pattern.json`
+2. **Governance Tool (Validation)**: Enforce architectural standards using `calm validate -p pattern.json -a architecture.json`
+
+One pattern definition serves both purposes - write once, use everywhere.
+
+## How Patterns Work
+
+### For Generation (calm generate)
+When you run `calm generate -p pattern.json`, the CLI reads the pattern and creates an architecture where:
+- **`const` values** become the actual values in the generated file
+- **`prefixItems`** define what nodes/relationships are created
+- **`anyOf`/`oneOf`** become interactive choices (CLI prompts user to select)
+- **Undefined properties** get placeholders like `[[ HOST ]]`, `[[ URL ]]`, or `-1`
+
+### For Validation (calm validate)
+When you run `calm validate -p pattern.json -a architecture.json`, the CLI checks:
+- **`const` values** must match exactly (e.g., unique-id must be "api-gateway")
+- **`required` arrays** enforce that properties exist
+- **`minItems`/`maxItems`** validate array sizes
+- **`prefixItems`** check that specific items are in the correct positions
+- **`anyOf`/`oneOf`** ensure one valid option is chosen
+
+This dual purpose makes patterns incredibly powerful - developers get instant scaffolds, governance gets automatic compliance.
 
 ## Pattern Structure
 
@@ -19,6 +43,23 @@ A CALM pattern is a JSON schema that:
 
 ## Basic Pattern Schema
 
+### Key Concepts for Pattern Creation
+
+**Using `const` for Fixed Values:**
+- When a property has `"const": "value"`, that exact value will be used in generation and required in validation
+- Use `const` for IDs, names, and descriptions that should be exactly as specified
+
+**Using `prefixItems` for Exact Structure:**
+- `prefixItems` defines the exact nodes/relationships/interfaces that must exist in specific positions
+- First item in `prefixItems` = first item in the generated array
+- Second item in `prefixItems` = second item in the generated array, etc.
+
+**Using `minItems`/`maxItems`:**
+- Controls how many items the array must/can have
+- When `minItems` equals `maxItems`, the array size is fixed
+- Use with `prefixItems` to define exact structures
+
+**Example Pattern:**
 ```json
 {
     "$schema": "https://calm.finos.org/release/1.0/meta/calm.json",
@@ -28,6 +69,7 @@ A CALM pattern is a JSON schema that:
     "properties": {
         "nodes": {
             "type": "array",
+            "minItems": 3,
             "maxItems": 3,
             "prefixItems": [
                 {
@@ -40,8 +82,47 @@ A CALM pattern is a JSON schema that:
                         "name": {
                             "const": "Frontend Application"
                         },
+                        "description": {
+                            "const": "Web-based user interface"
+                        },
                         "node-type": {
                             "const": "webclient"
+                        }
+                    }
+                },
+                {
+                    "$ref": "https://calm.finos.org/release/1.0/meta/core.json#/defs/node",
+                    "type": "object",
+                    "properties": {
+                        "unique-id": {
+                            "const": "api-service"
+                        },
+                        "name": {
+                            "const": "API Service"
+                        },
+                        "description": {
+                            "const": "Backend API service"
+                        },
+                        "node-type": {
+                            "const": "service"
+                        }
+                    }
+                },
+                {
+                    "$ref": "https://calm.finos.org/release/1.0/meta/core.json#/defs/node",
+                    "type": "object",
+                    "properties": {
+                        "unique-id": {
+                            "const": "database"
+                        },
+                        "name": {
+                            "const": "Database"
+                        },
+                        "description": {
+                            "const": "Data storage"
+                        },
+                        "node-type": {
+                            "const": "database"
                         }
                     }
                 }
@@ -49,13 +130,81 @@ A CALM pattern is a JSON schema that:
         },
         "relationships": {
             "type": "array",
-            "minItems": 1,
-            "maxItems": 2
+            "minItems": 2,
+            "maxItems": 2,
+            "prefixItems": [
+                {
+                    "$ref": "https://calm.finos.org/release/1.0/meta/core.json#/defs/relationship",
+                    "type": "object",
+                    "properties": {
+                        "unique-id": {
+                            "const": "frontend-to-api"
+                        },
+                        "description": {
+                            "const": "Frontend calls API"
+                        },
+                        "protocol": {
+                            "const": "HTTPS"
+                        },
+                        "relationship-type": {
+                            "const": {
+                                "connects": {
+                                    "source": {
+                                        "node": "frontend"
+                                    },
+                                    "destination": {
+                                        "node": "api-service"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": ["description"]
+                },
+                {
+                    "$ref": "https://calm.finos.org/release/1.0/meta/core.json#/defs/relationship",
+                    "type": "object",
+                    "properties": {
+                        "unique-id": {
+                            "const": "api-to-database"
+                        },
+                        "description": {
+                            "const": "API stores data"
+                        },
+                        "protocol": {
+                            "const": "JDBC"
+                        },
+                        "relationship-type": {
+                            "const": {
+                                "connects": {
+                                    "source": {
+                                        "node": "api-service"
+                                    },
+                                    "destination": {
+                                        "node": "database"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": ["description"]
+                }
+            ]
         }
     },
     "required": ["nodes", "relationships"]
 }
 ```
+
+**When this pattern is used with `calm generate`:**
+- Creates exactly 3 nodes with the IDs, names, and descriptions specified
+- Creates exactly 2 relationships with specified connections
+- Properties not defined in the pattern get placeholders (e.g., `[[ HOST ]]`)
+
+**When this pattern is used with `calm validate`:**
+- Checks that architecture has exactly these 3 nodes with these IDs
+- Checks that relationships exist with these connections
+- Ensures required properties are present
 
 ## Providing Options with anyOf/oneOf
 
