@@ -10,7 +10,9 @@ Use the CALM chatmode you configured on Day 1 to create your first architecture 
 ## Requirements
 
 ### 1. Understand What a Node Represents
-A **node** in CALM represents a distinct architectural component:
+A **node** in CALM represents a distinct architectural component. CALM provides built-in node types, but also allows architects to define their own custom node types to match their specific domain needs.
+
+**Built-in node types include:**
 - **actor**: External users or systems
 - **system**: High-level business systems
 - **service**: Microservices or applications
@@ -20,22 +22,25 @@ A **node** in CALM represents a distinct architectural component:
 - **webclient**: Browser-based clients
 - **data-asset**: Data products or datasets
 
+**Custom node types:** You can define your own node types (e.g., "message-queue", "cache", "api-gateway") to better represent components specific to your architecture.
+
 ### 2. Open the CALM Chatmode in VSCode
 
 1. Open your `advent-of-calm-2025` repository in VSCode
 2. Open the Copilot Chat panel:
    - **Windows/Linux**: `Ctrl+Alt+I` or click the chat icon in the sidebar
    - **Mac**: `Cmd+Shift+I` or click the chat icon in the sidebar
-3. In the chat input, type `@workspace` followed by `/CALM` to activate the CALM chatmode
-4. You should see the chatmode indicator showing you're using CALM-specific guidance
+3. **Select the CALM chatmode** to maintain context across multiple prompts:
+   - Click the chatmode selector dropdown in the chat panel (it shows "General Purpose" by default)
+   - Select **"CALM"** from the list of available chatmodes
+   - The chat panel will now show "CALM" as the active mode
+   - This keeps you in CALM mode for all subsequent prompts in this conversation
 
 ### 3. Use This Prompt with Copilot
 
 Copy and paste this prompt into the Copilot chat (customize the parts in brackets):
 
-```
-@workspace /CALM
-
+```text
 Create a new CALM architecture file at architectures/my-first-architecture.json
 
 The architecture should contain a single node representing [describe a system you work with, e.g., "a payment processing service that handles credit card transactions"].
@@ -46,9 +51,7 @@ Make sure the file includes the correct $schema reference and validates against 
 ```
 
 **Example customized prompt:**
-```
-@workspace /CALM
-
+```text
 Create a new CALM architecture file at architectures/my-first-architecture.json
 
 The architecture should contain a single node representing a customer authentication service that validates user credentials and manages session tokens.
@@ -77,7 +80,7 @@ calm validate -a architectures/my-first-architecture.json
 
 If validation fails:
 - Read the error message carefully
-- Ask Copilot to fix it: `@workspace /CALM Fix the validation errors in architectures/my-first-architecture.json`
+- Ask Copilot to fix it: `Fix the validation errors in architectures/my-first-architecture.json`
 - Validate again
 
 ### 6. Understand What Was Created
@@ -88,22 +91,22 @@ Open the generated file and make sure you understand each part:
 - What would happen if you changed the `node-type`?
 
 **Try this:** Ask Copilot to explain:
-```
-@workspace /CALM Explain each property in the node I just created
+```text
+Explain each property in the node I just created
 ```
 
 ### 7. Commit Your Work
-
-```bash
-git add architectures/my-first-architecture.json README.md
-git commit -m "Day 2: Create first CALM architecture with single node using AI assistance"
-git tag day-2
-```
 
 Update your README.md progress:
 ```markdown
 - [x] Day 1: Install CALM CLI and Initialize Repository
 - [x] Day 2: Create Your First Node
+```
+
+```bash
+git add architectures/my-first-architecture.json README.md
+git commit -m "Day 2: Create first CALM architecture with single node using AI assistance"
+git tag day-2
 ```
 
 ## Deliverables / Validation Criteria
@@ -129,6 +132,7 @@ git tag | grep -q "day-2"
 
 ## Tips
 - The chatmode makes Copilot a CALM expert - use it liberally!
+- **Remember to select the CALM chatmode** from the dropdown to maintain conversation context across multiple prompts
 - If you don't have Copilot access, you can manually create the file following this structure:
   ```json
   {
@@ -144,11 +148,11 @@ git tag | grep -q "day-2"
   }
   ```
 - Ask Copilot follow-up questions if you don't understand something
-- Use `@workspace /CALM` before each prompt to ensure you're using the chatmode
+- Use the CALM chatmode selector to stay in CALM mode across all your prompts
 
 ## Troubleshooting
 
-**"I don't see /CALM in the chatmode list"**
+**"I don't see CALM in the chatmode list"**
 - Make sure you ran `calm copilot-chatmode -d .` on Day 1
 - Check that `.github/chatmodes/CALM.chatmode.md` exists
 - Restart VSCode and try again
