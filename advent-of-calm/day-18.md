@@ -460,7 +460,11 @@ git checkout architectures/ecommerce-platform.json
 
 Update your main README.md to include CI/CD information.
 
-### 11. Commit CI/CD Setup
+### 11. Update Your README Checklist
+
+Before committing, ensure the README progress tracker marks Day 18 complete and that the CI/CD section mentions the new workflows, pre-commit hook, and badge you added.
+
+### 12. Commit CI/CD Setup
 
 ```bash
 git add .github/workflows scripts/pre-commit-hook.sh docs/ci-cd-guide.md README.md
@@ -468,7 +472,7 @@ git commit -m "Day 18: Add automated CALM validation in CI/CD"
 git tag day-18
 ```
 
-### 12. Push and Verify (If Using GitHub)
+### 13. Push and Verify (If Using GitHub)
 
 ```bash
 git push origin main --tags

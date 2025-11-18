@@ -404,7 +404,11 @@ And I plan to continue helping the community by:
 - [Future plans]
 ```
 
-### 8. Document Your Contribution
+### 8. Update Your README
+
+Mark Day 23 complete in your README progress tracker and ensure the Community Contribution section you added in Step 5 includes links to your new docs (`docs/community-contribution.md`, reflections, acknowledgments, etc.).
+
+### 9. Document Your Contribution
 
 ```bash
 git add docs/community-contribution.md docs/contribution-reflection.md docs/acknowledgments.md README.md
@@ -412,7 +416,7 @@ git commit -m "Day 23: Contribute to CALM community"
 git tag day-23
 ```
 
-### 9. Optional: Create a Contribution Template
+### 10. Optional: Create a Contribution Template
 
 If you plan to contribute regularly, create a template:
 
@@ -449,7 +453,7 @@ assignees: ''
 [Other approaches you thought about]
 ```
 
-### 10. Consider Ongoing Contributions
+### 11. Consider Ongoing Contributions
 
 **File:** `docs/ongoing-contributions-plan.md`
 

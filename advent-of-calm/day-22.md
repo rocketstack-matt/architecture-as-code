@@ -108,9 +108,7 @@ When migrating to CALM, we can add:
 ### 4. Create the CALM Architecture
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create a new CALM architecture file: architectures/migrated-[system-name].json
 
 Based on the component inventory in docs/migration-inventory.md, create a complete CALM architecture including:
@@ -137,9 +135,7 @@ Make this production-quality, filling in gaps from the original documentation.
 Add elements the original documentation lacked:
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Enhance architectures/migrated-[system-name].json beyond the original documentation:
 
 1. Add controls for security/compliance
@@ -464,7 +460,11 @@ echo "Original components: [X from inventory]"
 grep -c '"unique-id"' architectures/migrated-[system-name].json
 ```
 
-### 13. Commit Migration Work
+### 13. Update Your README
+
+Mark Day 22 complete in your README, summarize the before/after wins, and link to the migrated architecture plus the supporting docs (inventory, guide, lessons learned, transition plan, and screenshots).
+
+### 14. Commit Migration Work
 
 ```bash
 git add architectures/migrated-*.json docs/migration-*.md docs/transition-plan.md docs/screenshots README.md
@@ -517,7 +517,7 @@ git tag | grep -q "day-22"
 - Document what you learned for next migration
 - Original doc likely has outdated info - this is chance to fix it
 - Migration is discovery - you'll find missing pieces
-- Use AI to help extract info from documents (@workspace /CALM)
+- Use AI to help extract info from documents by pointing the assistant at the exact files you inventoried
 
 ## Next Steps
 Tomorrow (Day 23) you'll contribute to the CALM community!

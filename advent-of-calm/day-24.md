@@ -784,7 +784,11 @@ has successfully completed the 24-day Advent of CALM challenge
 **Architecture As Code • FINOS • Open Source**
 ```
 
-### 7. Final Git Operations
+### 7. Final README Check
+
+Give your README one more pass to ensure the progress tracker is complete, the celebration section links to `JOURNEY.md`, the presentation deck, and the portfolio showcase, and that any new screenshots or badges render correctly.
+
+### 8. Final Git Operations
 
 ```bash
 # Add all final documentation
@@ -803,7 +807,7 @@ git tag advent-of-calm-complete
 git push origin main --tags
 ```
 
-### 8. Share Your Achievement
+### 9. Share Your Achievement
 
 **Social media post template:**
 ```
@@ -849,7 +853,7 @@ Check out my complete journey and portfolio: [Your repo URL]
 #ArchitectureAsCode #OpenSource #FINOS #ContinuousLearning
 ```
 
-### 9. Plan a Celebration
+### 10. Plan a Celebration
 
 You've completed 24 days of learning! Celebrate appropriately:
 
@@ -860,7 +864,7 @@ You've completed 24 days of learning! Celebrate appropriately:
 - [ ] Take a well-deserved break
 - [ ] Plan next steps with CALM
 
-### 10. Create a "What's Next" Plan
+### 11. Create a "What's Next" Plan
 
 **File:** `docs/whats-next.md`
 

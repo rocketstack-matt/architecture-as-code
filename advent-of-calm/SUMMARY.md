@@ -128,7 +128,7 @@ Every day file includes:
 
 All days include:
 - Concrete examples with actual syntax
-- AI prompts using @workspace /CALM
+- AI prompts that cite the exact CALM files and goals (no IDE-specific commands required)
 - Validation commands
 - Git commit and tag steps
 - Screenshot instructions where applicable

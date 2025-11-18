@@ -27,9 +27,7 @@ All interfaces share:
 Update the `api-gateway` node in `architectures/ecommerce-platform.json`.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update the api-gateway node in architectures/ecommerce-platform.json to add an interfaces array with a url-interface:
 
 - unique-id: "gateway-rest-api"
@@ -43,9 +41,7 @@ If interfaces already exist, add this as an additional interface.
 Update the `order-database` node.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update the order-database node in architectures/ecommerce-platform.json to add a host-port-interface:
 
 - unique-id: "postgres-jdbc"
@@ -63,9 +59,7 @@ Update the relationship's connects section to include:
 Add a new message broker node.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add a new node to architectures/ecommerce-platform.json:
 
 - unique-id: "message-broker"
@@ -92,9 +86,7 @@ Add a relationship connecting order-service to message-broker:
 Add authentication configuration to the api-gateway.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add an oauth2-audience-interface to the api-gateway node in architectures/ecommerce-platform.json:
 
 - unique-id: "oauth2-config"
@@ -191,7 +183,11 @@ calm docify --architecture architectures/ecommerce-platform.json --output docs/g
 
 Open `docs/generated/ecommerce-interfaces/index.html` to see interface details in the generated docs.
 
-### 10. Commit Your Work
+### 10. Update Your README
+
+Check off Day 12 in your README progress checklist and note that the architecture now documents REST, JDBC, AMQP, and OAuth2 interfaces. Link to `docs/interface-catalog.md` or the generated docs so teammates know where to review the catalog.
+
+### 11. Commit Your Work
 
 ```bash
 git add architectures/ecommerce-platform.json docs/interface-catalog.md docs/generated README.md

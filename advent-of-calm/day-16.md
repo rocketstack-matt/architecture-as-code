@@ -281,7 +281,11 @@ To stop and remove all data:
 docker-compose down -v
 ```
 
-### 14. Commit Your Work
+### 14. Update Your README
+
+Update the README checklist for Day 16 and capture quick notes about running CALM Hub locally, including links to `docs/calm-hub-setup.md`, the new upload script, and any screenshots you added.
+
+### 15. Commit Your Work
 
 ```bash
 git add docs/calm-hub-setup.md scripts/upload-to-hub.sh docs/screenshots README.md

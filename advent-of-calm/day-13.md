@@ -123,9 +123,7 @@ Implement OAuth2 with JWT tokens for all API authentication.
 ### 5. Link ADRs to Your Architecture
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add an adrs array at the top level of architectures/ecommerce-platform.json (after the $schema and before metadata).
 
 Add these URLs:
@@ -233,7 +231,11 @@ Open `docs/generated/ecommerce-with-adrs/index.html` - ADRs should appear in the
 - [ ] Deployment strategy (blue/green vs. canary)
 ```
 
-### 10. Commit Your Work
+### 10. Update Your README
+
+Update your README to reflect that Day 13 is complete, mention that ADRs are now linked to the architecture, and add links to the specific ADR files so reviewers can jump directly to the decisions.
+
+### 11. Commit Your Work
 
 ```bash
 git add architectures/ecommerce-platform.json docs/adr docs/decision-timeline.md docs/generated README.md

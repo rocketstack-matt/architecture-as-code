@@ -92,9 +92,7 @@ Before creating the JSON, sketch out:
 - `actor`: External users, systems
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create a comprehensive CALM architecture file at architectures/production-[system-name].json
 
 System description: [Describe your system in detail]
@@ -143,9 +141,7 @@ Make this production-quality and realistic.
 Document where components run:
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add deployment topology to architectures/production-[system-name].json
 
 Create infrastructure nodes:
@@ -176,9 +172,7 @@ Ensure every node has rich metadata:
 - `incident-channel`: Slack/Teams channel
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Enhance all nodes in architectures/production-[system-name].json with comprehensive metadata:
 
 For each node, add:
@@ -394,7 +388,11 @@ See: [Security assessment](generated/production-[system-name]-bundle/security-as
 [List compliance frameworks from controls]
 ```
 
-### 12. Commit Your Production Architecture
+### 12. Update Your README
+
+Capture the highlights from Day 19 in your README before committing: mark the checklist, note the new production architecture file, and link to planning docs, the runbook, and generated documentation so stakeholders know where to look.
+
+### 13. Commit Your Production Architecture
 
 ```bash
 git add architectures/production-*.json docs/ README.md
