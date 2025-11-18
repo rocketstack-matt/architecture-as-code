@@ -298,7 +298,11 @@ chmod +x scripts/generate-docs.sh
 
 Verify all documentation was generated successfully.
 
-### 12. Commit Your Work
+### 12. Update Your README
+
+Document Day 14 progress in your README: mark the checklist, describe the new documentation outputs, and link to `docs/generated/README.md` or the screenshots so stakeholders know where to browse the generated sites.
+
+### 13. Commit Your Work
 
 ```bash
 git add templates/ docs/generated/ scripts/generate-docs.sh README.md

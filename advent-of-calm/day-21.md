@@ -69,9 +69,7 @@ Use CALM flows to model this with:
 ### 3. Create Customer Data Lineage Flow
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add a flow to architectures/production-[system-name].json:
 
 unique-id: "customer-data-lineage"
@@ -97,9 +95,7 @@ Add controls to this flow:
 ### 4. Create Payment Data Lineage Flow
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add a payment data lineage flow to architectures/production-[system-name].json:
 
 unique-id: "payment-data-lineage"
@@ -126,9 +122,7 @@ Add controls:
 ### 5. Create Analytics Data Lineage Flow
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add an analytics data lineage flow to architectures/production-[system-name].json:
 
 unique-id: "analytics-data-lineage"
@@ -151,9 +145,7 @@ Add metadata to flow:
 ### 6. Add Data Retention Controls
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add data retention controls to relevant database nodes in architectures/production-[system-name].json:
 
 For User Database:
@@ -432,7 +424,11 @@ The CALM architecture ensures:
 - Compliance requirements are linked
 ```
 
-### 13. Commit Data Lineage Work
+### 13. Update Your README
+
+Update the README checklist for Day 21 and note where the new lineage docs live (planning file, governance policy, subject request process, screenshots, and generated `data-flows` output).
+
+### 14. Commit Data Lineage Work
 
 ```bash
 git add architectures/production-*.json docs/data-*.md docs/screenshots README.md

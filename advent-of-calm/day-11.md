@@ -32,9 +32,7 @@ Identify the relationships for the order flow:
 - Payment Service → Database
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add a flows array at the top level of architectures/ecommerce-platform.json (after controls, before nodes).
 
 Create a flow with:
@@ -61,9 +59,7 @@ Should pass! ✅
 ### 4. Add a Second Flow: User Authentication
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add a second flow to the flows array in architectures/ecommerce-platform.json:
 
 - unique-id: "user-authentication-flow"
@@ -105,9 +101,7 @@ calm docify --architecture architectures/ecommerce-platform.json --output docs/g
 Flows can have their own controls!
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add a controls section to the order-processing-flow in architectures/ecommerce-platform.json:
 
 Add an "audit" control with:
@@ -158,7 +152,11 @@ Add an "audit" control with:
 - **Documentation:** Auto-generate flow diagrams and descriptions
 ```
 
-### 9. Commit Your Work
+### 9. Update Your README
+
+Mark Day 11 as complete in your README checklist and mention the new flow artifacts (`docs/flows-guide.md` plus the generated `docs/generated/ecommerce-with-flows` output) so collaborators know where they can explore the business process context.
+
+### 10. Commit Your Work
 
 ```bash
 git add architectures/ecommerce-platform.json docs/flows-guide.md docs/generated README.md

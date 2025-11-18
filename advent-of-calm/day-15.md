@@ -43,13 +43,17 @@ mkdir -p templates/comprehensive-bundle
 - **Total Components:** {{nodes.length}}
 - **Integration Points:** {{relationships.length}}
 - **Business Processes:** {{#if flows}}{{flows.length}}{{else}}0{{/if}}
-- **Security Controls:** {{#if controls}}{{#keys controls}}{{this.length}}{{/keys}}{{else}}0{{/if}}
+- **Security Controls:** {{#if controls}}Documented below{{else}}0{{/if}}
 
 ## Component Breakdown
 
-{{#group nodes by="node-type.name"}}
-- **{{@key}}:** {{this.length}} components
-{{/group}}
+{{#if nodes}}
+{{#each nodes}}
+- **{{this.name}}** ({{this.node-type.name}}) - {{this.description}}
+{{/each}}
+{{else}}
+No components defined yet.
+{{/if}}
 
 ## Security & Compliance
 
@@ -60,12 +64,12 @@ This architecture implements the following security and compliance controls:
 ### {{@key}}
 {{this.description}}
 
+{{#if this.requirements}}
+Requirements:
 {{#each this.requirements}}
-- Requirement: {{this.control-requirement-url}}
-{{#if this.control-config-url}}
-- Configuration: {{this.control-config-url}}
-{{/if}}
+- {{this.control-requirement-url}}{{#if this.control-config-url}} (Config: {{this.control-config-url}}){{/if}}
 {{/each}}
+{{/if}}
 
 {{/each}}
 {{else}}
@@ -208,7 +212,7 @@ This service uses OAuth2 authentication.
 ## Control Summary
 
 {{#if controls}}
-This architecture has implemented **{{#keys controls}}{{this.length}}{{/keys}}** control domains.
+This architecture has implemented the following control domains.
 
 {{#each controls}}
 ## Control Domain: {{@key}}
@@ -497,7 +501,11 @@ chmod +x scripts/generate-docs.sh
 
 Verify all files in `docs/generated/comprehensive/` were created.
 
-### 12. Commit Your Work
+### 12. Update Your README
+
+Summarize the new comprehensive template bundle in your README before committing. Mark Day 15 complete, list the five templates plus `docs/generated/comprehensive`, and mention that `scripts/generate-docs.sh` now handles the bundle.
+
+### 13. Commit Your Work
 
 ```bash
 git add templates/comprehensive-bundle docs/generated/comprehensive scripts/generate-docs.sh README.md

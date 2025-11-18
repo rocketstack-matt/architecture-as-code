@@ -60,9 +60,7 @@ Use CALM to model:
 ### 3. Add Region and Zone Nodes
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add infrastructure nodes to architectures/production-[system-name].json:
 
 1. Add region nodes (node-type: system):
@@ -82,9 +80,7 @@ Use metadata to indicate:
 ### 4. Add Network Zone Nodes
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add network zone nodes to architectures/production-[system-name].json:
 
 For each region, add 3 network zones (node-type: system):
@@ -109,9 +105,7 @@ Add composed-of relationships from regions to their zones.
 ### 5. Add Compute Cluster Nodes
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add Kubernetes cluster nodes (or VM groups) to architectures/production-[system-name].json:
 
 For each region, add cluster nodes (node-type: system):
@@ -130,9 +124,7 @@ Add deployed-in relationships: cluster deployed-in region
 ### 6. Map Services to Deployment Infrastructure
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add deployed-in relationships for all application services in architectures/production-[system-name].json:
 
 For each service node:
@@ -150,9 +142,7 @@ This shows both compute and network placement.
 ### 7. Add Multi-Region Deployment
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 For services that have DR replicas in architectures/production-[system-name].json:
 
 1. Create duplicate service nodes with suffix "-dr":
@@ -335,7 +325,11 @@ calm validate -a architectures/production-[system-name].json
 calm docify --architecture architectures/production-[system-name].json --template templates/comprehensive-bundle/deployment-checklist.hbs --output docs/generated/deployment-checklist.md
 ```
 
-### 13. Commit Deployment Topology
+### 13. Update Your README
+
+Mark Day 20 complete in the README and summarize the deployment artifacts (planning doc, topology write-up, infrastructure costs, and screenshots) so the topology work is easy to discover later.
+
+### 14. Commit Deployment Topology
 
 ```bash
 git add architectures/production-*.json docs/deployment-*.md docs/infrastructure-costs.md docs/screenshots README.md

@@ -21,9 +21,7 @@ Open `architectures/ecommerce-platform.json` and assess:
 ### 2. Use AI to Add Missing Components
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Analyze architectures/ecommerce-platform.json and suggest:
 
 1. Missing components that a production e-commerce system would need
@@ -37,9 +35,7 @@ Then add the top 3 most important missing elements.
 ### 3. AI-Powered Flow Generation
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Create a comprehensive "Product Search and Browse" flow for architectures/ecommerce-platform.json
 
 The flow should:
@@ -56,9 +52,7 @@ Use actual relationship unique-ids from the architecture.
 ### 4. AI-Powered Security Control Audit
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Audit the security controls in architectures/ecommerce-platform.json
 
 For an e-commerce platform handling payments and customer data:
@@ -72,9 +66,7 @@ Add the 3 most critical missing controls to the architecture.
 ### 5. AI-Powered Metadata Enhancement
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Enhance the metadata in architectures/ecommerce-platform.json
 
 Add to nodes missing metadata:
@@ -89,9 +81,7 @@ Infer appropriate values based on the component's role.
 ### 6. AI-Powered Architecture Optimization
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Review architectures/ecommerce-platform.json for architectural anti-patterns:
 
 1. Are there any single points of failure?
@@ -106,9 +96,7 @@ Suggest 3 specific improvements and implement the most important one.
 ### 7. AI-Powered Interface Completeness Check
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Ensure every relationship in architectures/ecommerce-platform.json that uses "connects" references specific interfaces.
 
 For each connects relationship:
@@ -122,9 +110,7 @@ Focus on database connections and API integrations.
 ### 8. AI-Powered Pattern Extraction
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 From architectures/ecommerce-platform.json, extract a reusable pattern for the "API Gateway + Service + Database" triplet.
 
 Create patterns/gateway-service-db-pattern.json that:
@@ -139,9 +125,7 @@ Include proper JSON Schema constraints.
 ### 9. Generate Comparison Report
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Compare the original architectures/ecommerce-platform.json (from git tag day-13) with the current version.
 
 Create docs/ai-refactoring-report.md showing:
@@ -179,13 +163,9 @@ Review the updated documentation to see how AI improvements appear.
 
 ## Effective Prompting Strategies
 
-### 1. Use @workspace Context
+### 1. Share Repository Context
 
-Always include `@workspace /CALM` to give the AI access to:
-- CALM schema definitions
-- Your existing architectures
-- Pattern examples
-- Best practices
+Reference the specific files and objectives in your prompt (for example, "Review architectures/ecommerce-platform.json and patterns/ecommerce-platform-pattern.json before suggesting changes"). Being explicit gives the assistant the necessary CALM context without relying on IDE-specific commands.
 
 ### 2. Be Specific About Constraints
 
@@ -214,8 +194,6 @@ Always run `calm validate` after AI-generated changes. AI can hallucinate or mis
 ### Adding Components
 
 ```
-@workspace /CALM
-
 Add a caching layer (Redis) to architectures/ecommerce-platform.json:
 - New node: unique-id "redis-cache", node-type "system"
 - Interface: host-port-interface on localhost:6379
@@ -225,8 +203,6 @@ Add a caching layer (Redis) to architectures/ecommerce-platform.json:
 ### Generating Flows
 
 ```
-@workspace /CALM
-
 Create a "User Registration" flow that traces:
 1. User submits form
 2. API validates input
@@ -238,16 +214,12 @@ Create a "User Registration" flow that traces:
 ### Enhancing Security
 
 ```
-@workspace /CALM
-
 Add GDPR compliance controls to all nodes that store personal data in architectures/ecommerce-platform.json
 ```
 
 ### Optimizing Structure
 
 ```
-@workspace /CALM
-
 Refactor architectures/ecommerce-platform.json to follow microservices best practices:
 - Add API gateway if missing
 - Ensure services don't directly connect to each other's databases
@@ -311,7 +283,11 @@ calm docify --architecture architectures/ecommerce-after-ai.json --output docs/g
 
 Take screenshots comparing the two visualizations.
 
-### 14. Commit Your Work
+### 14. Update Your README
+
+Mark Day 17 complete in the README and summarize the AI improvements, linking to `docs/ai-refactoring-report.md`, `docs/ai-architecture-guide.md`, and the before/after screenshots so reviewers can quickly find the highlights.
+
+### 15. Commit Your Work
 
 ```bash
 git add architectures/ docs/ai-refactoring-report.md docs/ai-architecture-guide.md docs/generated patterns/ README.md

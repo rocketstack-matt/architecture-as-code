@@ -27,9 +27,7 @@ Controls can be at:
 Open your `architectures/ecommerce-platform.json` from Day 7.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add a controls section at the top level of architectures/ecommerce-platform.json
 
 Add a "security" control with:
@@ -47,9 +45,7 @@ Place it after the metadata section and before nodes.
 Add a control to the `payment-service` node.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Add a controls section to the payment-service node in architectures/ecommerce-platform.json
 
 Add a "compliance" control with:
@@ -78,9 +74,7 @@ Controls won't appear in the visual diagram, but they're documented in the JSON 
 Update your pattern to enforce controls.
 
 **Prompt:**
-```
-@workspace /CALM
-
+```text
 Update patterns/ecommerce-platform-pattern.json to require the security control at the architecture level.
 
 Add to the pattern's properties section:
@@ -128,7 +122,11 @@ Controls document security, compliance, and operational requirements in architec
 3. **Traceability:** Connects technical implementation to policy
 ```
 
-### 9. Commit Your Work
+### 9. Update Your README
+
+Mark Day 10 as complete in your progress checklist and add a short note about the new controls plus a link to `docs/controls-guide.md` so collaborators know where to find the governance details.
+
+### 10. Commit Your Work
 
 ```bash
 git add architectures/ecommerce-platform.json patterns/ecommerce-platform-pattern.json docs/controls-guide.md README.md
