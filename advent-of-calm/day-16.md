@@ -1,345 +1,557 @@
-# Day 16: Set Up CALM Hub Locally
+# Day 16: Create a Custom Template Bundle
 
 ## Overview
-Deploy CALM Hub locally using Docker Compose to create a centralized architecture repository.
+Build a comprehensive template bundle to generate multiple documentation artifacts from your architecture.
 
 ## Objective and Rationale
-- **Objective:** Run CALM Hub locally and upload your architecture via the API
-- **Rationale:** CALM Hub provides centralized storage, discovery, and collaboration for architecture models. Teams can share architectures, search across systems, and track changes. Essential for organization-wide architecture governance.
+- **Objective:** Create a template bundle with multiple Handlebars templates for different documentation outputs
+- **Rationale:** Different stakeholders need different views. Template bundles allow you to generate technical docs, executive summaries, security assessments, and integration guides from the same source architecture.
 
 ## Requirements
 
-### 1. Prerequisites
+### 1. Understand Template Bundles
 
-Ensure you have Docker and Docker Compose installed:
+A template bundle is a directory containing:
+- Multiple `.hbs` (Handlebars) template files
+- Each template generates a different output file
+- Use `--template-dir` to generate all at once
 
-```bash
-docker --version
-docker-compose --version
-```
-
-### 2. Get CALM Hub Docker Compose Configuration
-
-The CALM Hub repository includes a ready-to-use Docker Compose setup:
+### 2. Create Template Bundle Directory
 
 ```bash
-# If you're in the main architecture-as-code repo
-cd calm-hub/deploy
-
-# Or download the compose file separately
-curl -O https://raw.githubusercontent.com/finos/architecture-as-code/main/calm-hub/deploy/docker-compose.yml
+mkdir -p templates/comprehensive-bundle
 ```
 
-### 3. Start CALM Hub
+### 3. Create Executive Summary Template
 
-```bash
-docker-compose up -d
-```
-
-This starts:
-- **MongoDB:** Database backend (port 27017)
-- **CALM Hub:** API server (port 8080)
-
-Verify containers are running:
-```bash
-docker-compose ps
-```
-
-Should show both `calm_mongodb` and `calm-hub` containers running.
-
-### 4. Verify CALM Hub is Running
-
-```bash
-curl http://localhost:8080/q/health/ready
-```
-
-Should return health status indicating the service is ready.
-
-### 5. Explore the API
-
-Get API documentation:
-
-```bash
-curl http://localhost:8080/q/swagger-ui
-```
-
-Or open in browser: http://localhost:8080/q/swagger-ui
-
-### 6. Upload Your Architecture
-
-Use curl to upload your e-commerce architecture:
-
-```bash
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -d @architectures/ecommerce-platform.json \
-  http://localhost:8080/api/architectures
-```
-
-The API should return the created architecture with an assigned ID.
-
-Save the response to capture the architecture ID:
-
-```bash
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -d @architectures/ecommerce-platform.json \
-  http://localhost:8080/api/architectures \
-  | tee hub-response.json | jq .
-```
-
-### 7. List All Architectures
-
-```bash
-curl http://localhost:8080/api/architectures | jq .
-```
-
-You should see your uploaded architecture in the list.
-
-### 8. Retrieve Specific Architecture
-
-Extract the ID from the previous response, then:
-
-```bash
-# Replace {id} with the actual ID
-curl http://localhost:8080/api/architectures/{id} | jq .
-```
-
-### 9. Search Architectures
-
-Search for architectures by name or metadata:
-
-```bash
-# Search by name
-curl "http://localhost:8080/api/architectures?name=ecommerce" | jq .
-
-# Search by owner (adjust based on your metadata)
-curl "http://localhost:8080/api/architectures?owner=your-name" | jq .
-```
-
-### 10. Document Your Hub Interaction
-
-**File:** `docs/calm-hub-setup.md`
+**File:** `templates/comprehensive-bundle/executive-summary.hbs`
 
 **Content:**
-```markdown
-# CALM Hub Setup
+```handlebars
+# Executive Summary: {{metadata.title}}
+
+**Document Version:** {{metadata.version}}  
+**Last Updated:** {{metadata.timestamp}}  
+**Architecture Owner:** {{metadata.owner}}
+
+## System Overview
+
+{{metadata.description}}
+
+## System Metrics
+
+- **Total Components:** {{nodes.length}}
+- **Integration Points:** {{relationships.length}}
+- **Business Processes:** {{#if flows}}{{flows.length}}{{else}}0{{/if}}
+- **Security Controls:** {{#if controls}}Documented below{{else}}0{{/if}}
+
+## Component Breakdown
+
+{{#if nodes}}
+{{#each nodes}}
+- **{{this.name}}** ({{this.node-type.name}}) - {{this.description}}
+{{/each}}
+{{else}}
+No components defined yet.
+{{/if}}
+
+## Security & Compliance
+
+{{#if controls}}
+This architecture implements the following security and compliance controls:
+
+{{#each controls}}
+### {{@key}}
+{{this.description}}
+
+{{#if this.requirements}}
+Requirements:
+{{#each this.requirements}}
+- {{this.control-requirement-url}}{{#if this.control-config-url}} (Config: {{this.control-config-url}}){{/if}}
+{{/each}}
+{{/if}}
+
+{{/each}}
+{{else}}
+No formal controls documented yet.
+{{/if}}
+
+## Business Processes
+
+{{#if flows}}
+{{#each flows}}
+- **{{this.name}}:** {{this.description}} ({{this.transitions.length}} steps)
+{{/each}}
+{{else}}
+No business flows documented yet.
+{{/if}}
+
+## Recommendations
+
+- Regular architecture reviews recommended quarterly
+- Update architecture documentation when adding new services
+- Review security controls annually
+
+---
+*This executive summary was auto-generated from the CALM architecture model.*
+```
+
+### 4. Create Technical Integration Guide Template
+
+**File:** `templates/comprehensive-bundle/integration-guide.hbs`
+
+**Content:**
+```handlebars
+# Integration Guide: {{metadata.title}}
 
 ## Overview
 
-CALM Hub provides centralized architecture storage and discovery.
+This guide provides technical integration details for the {{metadata.title}} architecture.
 
-## Local Deployment
+## Service Endpoints
 
-### Start Hub
+{{#each nodes}}
+{{#if this.interfaces}}
+### {{this.name}}
 
-\`\`\`bash
-cd calm-hub/deploy
-docker-compose up -d
-\`\`\`
+**Service Type:** {{this.node-type.name}}  
+**Description:** {{this.description}}
 
-### Verify
+#### Available Interfaces
 
-\`\`\`bash
-curl http://localhost:8080/q/health/ready
-\`\`\`
+{{#each this.interfaces}}
+**Interface ID:** `{{this.unique-id}}`
 
-### Stop Hub
+{{#if this.url}}
+- **Type:** REST API
+- **URL:** `{{this.url}}`
+- **Usage:** Base URL for all API calls
+{{/if}}
 
-\`\`\`bash
-docker-compose down
-\`\`\`
+{{#if this.host}}
+{{#if this.port}}
+- **Type:** Network Service
+- **Host:** `{{this.host}}`
+- **Port:** `{{this.port}}`
+- **Connection String:** `{{this.host}}:{{this.port}}`
+{{/if}}
+{{/if}}
 
-## API Usage
+{{#if this.audiences}}
+- **Type:** OAuth2 Configuration
+- **Audiences:** {{#each this.audiences}}`{{this}}` {{/each}}
+{{/if}}
 
-### Upload Architecture
+{{/each}}
 
-\`\`\`bash
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -d @architectures/ecommerce-platform.json \
-  http://localhost:8080/api/architectures
-\`\`\`
+{{#if this.metadata}}
+#### Configuration
+{{#each this.metadata}}
+- **{{@key}}:** {{this}}
+{{/each}}
+{{/if}}
 
-### List All Architectures
+---
 
-\`\`\`bash
-curl http://localhost:8080/api/architectures | jq .
-\`\`\`
+{{/if}}
+{{/each}}
 
-### Get Specific Architecture
+## Integration Patterns
 
-\`\`\`bash
-curl http://localhost:8080/api/architectures/{id} | jq .
-\`\`\`
+{{#each relationships}}
+### {{this.description}}
 
-### Search
+**Connection:** {{this.relationship-type.connects.source-node}} → {{this.relationship-type.connects.destination-node}}  
+**Protocol:** {{this.relationship-type.connects.protocol}}
 
-\`\`\`bash
-curl "http://localhost:8080/api/architectures?name=ecommerce" | jq .
-\`\`\`
+{{#if this.relationship-type.connects.interfaces}}
+**Interfaces Used:** {{#each this.relationship-type.connects.interfaces}}`{{this}}` {{/each}}
+{{/if}}
 
-## Architecture IDs
+{{/each}}
 
-| Architecture | Hub ID | Upload Date |
-|--------------|--------|-------------|
-| E-Commerce Platform | `{captured-id}` | 2024-12-15 |
+## Authentication
 
-## API Endpoints
+{{#each nodes}}
+{{#each this.interfaces}}
+{{#if this.audiences}}
+### {{../name}} - OAuth2
 
-- **Health:** http://localhost:8080/q/health
-- **Swagger UI:** http://localhost:8080/q/swagger-ui
-- **Architectures:** http://localhost:8080/api/architectures
+This service uses OAuth2 authentication.
 
-## Benefits
+**Accepted Audiences:**
+{{#each this.audiences}}
+- `{{this}}`
+{{/each}}
 
-1. **Centralized Repository:** Single source of truth for all architectures
-2. **Discovery:** Search and browse architectures across teams
-3. **Version Control:** Track architecture evolution over time
-4. **Collaboration:** Share architectures organization-wide
-5. **API Access:** Programmatic access for tools and automation
+**Token Requirements:**
+- Valid JWT token in Authorization header
+- Format: `Authorization: Bearer <token>`
+- Token must include appropriate audience claim
 
-## Next Steps
+{{/if}}
+{{/each}}
+{{/each}}
 
-- Set up authentication for production deployment
-- Configure backup for MongoDB
-- Integrate with CI/CD to auto-upload architectures
-- Deploy to shared infrastructure for team access
+---
+*Generated from CALM architecture. Contact {{metadata.owner}} for questions.*
 ```
 
-### 11. Create Hub Upload Script
+### 5. Create Security Assessment Template
 
-**File:** `scripts/upload-to-hub.sh`
+**File:** `templates/comprehensive-bundle/security-assessment.hbs`
 
 **Content:**
-```bash
-#!/bin/bash
-set -e
+```handlebars
+# Security Assessment Report
 
-HUB_URL="${CALM_HUB_URL:-http://localhost:8080}"
-ARCHITECTURE_FILE="${1:-architectures/ecommerce-platform.json}"
+**Architecture:** {{metadata.title}}  
+**Assessment Date:** {{metadata.timestamp}}  
+**Classification:** {{#if metadata.classification}}{{metadata.classification}}{{else}}Not Specified{{/if}}
 
-echo "🚀 Uploading architecture to CALM Hub..."
-echo "   Hub URL: $HUB_URL"
-echo "   File: $ARCHITECTURE_FILE"
+## Control Summary
 
-# Verify hub is running
-if ! curl -sf "$HUB_URL/q/health/ready" > /dev/null; then
-    echo "❌ CALM Hub is not running at $HUB_URL"
-    echo "   Start it with: cd calm-hub/deploy && docker-compose up -d"
-    exit 1
-fi
+{{#if controls}}
+This architecture has implemented the following control domains.
 
-# Upload architecture
-RESPONSE=$(curl -s -X POST \
-  -H "Content-Type: application/json" \
-  -d @"$ARCHITECTURE_FILE" \
-  "$HUB_URL/api/architectures")
+{{#each controls}}
+## Control Domain: {{@key}}
 
-# Check for errors
-if echo "$RESPONSE" | jq -e .id > /dev/null 2>&1; then
-    ID=$(echo "$RESPONSE" | jq -r .id)
-    echo "✅ Architecture uploaded successfully!"
-    echo "   ID: $ID"
-    echo "   View: $HUB_URL/api/architectures/$ID"
-else
-    echo "❌ Upload failed:"
-    echo "$RESPONSE" | jq .
-    exit 1
-fi
+**Description:** {{this.description}}
+
+### Requirements
+
+{{#each this.requirements}}
+#### Requirement {{@index}}
+- **Requirement URL:** {{this.control-requirement-url}}
+{{#if this.control-config-url}}
+- **Configuration:** {{this.control-config-url}}
+- **Status:** ✅ Configured
+{{else}}
+- **Status:** ⚠️ Configuration needed
+{{/if}}
+
+{{/each}}
+
+{{/each}}
+
+{{else}}
+⚠️ **WARNING:** No security controls documented at the architecture level.
+{{/if}}
+
+## Component Security Analysis
+
+{{#each nodes}}
+### {{this.name}}
+
+**Type:** {{this.node-type.name}}  
+**Controls:** {{#if this.controls}}✅ Implemented{{else}}❌ Not Implemented{{/if}}
+
+{{#if this.controls}}
+{{#each this.controls}}
+#### {{@key}}
+{{this.description}}
+
+{{#each this.requirements}}
+- {{this.control-requirement-url}}
+{{/each}}
+
+{{/each}}
+{{else}}
+⚠️ No component-level controls defined.
+{{/if}}
+
+---
+
+{{/each}}
+
+## Security Recommendations
+
+{{#unless controls}}
+1. **Critical:** Define architecture-level security controls
+2. **Critical:** Implement encryption and authentication requirements
+{{/unless}}
+
+3. Review and update security controls quarterly
+4. Ensure all external interfaces use secure protocols (HTTPS, TLS)
+5. Document incident response procedures
+
+## Protocol Security
+
+{{#each relationships}}
+{{#if this.relationship-type.connects.protocol}}
+- {{this.relationship-type.connects.source-node}} → {{this.relationship-type.connects.destination-node}}: **{{this.relationship-type.connects.protocol}}** {{#if (eq this.relationship-type.connects.protocol "HTTPS")}}✅{{else if (eq this.relationship-type.connects.protocol "HTTP")}}⚠️ Insecure{{else}}ℹ️{{/if}}
+{{/if}}
+{{/each}}
+
+---
+*This security assessment is auto-generated. Manual review required.*
 ```
 
-Make it executable:
-```bash
-chmod +x scripts/upload-to-hub.sh
+### 6. Create Flow Documentation Template
+
+**File:** `templates/comprehensive-bundle/flow-documentation.hbs`
+
+**Content:**
+```handlebars
+# Business Flow Documentation
+
+**Architecture:** {{metadata.title}}
+
+{{#if flows}}
+This architecture documents **{{flows.length}}** business flow(s).
+
+{{#each flows}}
+## {{this.name}}
+
+**Flow ID:** `{{this.unique-id}}`  
+**Description:** {{this.description}}
+
+### Process Steps
+
+{{#each this.transitions}}
+**Step {{this.sequence-number}}:** {{this.summary}}  
+- **Relationship:** `{{this.relationship-unique-id}}`
+- **Direction:** {{this.direction}}
+
+{{/each}}
+
+### Flow Controls
+
+{{#if this.controls}}
+{{#each this.controls}}
+#### {{@key}}
+{{this.description}}
+
+Requirements:
+{{#each this.requirements}}
+- {{this.control-requirement-url}}
+{{/each}}
+
+{{/each}}
+{{else}}
+No specific controls defined for this flow.
+{{/if}}
+
+---
+
+{{/each}}
+
+{{else}}
+No business flows documented in this architecture.
+
+**Recommendation:** Document key business processes as flows to:
+- Enable business-IT alignment
+- Support impact analysis
+- Facilitate compliance mapping
+{{/if}}
+
+---
+*Generated from CALM architecture model.*
 ```
 
-Test:
-```bash
-./scripts/upload-to-hub.sh architectures/ecommerce-platform.json
+### 7. Create Deployment Checklist Template
+
+**File:** `templates/comprehensive-bundle/deployment-checklist.hbs`
+
+**Content:**
+```handlebars
+# Deployment Checklist: {{metadata.title}}
+
+## Pre-Deployment
+
+### Infrastructure
+{{#each nodes}}
+- [ ] **{{this.name}}** ({{this.node-type.name}})
+  {{#if this.interfaces}}
+  {{#each this.interfaces}}
+  {{#if this.host}}
+  - [ ] Verify {{this.host}} is accessible
+  {{/if}}
+  {{#if this.port}}
+  - [ ] Ensure port {{this.port}} is open
+  {{/if}}
+  {{#if this.url}}
+  - [ ] Validate URL {{this.url}} is configured
+  {{/if}}
+  {{/each}}
+  {{/if}}
+{{/each}}
+
+### Integrations
+{{#each relationships}}
+- [ ] **{{this.description}}**
+  - Protocol: {{this.relationship-type.connects.protocol}}
+  - Source: {{this.relationship-type.connects.source-node}}
+  - Destination: {{this.relationship-type.connects.destination-node}}
+{{/each}}
+
+### Security Controls
+{{#if controls}}
+{{#each controls}}
+- [ ] **{{@key}}**: {{this.description}}
+  {{#each this.requirements}}
+  - [ ] Verify {{this.control-requirement-url}}
+  {{/each}}
+{{/each}}
+{{else}}
+- [ ] **WARNING:** Define security controls before deployment
+{{/if}}
+
+## Post-Deployment
+
+### Verification
+{{#each flows}}
+- [ ] **Test {{this.name}}**
+  {{#each this.transitions}}
+  - [ ] Step {{this.sequence-number}}: {{this.summary}}
+  {{/each}}
+{{/each}}
+
+### Monitoring
+- [ ] Set up health checks for all services
+- [ ] Configure alerting
+- [ ] Verify logging is operational
+
+### Documentation
+- [ ] Update runbooks
+- [ ] Document connection strings
+- [ ] Share integration guide with teams
+
+---
+**Deployment Owner:** {{metadata.owner}}  
+**Version:** {{metadata.version}}
 ```
 
-### 12. Take Screenshots
-
-**Document these views:**
-1. Docker containers running (`docker-compose ps`)
-2. Swagger UI in browser
-3. Successful API response showing uploaded architecture
-4. List of architectures from API
-
-### 13. Stop CALM Hub
-
-When done testing:
+### 8. Generate All Documentation from Bundle
 
 ```bash
-cd calm-hub/deploy
-docker-compose down
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --template-dir templates/comprehensive-bundle \
+  --output docs/generated/comprehensive
 ```
 
-To stop and remove all data:
-```bash
-docker-compose down -v
+This generates all templates at once in the `docs/generated/comprehensive/` directory.
+
+### 9. Create Bundle README
+
+**File:** `templates/comprehensive-bundle/README.md`
+
+**Content:**
+```markdown
+# Comprehensive Documentation Template Bundle
+
+This template bundle generates complete documentation sets from CALM architectures.
+
+## Templates
+
+| Template | Output | Audience |
+|----------|--------|----------|
+| `executive-summary.hbs` | `executive-summary.md` | Executives, stakeholders |
+| `integration-guide.hbs` | `integration-guide.md` | Developers, integrators |
+| `security-assessment.hbs` | `security-assessment.md` | Security team, auditors |
+| `flow-documentation.hbs` | `flow-documentation.md` | Business analysts, PMs |
+| `deployment-checklist.hbs` | `deployment-checklist.md` | DevOps, SRE |
+
+## Usage
+
+\`\`\`bash
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --template-dir templates/comprehensive-bundle \
+  --output docs/generated/comprehensive
+\`\`\`
+
+## Customization
+
+Edit any `.hbs` file to customize output for your organization's needs.
+
+### Handlebars Features Used
+
+- `{{#if}}` - Conditional rendering
+- `{{#each}}` - Iteration over arrays
+- `{{@key}}` - Object property names
+- `{{metadata.property}}` - Dot notation access
 ```
 
-### 14. Update Your README
-
-Update the README checklist for Day 16 and capture quick notes about running CALM Hub locally, including links to `docs/calm-hub-setup.md`, the new upload script, and any screenshots you added.
-
-### 15. Commit Your Work
+### 10. Update Documentation Script
 
 ```bash
-git add docs/calm-hub-setup.md scripts/upload-to-hub.sh docs/screenshots README.md
-git commit -m "Day 16: Set up CALM Hub locally and upload architecture via API"
+cat >> scripts/generate-docs.sh << 'EOF'
+
+# Comprehensive template bundle
+echo "📦 Generating comprehensive documentation bundle..."
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --template-dir templates/comprehensive-bundle \
+  --output docs/generated/comprehensive
+
+echo "✅ All documentation generated!"
+echo "   Comprehensive docs: docs/generated/comprehensive/"
+EOF
+```
+
+### 11. Test Bundle Generation
+
+```bash
+chmod +x scripts/generate-docs.sh
+./scripts/generate-docs.sh
+```
+
+Verify all files in `docs/generated/comprehensive/` were created.
+
+### 12. Update Your README
+
+Summarize the new comprehensive template bundle in your README before committing. Mark Day 16 complete, list the five templates plus `docs/generated/comprehensive`, and mention that `scripts/generate-docs.sh` now handles the bundle.
+
+### 13. Commit Your Work
+
+```bash
+git add templates/comprehensive-bundle docs/generated/comprehensive scripts/generate-docs.sh README.md
+git commit -m "Day 16: Create comprehensive template bundle for multi-stakeholder documentation"
 git tag day-16
 ```
 
 ## Deliverables
 
 ✅ **Required:**
-- `docs/calm-hub-setup.md` - Hub setup documentation
-- `scripts/upload-to-hub.sh` - Upload automation script
-- Screenshots showing:
-  - Hub running in Docker
-  - API interaction
-  - Architecture uploaded successfully
+- `templates/comprehensive-bundle/` directory with 5 templates
+- `docs/generated/comprehensive/` with all generated docs
+- `templates/comprehensive-bundle/README.md`
+- Updated `scripts/generate-docs.sh`
 - Updated `README.md` - Day 16 marked complete
 
 ✅ **Validation:**
 ```bash
-# Verify documentation exists
-test -f docs/calm-hub-setup.md
-test -x scripts/upload-to-hub.sh
+# Verify templates exist
+test -f templates/comprehensive-bundle/executive-summary.hbs
+test -f templates/comprehensive-bundle/integration-guide.hbs
+test -f templates/comprehensive-bundle/security-assessment.hbs
+test -f templates/comprehensive-bundle/flow-documentation.hbs
+test -f templates/comprehensive-bundle/deployment-checklist.hbs
 
-# Start hub (if not running)
-# cd calm-hub/deploy && docker-compose up -d
+# Generate bundle
+calm docify --architecture architectures/ecommerce-platform.json --template-dir templates/comprehensive-bundle --output docs/generated/comprehensive
 
-# Test health endpoint
-curl -sf http://localhost:8080/q/health/ready
-
-# Test upload script
-./scripts/upload-to-hub.sh architectures/ecommerce-platform.json
-
-# List architectures
-curl http://localhost:8080/api/architectures | jq length
-
-# Stop hub
-# cd calm-hub/deploy && docker-compose down
+# Verify all outputs
+test -f docs/generated/comprehensive/executive-summary.md
+test -f docs/generated/comprehensive/integration-guide.md
 
 # Check tag
 git tag | grep -q "day-16"
 ```
 
 ## Resources
-- [CALM Hub Repository](https://github.com/finos/architecture-as-code/tree/main/calm-hub)
-- [CALM Hub Documentation](https://github.com/finos/architecture-as-code/blob/main/calm-hub/README.md)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [Handlebars Documentation](https://handlebarsjs.com/)
+- [CALM Template System](https://github.com/finos/architecture-as-code/tree/main/cli#templates)
 
 ## Tips
-- Use environment variable `CALM_HUB_URL` to point to different Hub instances
-- For production: enable authentication and HTTPS
-- Consider deploying Hub on shared infrastructure for team access
-- MongoDB data persists in Docker volumes (use `-v` flag to remove)
-- Hub can be deployed on Kubernetes using the k8s manifests in the repo
+- Create templates for each stakeholder type
+- Use conditionals (`{{#if}}`) to handle optional sections gracefully
+- Test templates with minimal and maximal architectures
+- Template bundles enable "single source, multiple outputs"
+- Consider CI/CD integration to auto-publish documentation
 
 ## Next Steps
 Tomorrow (Day 17) you'll use AI to perform advanced architecture refactoring!

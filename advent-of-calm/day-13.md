@@ -1,178 +1,237 @@
-# Day 13: Create Your First Pattern - CALM's Superpower
+# Day 13: Add Multiple Interface Types
 
 ## Overview
-Create a CALM pattern that instantly generates architecture scaffolds AND enforces governance rules - CALM's dual superpower.
+Model heterogeneous integration patterns by adding different interface types to your architecture.
 
 ## Objective and Rationale
-- **Objective:** Create a simple pattern for a web application architecture that can generate scaffolds and validate compliance
-- **Rationale:** Patterns are CALM's superpower - one pattern does two things: (1) Generate compliant architecture in seconds (productivity), (2) Validate architectures follow standards (governance). Learn how `const`, `prefixItems`, and JSON Schema constraints enable both.
+- **Objective:** Add different interface types (REST API, message queue, database connection) to nodes in your architecture
+- **Rationale:** Real systems use multiple integration protocols. Learn to model HTTP APIs, async messaging, database connections, and other interface types. This makes architectures actionable for code generation and integration testing.
 
 ## Requirements
 
-### 1. Understand CALM's Dual Superpower
+### 1. Understand Interface Types
 
-**One Pattern = Two Powers:**
+CALM supports multiple interface patterns:
+- **host-port-interface:** Traditional host:port (APIs, databases)
+- **url-interface:** Full URLs (REST APIs, webhooks)
+- **hostname-interface:** Just hostname (DNS, service discovery)
+- **path-interface:** File paths (shared filesystems)
+- **oauth2-audience-interface:** OAuth2 configuration
 
-**Power 1 - Productivity (Generation):**
-```bash
-calm generate -p my-pattern.json -o new-service.json
-```
-Result: Instant architecture scaffold with all best practices baked in
+All interfaces share:
+- **unique-id:** Identifier
+- **Protocol** (in the relationship that uses it): HTTP, HTTPS, JDBC, AMQP, etc.
 
-**Power 2 - Governance (Validation):**
-```bash
-calm validate -p my-pattern.json -a existing-service.json
-```
-Result: Automated compliance checking against your standards
+### 2. Add a REST API Interface
 
-**How the same pattern does both:**
-- **`const: "api-gateway"`** → Generation: creates node with ID "api-gateway" | Validation: requires ID must be "api-gateway"
-- **`minItems: 3`** → Generation: creates 3 items | Validation: requires exactly 3 items
-- **`prefixItems: [...]`** → Generation: creates these exact items | Validation: checks these items exist
-
-### 2. Create a Simple Web Application Pattern
-
-You'll create a pattern for a standard 3-tier web app:
-- Frontend (webclient)
-- API Service (service) 
-- Database (database)
-
-**File:** `patterns/web-app-pattern.json`
+Update the `api-gateway` node in `architectures/ecommerce-platform.json`.
 
 **Prompt:**
 ```text
-Create a new file at patterns/web-app-pattern.json
+Update the api-gateway node in architectures/ecommerce-platform.json to add an interfaces array with a url-interface:
 
-This pattern defines a standard 3-tier web application architecture.
+- unique-id: "gateway-rest-api"
+- url: "https://api.example.com/v1"
 
-The pattern should have:
-
-1. Schema setup:
-   - $schema: "https://calm.finos.org/release/1.0/meta/calm.json"
-   - $id: "https://example.com/patterns/web-app.json"
-   - title: "Standard Web Application Pattern"
-   - description: "Three-tier web application with frontend, API, and database"
-   - type: "object"
-
-2. Exactly 3 nodes using prefixItems (with minItems: 3, maxItems: 3):
-   - Node 1: unique-id "web-frontend", node-type "webclient", name "Web Frontend", description "User-facing web application"
-   - Node 2: unique-id "api-service", node-type "service", name "API Service", description "Backend API service"  
-   - Node 3: unique-id "app-database", node-type "database", name "Application Database", description "Primary data storage"
-
-3. Exactly 2 relationships using prefixItems (with minItems: 2, maxItems: 2):
-   - Relationship 1: unique-id "frontend-to-api", connects web-frontend to api-service, protocol "HTTPS", description "Frontend calls API"
-   - Relationship 2: unique-id "api-to-database", connects api-service to app-database, protocol "JDBC", description "API stores data"
-
-Use const for all unique-id, name, description, node-type properties.
-Use const for the entire relationship-type object.
-Each node and relationship must reference the base CALM schema using $ref.
-Set required: ["nodes", "relationships"] at the top level.
-Set required: ["description"] on each relationship.
-
-Refer to the pattern-creation.md guide in .github/chatmodes/CALM.chatmode.md for detailed pattern structure examples.
+If interfaces already exist, add this as an additional interface.
 ```
 
-### 3. Test Generation
+### 3. Add a Database JDBC Interface
 
-Generate an architecture from your pattern:
-
-```bash
-calm generate -p patterns/web-app-pattern.json -o architectures/generated-webapp.json
-```
-
-Open `architectures/generated-webapp.json` and observe:
-- ✅ Has exactly 3 nodes with the IDs, names, descriptions from your pattern
-- ✅ Has exactly 2 relationships connecting them
-- ✅ Ready for enhancement with interfaces and metadata
-
-### 4. Visualize the Generated Architecture
-
-**Steps:**
-1. Open `architectures/generated-webapp.json` in VSCode
-2. Open preview (Ctrl+Shift+C / Cmd+Shift+C)
-3. See the 3-tier architecture visualized
-4. **Take a screenshot** of the generated architecture
-
-This shows how patterns create instant, visual architectures!
-
-### 5. Enhance the Generated Architecture
-
-The generated architecture has the basic structure, but you can enhance it:
+Update the `order-database` node.
 
 **Prompt:**
 ```text
-Update architectures/generated-webapp.json to add:
-- Interfaces to the service and database nodes with realistic host, port values
-- Metadata at the architecture level with owner, version, created date
-- Any additional properties that make it production-ready
+Update the order-database node in architectures/ecommerce-platform.json to add a host-port-interface:
 
-Keep the unique-ids, names, and core descriptions as they are (from the pattern).
+- unique-id: "postgres-jdbc"
+- host: "db-cluster-1.internal.example.com"
+- port: 5432
+
+Reference this interface in the relationship that connects to this database.
+Update the relationship's connects section to include:
+- destination-node: "order-database"
+- interfaces: ["postgres-jdbc"]
 ```
 
-### 6. Test Validation
+### 4. Add a Message Queue Interface
+
+Add a new message broker node.
+
+**Prompt:**
+```text
+Add a new node to architectures/ecommerce-platform.json:
+
+- unique-id: "message-broker"
+- node-type: "system"
+- name: "Message Queue"
+- description: "RabbitMQ message broker for async processing"
+- interfaces array:
+  - unique-id: "amqp-interface"
+  - host: "rabbitmq.internal.example.com"
+  - port: 5672
+
+Add a relationship connecting order-service to message-broker:
+- unique-id: "order-to-queue"
+- description: "Order service publishes events to message queue"
+- relationship-type: connects
+  - source-node: "order-service"
+  - destination-node: "message-broker"
+  - interfaces: ["amqp-interface"]
+  - protocol: "AMQP"
+```
+
+### 5. Add an OAuth2 Interface
+
+Add authentication configuration to the api-gateway.
+
+**Prompt:**
+```text
+Add an oauth2-audience-interface to the api-gateway node in architectures/ecommerce-platform.json:
+
+- unique-id: "oauth2-config"
+- audiences: ["https://api.example.com", "https://mobile.example.com"]
+
+This documents which OAuth2 audiences the gateway accepts.
+```
+
+### 6. Validate Multiple Interface Types
 
 ```bash
-calm validate -p patterns/web-app-pattern.json -a architectures/generated-webapp.json
+calm validate -a architectures/ecommerce-platform.json
 ```
 
 Should pass! ✅
 
-**Test Governance by Breaking Rules**
+### 7. Visualize the Multi-Protocol Architecture
 
-**Prompt:**
-```text
-Create architectures/broken-webapp.json by copying generated-webapp.json and changing the unique-id of "web-frontend" to "my-custom-frontend"
+**Steps:**
+1. Save `architectures/ecommerce-platform.json`
+2. Open preview (Ctrl+Shift+C)
+3. Relationships should show different protocols (HTTPS, JDBC, AMQP)
+4. **Take a screenshot** showing the heterogeneous integration patterns
+
+### 8. Create an Interface Catalog
+
+**File:** `docs/interface-catalog.md`
+
+**Content:**
+```markdown
+# E-Commerce Platform Interface Catalog
+
+## REST APIs
+
+### API Gateway - Main API
+- **Interface ID:** gateway-rest-api
+- **Type:** url-interface
+- **URL:** https://api.example.com/v1
+- **Protocol:** HTTPS
+- **Purpose:** Primary public-facing API for web and mobile clients
+
+## Database Connections
+
+### Order Database - PostgreSQL
+- **Interface ID:** postgres-jdbc
+- **Type:** host-port-interface
+- **Host:** db-cluster-1.internal.example.com
+- **Port:** 5432
+- **Protocol:** JDBC
+- **Purpose:** Persistent storage for order data
+
+## Message Queues
+
+### Message Broker - RabbitMQ
+- **Interface ID:** amqp-interface
+- **Type:** host-port-interface
+- **Host:** rabbitmq.internal.example.com
+- **Port:** 5672
+- **Protocol:** AMQP
+- **Purpose:** Asynchronous event processing and service decoupling
+
+## Authentication
+
+### API Gateway - OAuth2
+- **Interface ID:** oauth2-config
+- **Type:** oauth2-audience-interface
+- **Audiences:** 
+  - https://api.example.com
+  - https://mobile.example.com
+- **Purpose:** OAuth2 token validation configuration
+
+## Integration Patterns Summary
+
+| Pattern | Count | Use Cases |
+|---------|-------|-----------|
+| REST API (HTTPS) | 5+ | Client-server communication |
+| Database (JDBC) | 2+ | Data persistence |
+| Message Queue (AMQP) | 1 | Async processing, event-driven |
+| OAuth2 | 1 | Authentication & authorization |
+
+## Benefits
+
+1. **Multi-Protocol:** Models real-world heterogeneous systems
+2. **Precise Connections:** Relationships reference specific interfaces
+3. **Code Generation:** Enough detail to generate client code
+4. **Testing:** Integration tests can use interface details
 ```
 
-Validate:
+### 9. Generate Documentation
+
 ```bash
-calm validate -p patterns/web-app-pattern.json -a architectures/broken-webapp.json
+calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-interfaces
 ```
 
-Should fail! ❌ The pattern catches the violation.
+Open `docs/generated/ecommerce-interfaces/index.html` to see interface details in the generated docs.
 
-Delete the broken file:
-```bash
-rm architectures/broken-webapp.json
-```
+### 10. Update Your README
 
-### 7. Document the Superpower
+Check off Day 13 in your README progress checklist and note that the architecture now documents REST, JDBC, AMQP, and OAuth2 interfaces. Link to `docs/interface-catalog.md` or the generated docs so teammates know where to review the catalog.
 
-**File:** `patterns/README.md`
-
-**Prompt:**
-```text
-Create patterns/README.md explaining:
-
-1. The Dual Superpower: Patterns both generate AND validate
-2. How to use web-app-pattern.json for generation and validation
-3. What it enforces and why
-4. Time savings example
-```
-
-### 8. Commit Your Work
+### 11. Commit Your Work
 
 ```bash
-git add patterns/web-app-pattern.json architectures/generated-webapp.json patterns/README.md docs/screenshots/day-13-pattern.png README.md
-git commit -m "Day 13: Create web app pattern - generation and validation superpower"
+git add architectures/ecommerce-platform.json docs/interface-catalog.md docs/generated README.md
+git commit -m "Day 13: Add multiple interface types (REST, JDBC, AMQP, OAuth2)"
 git tag day-13
 ```
 
-## Deliverables / Validation Criteria
+## Deliverables
 
-Your Day 13 submission should include a commit tagged `day-13` containing:
+✅ **Required:**
+- `architectures/ecommerce-platform.json` - With 4+ different interface types
+- `docs/interface-catalog.md` - Interface documentation
+- `docs/generated/ecommerce-interfaces/` - Generated documentation
+- Screenshot showing multi-protocol visualization
+- Updated `README.md` - Day 12 marked complete
 
-✅ **Required Files:**
-- `patterns/web-app-pattern.json` - Pattern defining 3-tier web app
-- `architectures/generated-webapp.json` - Architecture generated from pattern
-- `patterns/README.md` - Documentation
-- `docs/screenshots/day-13-pattern.png` - Visualization
-- Updated `README.md` - Day 13 marked as complete
+✅ **Validation:**
+```bash
+# Verify multiple interface types
+grep -q 'url-interface' architectures/ecommerce-platform.json
+grep -q 'host-port-interface' architectures/ecommerce-platform.json
+grep -q 'oauth2-audience-interface' architectures/ecommerce-platform.json
+
+# Verify message broker
+grep -q 'message-broker' architectures/ecommerce-platform.json
+grep -q 'AMQP' architectures/ecommerce-platform.json
+
+# Validate
+calm validate -a architectures/ecommerce-platform.json
+
+# Check tag
+git tag | grep -q "day-13"
+```
 
 ## Resources
+- [CALM Interface Schema](https://github.com/finos/architecture-as-code/blob/main/calm/draft/2025-03/meta/interface.json)
+- [OAuth2 Audiences](https://datatracker.ietf.org/doc/html/rfc8693#section-4.3)
 
-- [CALM Pattern Documentation](https://github.com/finos/architecture-as-code/tree/main/calm/pattern)
-- [JSON Schema prefixItems](https://json-schema.org/understanding-json-schema/reference/array#tupleValidation)
+## Tips
+- Relationships reference interfaces via the `interfaces` array in `connects`
+- Multiple nodes can share the same interface type (e.g., all DBs use host-port)
+- Interface details enable code generation and testing automation
+- Use meaningful unique-ids that indicate purpose
+- Document protocol choices in your interface catalog
 
 ## Next Steps
-Tomorrow (Day 14) you'll reverse-engineer your e-commerce architecture into a pattern!
+Tomorrow (Day 14) you'll create your first CALM pattern - the superpower for generation and validation!

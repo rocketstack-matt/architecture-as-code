@@ -1,150 +1,178 @@
-# Day 14: Reverse-Engineer a Pattern from Your E-Commerce Architecture
+# Day 14: Create Your First Pattern - CALM's Superpower
 
 ## Overview
-Transform your existing e-commerce architecture into a reusable pattern that others can use to generate similar systems.
+Create a CALM pattern that instantly generates architecture scaffolds AND enforces governance rules - CALM's dual superpower.
 
 ## Objective and Rationale
-- **Objective:** Create a pattern based on your e-commerce architecture from Day 7, then test it by generating and validating new architectures
-- **Rationale:** Patterns don't always start from scratch - often you have a great architecture and want to make it reusable. Learn to reverse-engineer architectures into patterns, enabling teams to share proven designs and enforce consistency.
+- **Objective:** Create a simple pattern for a web application architecture that can generate scaffolds and validate compliance
+- **Rationale:** Patterns are CALM's superpower - one pattern does two things: (1) Generate compliant architecture in seconds (productivity), (2) Validate architectures follow standards (governance). Learn how `const`, `prefixItems`, and JSON Schema constraints enable both.
 
 ## Requirements
 
-### 1. Understand Pattern Extraction
+### 1. Understand CALM's Dual Superpower
 
-Your Day 7 architecture has actual values - to make it a pattern, wrap structural values in `const` and use `prefixItems`.
+**One Pattern = Two Powers:**
 
-**What to constrain:**
-- ✅ Structure (IDs, node types, relationship connections)
-- ✅ Security defaults (HTTPS protocols, required security metadata)
-- ❌ Deployment details (specific hosts, ports) - let users customize
+**Power 1 - Productivity (Generation):**
+```bash
+calm generate -p my-pattern.json -o new-service.json
+```
+Result: Instant architecture scaffold with all best practices baked in
 
-### 2. Review Your E-Commerce Architecture
+**Power 2 - Governance (Validation):**
+```bash
+calm validate -p my-pattern.json -a existing-service.json
+```
+Result: Automated compliance checking against your standards
 
-Open `architectures/ecommerce-platform.json` from Day 7.
+**How the same pattern does both:**
+- **`const: "api-gateway"`** → Generation: creates node with ID "api-gateway" | Validation: requires ID must be "api-gateway"
+- **`minItems: 3`** → Generation: creates 3 items | Validation: requires exactly 3 items
+- **`prefixItems: [...]`** → Generation: creates these exact items | Validation: checks these items exist
+
+### 2. Create a Simple Web Application Pattern
+
+You'll create a pattern for a standard 3-tier web app:
+- Frontend (webclient)
+- API Service (service) 
+- Database (database)
+
+**File:** `patterns/web-app-pattern.json`
 
 **Prompt:**
 ```text
-Analyze architectures/ecommerce-platform.json and tell me:
+Create a new file at patterns/web-app-pattern.json
 
-1. How many nodes does it have and what are their unique-ids?
-2. How many relationships and what types?
-3. What structure should I preserve in a pattern (IDs, types, connections)?
-4. What should I leave flexible for customization (hosts, ports, specific metadata)?
+This pattern defines a standard 3-tier web application architecture.
+
+The pattern should have:
+
+1. Schema setup:
+   - $schema: "https://calm.finos.org/release/1.0/meta/calm.json"
+   - $id: "https://example.com/patterns/web-app.json"
+   - title: "Standard Web Application Pattern"
+   - description: "Three-tier web application with frontend, API, and database"
+   - type: "object"
+
+2. Exactly 3 nodes using prefixItems (with minItems: 3, maxItems: 3):
+   - Node 1: unique-id "web-frontend", node-type "webclient", name "Web Frontend", description "User-facing web application"
+   - Node 2: unique-id "api-service", node-type "service", name "API Service", description "Backend API service"  
+   - Node 3: unique-id "app-database", node-type "database", name "Application Database", description "Primary data storage"
+
+3. Exactly 2 relationships using prefixItems (with minItems: 2, maxItems: 2):
+   - Relationship 1: unique-id "frontend-to-api", connects web-frontend to api-service, protocol "HTTPS", description "Frontend calls API"
+   - Relationship 2: unique-id "api-to-database", connects api-service to app-database, protocol "JDBC", description "API stores data"
+
+Use const for all unique-id, name, description, node-type properties.
+Use const for the entire relationship-type object.
+Each node and relationship must reference the base CALM schema using $ref.
+Set required: ["nodes", "relationships"] at the top level.
+Set required: ["description"] on each relationship.
+
+Refer to the pattern-creation.md guide in .github/chatmodes/CALM.chatmode.md for detailed pattern structure examples.
 ```
 
-### 3. Create the E-Commerce Pattern
+### 3. Test Generation
 
-**File:** `patterns/ecommerce-platform-pattern.json`
-
-**Prompt:**
-```text
-Create patterns/ecommerce-platform-pattern.json based on architectures/ecommerce-platform.json
-
-Follow the same pattern structure as web-app-pattern.json but with all the nodes and relationships from my e-commerce architecture.
-
-Preserve as const:
-- All unique-ids
-- All names  
-- All node-types
-- All descriptions
-- All relationship-type structures
-- All protocols
-
-Set minItems and maxItems to match the exact counts.
-Use prefixItems to define the exact structure.
-```
-
-### 4. Test Generation
-
-Generate a new architecture from your pattern:
+Generate an architecture from your pattern:
 
 ```bash
-calm generate -p patterns/ecommerce-platform-pattern.json -o architectures/ecommerce-variation.json
+calm generate -p patterns/web-app-pattern.json -o architectures/generated-webapp.json
 ```
 
-### 5. Visualize Both Versions
+Open `architectures/generated-webapp.json` and observe:
+- ✅ Has exactly 3 nodes with the IDs, names, descriptions from your pattern
+- ✅ Has exactly 2 relationships connecting them
+- ✅ Ready for enhancement with interfaces and metadata
 
-Compare the original and generated:
+### 4. Visualize the Generated Architecture
 
 **Steps:**
-1. Open `architectures/ecommerce-platform.json` and view preview
-2. **Take a screenshot**
-3. Open `architectures/ecommerce-variation.json` and view preview
-4. **Take a screenshot**
-5. Compare - structure should be identical, some values will be placeholders
+1. Open `architectures/generated-webapp.json` in VSCode
+2. Open preview (Ctrl+Shift+C / Cmd+Shift+C)
+3. See the 3-tier architecture visualized
+4. **Take a screenshot** of the generated architecture
 
-### 6. Validate Both Against the Pattern
+This shows how patterns create instant, visual architectures!
 
-```bash
-calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
-calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-variation.json
-```
+### 5. Enhance the Generated Architecture
 
-Both should pass! ✅
-
-### 7. Update Your Pattern to Require Controls
-
-Your e-commerce architecture now has controls from Day 8. Update the pattern to enforce them.
+The generated architecture has the basic structure, but you can enhance it:
 
 **Prompt:**
 ```text
-Update patterns/ecommerce-platform-pattern.json to require the security and performance controls at the architecture level.
+Update architectures/generated-webapp.json to add:
+- Interfaces to the service and database nodes with realistic host, port values
+- Metadata at the architecture level with owner, version, created date
+- Any additional properties that make it production-ready
 
-Add to the pattern's properties section:
-- controls with const value matching the security and performance controls from your architecture
-- Add controls to the required array at top level
+Keep the unique-ids, names, and core descriptions as they are (from the pattern).
 ```
 
-### 8. Test Pattern Validation with Controls
+### 6. Test Validation
 
 ```bash
-calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
+calm validate -p patterns/web-app-pattern.json -a architectures/generated-webapp.json
 ```
 
 Should pass! ✅
 
-### 9. Commit Your Work
+**Test Governance by Breaking Rules**
+
+**Prompt:**
+```text
+Create architectures/broken-webapp.json by copying generated-webapp.json and changing the unique-id of "web-frontend" to "my-custom-frontend"
+```
+
+Validate:
+```bash
+calm validate -p patterns/web-app-pattern.json -a architectures/broken-webapp.json
+```
+
+Should fail! ❌ The pattern catches the violation.
+
+Delete the broken file:
+```bash
+rm architectures/broken-webapp.json
+```
+
+### 7. Document the Superpower
+
+**File:** `patterns/README.md`
+
+**Prompt:**
+```text
+Create patterns/README.md explaining:
+
+1. The Dual Superpower: Patterns both generate AND validate
+2. How to use web-app-pattern.json for generation and validation
+3. What it enforces and why
+4. Time savings example
+```
+
+### 8. Commit Your Work
 
 ```bash
-git add patterns/ecommerce-platform-pattern.json architectures/ecommerce-variation.json patterns/README.md docs/screenshots README.md
-git commit -m "Day 14: Reverse-engineer e-commerce architecture into reusable pattern"
+git add patterns/web-app-pattern.json architectures/generated-webapp.json patterns/README.md docs/screenshots/day-14-pattern.png README.md
+git commit -m "Day 14: Create web app pattern - generation and validation superpower"
 git tag day-14
 ```
 
-## Deliverables
+## Deliverables / Validation Criteria
+
+Your Day 14 submission should include a commit tagged `day-14` containing:
 
 ✅ **Required Files:**
-- `patterns/ecommerce-platform-pattern.json` - Pattern with controls enforcement
-- `architectures/ecommerce-variation.json` - Generated from pattern
-- Screenshots showing both architectures
-- Updated `README.md` - Day 14 marked complete
-
-✅ **Validation:**
-```bash
-# Verify pattern exists
-test -f patterns/ecommerce-platform-pattern.json
-
-# Verify generated architecture
-test -f architectures/ecommerce-variation.json
-
-# Validate both architectures against pattern
-calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
-calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-variation.json
-
-# Check tag
-git tag | grep -q "day-14"
-```
+- `patterns/web-app-pattern.json` - Pattern defining 3-tier web app
+- `architectures/generated-webapp.json` - Architecture generated from pattern
+- `patterns/README.md` - Documentation
+- `docs/screenshots/day-14-pattern.png` - Visualization
+- Updated `README.md` - Day 14 marked as complete
 
 ## Resources
 
 - [CALM Pattern Documentation](https://github.com/finos/architecture-as-code/tree/main/calm/pattern)
 - [JSON Schema prefixItems](https://json-schema.org/understanding-json-schema/reference/array#tupleValidation)
 
-## Tips
-
-- Start with structure (IDs, types) as const, leave details flexible
-- Patterns that enforce controls create governance-compliant architectures by default
-- Test both generation and validation to ensure your pattern works both ways
-
 ## Next Steps
-Tomorrow (Day 15) you'll create a comprehensive custom template bundle!
+Tomorrow (Day 15) you'll reverse-engineer your e-commerce architecture into a pattern!

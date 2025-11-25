@@ -250,4 +250,4 @@ git tag | grep -q "day-11"
 - Use `--url-to-local-file-mapping` to make local file references clickable
 
 ## Next Steps
-Tomorrow (Day 12) you'll add multiple interface types to your architecture!
+Tomorrow (Day 12) you'll use CALM as an expert architecture advisor to improve your e-commerce platform's resilience!

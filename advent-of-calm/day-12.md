@@ -1,101 +1,107 @@
-# Day 12: Add Multiple Interface Types
+# Day 12: Use CALM as Your Expert Architecture Advisor
 
 ## Overview
-Model heterogeneous integration patterns by adding different interface types to your architecture.
+
+Use CALM Chat mode as an expert architect to analyze and improve your e-commerce architecture for better resilience and performance.
 
 ## Objective and Rationale
-- **Objective:** Add different interface types (REST API, message queue, database connection) to nodes in your architecture
-- **Rationale:** Real systems use multiple integration protocols. Learn to model HTTP APIs, async messaging, database connections, and other interface types. This makes architectures actionable for code generation and integration testing.
+
+- **Objective:** Use AI-assisted architecture analysis to identify weaknesses and improve your e-commerce platform's resilience and performance
+- **Rationale:** CALM Chat mode understands architecture patterns, failure modes, and best practices. By treating it as an expert advisor, you can get recommendations for improving your architecture - like having a senior architect review your design. This demonstrates the power of architecture-as-code combined with AI.
 
 ## Requirements
 
-### 1. Understand Interface Types
+### 1. Understand AI-Assisted Architecture Review
 
-CALM supports multiple interface patterns:
-- **host-port-interface:** Traditional host:port (APIs, databases)
-- **url-interface:** Full URLs (REST APIs, webhooks)
-- **hostname-interface:** Just hostname (DNS, service discovery)
-- **path-interface:** File paths (shared filesystems)
-- **oauth2-audience-interface:** OAuth2 configuration
+CALM Chat mode can:
 
-All interfaces share:
-- **unique-id:** Identifier
-- **Protocol** (in the relationship that uses it): HTTP, HTTPS, JDBC, AMQP, etc.
+- Analyze your architecture for potential issues
+- Suggest improvements based on best practices
+- Help you implement changes with proper CALM syntax
+- Explain the rationale behind recommendations
 
-### 2. Add a REST API Interface
+Think of it as pair-programming with an expert architect who knows your entire system.
 
-Update the `api-gateway` node in `architectures/ecommerce-platform.json`.
+### 2. Get a Resilience Assessment
+
+Open your `architectures/ecommerce-platform.json` and ask CALM Chat mode to analyze it.
 
 **Prompt:**
+
 ```text
-Update the api-gateway node in architectures/ecommerce-platform.json to add an interfaces array with a url-interface:
+Analyze my e-commerce architecture in architectures/ecommerce-platform.json for resilience issues.
 
-- unique-id: "gateway-rest-api"
-- url: "https://api.example.com/v1"
+Consider:
+- Single points of failure
+- Missing redundancy
+- Failure isolation
+- Recovery patterns
 
-If interfaces already exist, add this as an additional interface.
+What are the top 3 resilience concerns and how would you address them?
 ```
 
-### 3. Add a Database JDBC Interface
+Review the recommendations carefully. The AI should identify issues like:
 
-Update the `order-database` node.
+- **Single API Gateway:** Critical single point of failure - if it fails, the entire platform is unavailable
+- **Single Database Instances:** No replication modeled for order-database or inventory-database
+- **Missing Async Decoupling:** Synchronous service calls mean payment failures cascade to order service
+
+### 3. Implement Resilience Improvement #1: Add Load Balancer and Gateway Redundancy
+
+The API Gateway is currently a critical single point of failure. Let's add a load balancer and model redundant gateways.
 
 **Prompt:**
+
 ```text
-Update the order-database node in architectures/ecommerce-platform.json to add a host-port-interface:
+My API Gateway is a single point of failure. Update my e-commerce architecture to add:
 
-- unique-id: "postgres-jdbc"
-- host: "db-cluster-1.internal.example.com"
-- port: 5432
+1. A new "load-balancer" node (type: service) as the entry point
+2. Two API Gateway instances: "api-gateway-1" and "api-gateway-2"
+3. Update the customer and admin interacts relationships to go through the load balancer
+4. Add connects relationships from load balancer to both gateway instances
+5. Add metadata indicating this is for high availability
 
-Reference this interface in the relationship that connects to this database.
-Update the relationship's connects section to include:
-- destination-node: "order-database"
-- interfaces: ["postgres-jdbc"]
+The existing api-gateway node can become api-gateway-1.
 ```
 
-### 4. Add a Message Queue Interface
+### 4. Implement Resilience Improvement #2: Add Database Replication
 
-Add a new message broker node.
+Both databases are single instances with no failover. Let's add read replicas.
 
 **Prompt:**
+
 ```text
-Add a new node to architectures/ecommerce-platform.json:
+My order-database is a single point of failure. Update the architecture to show:
 
-- unique-id: "message-broker"
-- node-type: "system"
-- name: "Message Queue"
-- description: "RabbitMQ message broker for async processing"
-- interfaces array:
-  - unique-id: "amqp-interface"
-  - host: "rabbitmq.internal.example.com"
-  - port: 5672
+1. Rename current order-database to "order-database-primary"
+2. Add a new "order-database-replica" node
+3. Add a relationship from Order Service to the replica for read operations
+4. Add metadata indicating primary/replica roles and replication mode (async)
+5. Use a composed-of relationship to group them into an "order-database-cluster"
 
-Add a relationship connecting order-service to message-broker:
-- unique-id: "order-to-queue"
-- description: "Order service publishes events to message queue"
-- relationship-type: connects
-  - source-node: "order-service"
-  - destination-node: "message-broker"
-  - interfaces: ["amqp-interface"]
-  - protocol: "AMQP"
+Keep the primary for writes, replica for reads.
 ```
 
-### 5. Add an OAuth2 Interface
+### 5. Implement Resilience Improvement #3: Add Message Queue (Per ADR-0001)
 
-Add authentication configuration to the api-gateway.
+Your ADR-0001 already documents the decision to use async processing - let's implement it! This decouples Order Service from Payment Service failures.
 
 **Prompt:**
+
 ```text
-Add an oauth2-audience-interface to the api-gateway node in architectures/ecommerce-platform.json:
+Implement the async processing pattern from ADR-0001 in my architecture:
 
-- unique-id: "oauth2-config"
-- audiences: ["https://api.example.com", "https://mobile.example.com"]
+1. Add a "message-broker" node (type: system) for RabbitMQ with an AMQP interface on port 5672
+2. Add an "order-queue" that's composed-of the message-broker
+3. Change the order-to-payment flow to go through the message broker:
+   - Order Service publishes to the queue
+   - Payment Service consumes from the queue
+4. Add metadata linking to the ADR: "adr": "docs/adr/0001-use-message-queue-for-async-processing.md"
 
-This documents which OAuth2 audiences the gateway accepts.
+This provides failure isolation - orders can queue if Payment Service is down.
 ```
 
-### 6. Validate Multiple Interface Types
+### 6. Validate After Resilience Changes
 
 ```bash
 calm validate -a architectures/ecommerce-platform.json
@@ -103,117 +109,143 @@ calm validate -a architectures/ecommerce-platform.json
 
 Should pass! ✅
 
-### 7. Visualize the Multi-Protocol Architecture
+### 7. Visualize the Improved Architecture
 
 **Steps:**
+
 1. Save `architectures/ecommerce-platform.json`
-2. Open preview (Ctrl+Shift+C)
-3. Relationships should show different protocols (HTTPS, JDBC, AMQP)
-4. **Take a screenshot** showing the heterogeneous integration patterns
+2. Open preview (Ctrl+Shift+C / Cmd+Shift+C)
+3. Notice the new components:
+   - Load balancer in front of redundant gateways
+   - Database cluster with primary/replica
+   - Message broker between Order and Payment services
+4. **Take a screenshot** showing the more resilient architecture
 
-### 8. Create an Interface Catalog
+### 8. Add Resilience Controls
 
-**File:** `docs/interface-catalog.md`
+Document your resilience requirements as controls.
+
+**Prompt:**
+
+```text
+Add resilience controls to my e-commerce architecture:
+
+1. Add an architecture-level "high-availability" control requiring 99.9% uptime
+2. Add a node-level "failover" control on the order-database-cluster documenting RTO/RPO targets
+3. Add a "circuit-breaker" control on the order-service documenting failure thresholds
+
+Use requirement-url pointing to internal-policy.example.com and include inline config with specific values.
+```
+
+### 9. Final Validation
+
+```bash
+calm validate -a architectures/ecommerce-platform.json
+```
+
+### 10. Document the Improvements
+
+**File:** `docs/architecture-improvements.md`
 
 **Content:**
+
 ```markdown
-# E-Commerce Platform Interface Catalog
+# Architecture Improvements
 
-## REST APIs
+## Overview
 
-### API Gateway - Main API
-- **Interface ID:** gateway-rest-api
-- **Type:** url-interface
-- **URL:** https://api.example.com/v1
-- **Protocol:** HTTPS
-- **Purpose:** Primary public-facing API for web and mobile clients
+This document captures architecture improvements made with AI-assisted analysis.
 
-## Database Connections
+## Resilience Issues Identified
 
-### Order Database - PostgreSQL
-- **Interface ID:** postgres-jdbc
-- **Type:** host-port-interface
-- **Host:** db-cluster-1.internal.example.com
-- **Port:** 5432
-- **Protocol:** JDBC
-- **Purpose:** Persistent storage for order data
+| Concern | Severity | Original State | Risk |
+|---------|----------|----------------|------|
+| Single API Gateway | Critical | 1 gateway, no LB | Total platform outage |
+| Single Database Instances | High | No replicas | Data unavailability |
+| No Async Decoupling | High | Sync service calls | Cascade failures |
 
-## Message Queues
+## Improvements Implemented
 
-### Message Broker - RabbitMQ
-- **Interface ID:** amqp-interface
-- **Type:** host-port-interface
-- **Host:** rabbitmq.internal.example.com
-- **Port:** 5672
-- **Protocol:** AMQP
-- **Purpose:** Asynchronous event processing and service decoupling
+### 1. Load Balancer + Redundant API Gateways
 
-## Authentication
+**Problem:** Single API Gateway was critical single point of failure
+**Solution:** Added load balancer with two gateway instances
+**Benefit:** Gateway failure no longer causes total outage; traffic routes to healthy instance
 
-### API Gateway - OAuth2
-- **Interface ID:** oauth2-config
-- **Type:** oauth2-audience-interface
-- **Audiences:** 
-  - https://api.example.com
-  - https://mobile.example.com
-- **Purpose:** OAuth2 token validation configuration
+### 2. Database Primary/Replica Cluster
 
-## Integration Patterns Summary
+**Problem:** Order database had no failover capability
+**Solution:** Added read replica with async replication in a composed cluster
+**Benefit:** Read scalability; continued read availability during primary issues; faster failover
 
-| Pattern | Count | Use Cases |
-|---------|-------|-----------|
-| REST API (HTTPS) | 5+ | Client-server communication |
-| Database (JDBC) | 2+ | Data persistence |
-| Message Queue (AMQP) | 1 | Async processing, event-driven |
-| OAuth2 | 1 | Authentication & authorization |
+### 3. Message Queue (ADR-0001 Implementation)
 
-## Benefits
+**Problem:** Synchronous Order→Payment calls meant payment failures blocked orders
+**Solution:** Added RabbitMQ message broker for async processing
+**Benefit:** Orders queue during Payment Service outages; automatic retry; failure isolation
 
-1. **Multi-Protocol:** Models real-world heterogeneous systems
-2. **Precise Connections:** Relationships reference specific interfaces
-3. **Code Generation:** Enough detail to generate client code
-4. **Testing:** Integration tests can use interface details
+## Controls Added
+
+| Control | Level | Requirement |
+|---------|-------|-------------|
+| high-availability | Architecture | 99.9% uptime SLA |
+| failover | Database Cluster | RTO: 5min, RPO: 1min |
+| circuit-breaker | Order Service | Open after 5 failures in 30s |
+
+## Architecture Evolution
+
+- **Before:** 8 nodes, single points of failure, sync processing
+- **After:** 12+ nodes, redundant entry point, replicated data, async decoupling
+
+## Alignment with ADRs
+
+- **ADR-0001:** Message queue implementation ✅
+- **ADR-0002:** OAuth2 on load balancer entry point ✅
+
+## Lessons Learned
+
+1. AI-assisted review quickly identifies single points of failure
+2. Existing ADRs should drive architecture improvements
+3. Controls document the requirements that drove resilience decisions
+4. Incremental improvements are easier to validate and visualize
 ```
 
-### 9. Generate Documentation
+### 11. Update Your README
+
+Mark Day 12 as complete in your README checklist and note the AI-assisted architecture improvements. Link to `docs/architecture-improvements.md` so collaborators can see the evolution.
+
+### 12. Commit Your Work
 
 ```bash
-calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-interfaces
-```
-
-Open `docs/generated/ecommerce-interfaces/index.html` to see interface details in the generated docs.
-
-### 10. Update Your README
-
-Check off Day 12 in your README progress checklist and note that the architecture now documents REST, JDBC, AMQP, and OAuth2 interfaces. Link to `docs/interface-catalog.md` or the generated docs so teammates know where to review the catalog.
-
-### 11. Commit Your Work
-
-```bash
-git add architectures/ecommerce-platform.json docs/interface-catalog.md docs/generated README.md
-git commit -m "Day 12: Add multiple interface types (REST, JDBC, AMQP, OAuth2)"
+git add architectures/ecommerce-platform.json docs/architecture-improvements.md README.md
+git commit -m "Day 12: AI-assisted resilience improvements - LB, replicas, message queue"
 git tag day-12
 ```
 
 ## Deliverables
 
 ✅ **Required:**
-- `architectures/ecommerce-platform.json` - With 4+ different interface types
-- `docs/interface-catalog.md` - Interface documentation
-- `docs/generated/ecommerce-interfaces/` - Generated documentation
-- Screenshot showing multi-protocol visualization
+
+- `architectures/ecommerce-platform.json` - With resilience improvements:
+  - Load balancer + redundant API gateways
+  - Database primary/replica cluster
+  - Message broker for async processing
+- `docs/architecture-improvements.md` - Documentation of changes
+- Screenshots showing before/after architecture
 - Updated `README.md` - Day 12 marked complete
 
 ✅ **Validation:**
-```bash
-# Verify multiple interface types
-grep -q 'url-interface' architectures/ecommerce-platform.json
-grep -q 'host-port-interface' architectures/ecommerce-platform.json
-grep -q 'oauth2-audience-interface' architectures/ecommerce-platform.json
 
-# Verify message broker
+```bash
+# Verify new components exist
+grep -q 'load-balancer' architectures/ecommerce-platform.json
+grep -q 'api-gateway-1\|api-gateway-2' architectures/ecommerce-platform.json
 grep -q 'message-broker' architectures/ecommerce-platform.json
-grep -q 'AMQP' architectures/ecommerce-platform.json
+grep -q 'replica' architectures/ecommerce-platform.json
+
+# Verify resilience controls
+grep -q 'high-availability' architectures/ecommerce-platform.json
+grep -q 'failover' architectures/ecommerce-platform.json
 
 # Validate
 calm validate -a architectures/ecommerce-platform.json
@@ -223,15 +255,21 @@ git tag | grep -q "day-12"
 ```
 
 ## Resources
-- [CALM Interface Schema](https://github.com/finos/architecture-as-code/blob/main/calm/draft/2025-03/meta/interface.json)
-- [OAuth2 Audiences](https://datatracker.ietf.org/doc/html/rfc8693#section-4.3)
+
+- [Resilience Patterns](https://learn.microsoft.com/en-us/azure/architecture/patterns/category/resiliency)
+- [Circuit Breaker Pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker)
+- [Message Queue Patterns](https://www.enterpriseintegrationpatterns.com/patterns/messaging/)
+- [Database Replication](https://www.postgresql.org/docs/current/high-availability.html)
 
 ## Tips
-- Relationships reference interfaces via the `interfaces` array in `connects`
-- Multiple nodes can share the same interface type (e.g., all DBs use host-port)
-- Interface details enable code generation and testing automation
-- Use meaningful unique-ids that indicate purpose
-- Document protocol choices in your interface catalog
+
+- Ask CALM Chat mode to explain *why* it recommends changes, not just *what* to change
+- Reference your ADRs when implementing - they document decisions already made
+- Implement changes incrementally and validate after each one
+- Use controls to document the SLAs and thresholds that drove improvements
+- Compare before/after visualizations to communicate changes to stakeholders
+- The AI advisor works best when you provide context about your constraints
 
 ## Next Steps
-Tomorrow (Day 13) you'll create your first CALM pattern - the superpower for generation and validation!
+
+Tomorrow (Day 13) you'll add multiple interface types to your architecture!
