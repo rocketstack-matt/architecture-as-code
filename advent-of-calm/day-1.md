@@ -3,6 +3,10 @@
 ## Overview
 Set up your CALM workspace with AI-powered assistance and establish the foundation for your 24-day journey.
 
+## Prerequisites
+
+Ensure you have all the [prerequisites installed](../).
+
 ## Objective and Rationale
 - **Objective:** Install the CALM CLI, create a git repository, and enable GitHub Copilot assistance for architecture development
 - **Rationale:** Starting with a git-based workflow establishes good practices from day one. AI assistance accelerates learning and helps avoid common pitfalls. All your progress will be tracked in commits, creating a portfolio of your learning journey.
