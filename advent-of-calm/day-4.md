@@ -219,7 +219,7 @@ git tag | grep -q "day-4"
 - **Tree View**: Navigate nodes, relationships, flows
 - **Search**: Filter elements in tree view
 - **Home Button**: Return to top-level view
-- **Live Docify**: Preview documentation generation (we'll use this on Day 13!)
+- **Live Docify**: Preview documentation generation (we'll use this later in the Advent of CALM)
 
 **Commands:**
 - `CALM: Open Preview` - Open visualization panel

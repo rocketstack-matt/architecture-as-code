@@ -15,7 +15,7 @@ CALM supports four core relationship types (you can only use **one** per relatio
 
 - **interacts**: Actor/human interactions with services (e.g., user → web application)
 - **connects**: Infrastructure/technical connections (e.g., service → database, service → message queue)
-- **deployed-in**: Deployment topology (e.g., service → cluster/region) - *we'll cover this in Week 4*
+- **deployed-in**: Deployment topology (e.g., service → cluster/region) - *we'll cover this later in the Advent of CALM*
 - **composed-of**: Hierarchical composition (e.g., system → services)
 
 Today we'll work with **interacts**, **connects**, and **composed-of**.
