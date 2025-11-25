@@ -11,10 +11,23 @@ Connect architectural decisions to your CALM architecture by linking Architectur
 
 ### 1. Understand ADRs in CALM
 
-The `adrs` property is a top-level array in CALM architectures containing URLs to decision records:
-- Can reference local markdown files
-- Can reference remote documentation
-- Links decisions to technical implementation
+Architecture Decision Records (ADRs) capture significant architectural decisions along with their context and consequences. CALM supports linking ADRs to architectures through the `adrs` top-level property.
+
+**How CALM ADR Linking Works:**
+- The `adrs` property is a simple array of URL strings
+- URLs can be **relative paths** to local markdown files (e.g., `docs/adr/0001-decision.md`)
+- URLs can be **absolute URLs** to external resources (e.g., a wiki, GitHub repo, or ADR management tool)
+- This flexibility means you can link to existing ADR repositories if you already have them
+
+**ADR Formats:**
+There are several popular ADR formats. We'll use **MADR (Markdown Any Decision Records)** which includes:
+- Title and date
+- Status (Proposed, Accepted, Deprecated, Superseded)
+- Context (the situation and problem)
+- Decision (what was decided)
+- Consequences (positive and negative impacts)
+
+> **Already have ADRs?** If your organization maintains ADRs in a wiki, GitHub repo, or ADR tool, you can link directly to those URLs instead of creating local files.
 
 ### 2. Create Your ADR Directory
 
@@ -24,7 +37,7 @@ mkdir -p docs/adr
 
 ### 3. Create Your First ADR
 
-Use the popular ADR format (title, status, context, decision, consequences).
+We'll create ADRs using the **MADR format** - a lightweight, markdown-based approach that's easy to maintain alongside your code.
 
 **File:** `docs/adr/0001-use-message-queue-for-async-processing.md`
 
@@ -152,13 +165,18 @@ Should pass! ✅
 This directory contains Architecture Decision Records (ADRs) for the e-commerce platform.
 
 ## Format
-We follow the format described in [Michael Nygard's ADR template](https://github.com/joelparkerhenderson/architecture_decision_record/blob/main/templates/decision-record-template-by-michael-nygard/index.md):
 
-- Title
+We use **MADR (Markdown Any Decision Records)** format, based on [the MADR template](https://adr.github.io/madr/):
+
+- Title and date
 - Status (Proposed, Accepted, Deprecated, Superseded)
-- Context
-- Decision
-- Consequences
+- Context (the situation and problem)
+- Decision (what was decided)
+- Consequences (positive, negative, and mitigations)
+
+## Linking to CALM
+
+All ADRs in this directory are linked from `architectures/ecommerce-platform.json` in the `adrs` array. This creates traceability between decisions and implementation.
 
 ## Index
 
@@ -188,49 +206,14 @@ Link the ADR in `architectures/ecommerce-platform.json` in the `adrs` array.
 4. **Evolution:** Track how architecture decisions change over time
 ```
 
-### 8. Create a Decision Log Visualization
-
-**File:** `docs/decision-timeline.md`
-
-**Content:**
-```markdown
-# Architecture Decision Timeline
-
-## December 2024
-
-### Week 3
-- **2024-12-15:** [ADR-0001] Adopted message queue for async processing
-  - Impact: Added RabbitMQ node to architecture
-  - Relationships: order-service → message-broker → payment-service
-  
-- **2024-12-15:** [ADR-0002] Adopted OAuth2 for authentication
-  - Impact: Added oauth2-audience-interface to api-gateway
-  - Security control: Links to internal OAuth2 policy
-
-## Decision Categories
-
-### Integration Patterns (1 ADR)
-- Asynchronous messaging via AMQP
-
-### Security & Authentication (1 ADR)
-- OAuth2 with JWT tokens
-
-## Future Decisions Needed
-
-- [ ] Database replication strategy
-- [ ] Caching layer (Redis vs. Memcached)
-- [ ] Monitoring and observability platform
-- [ ] Deployment strategy (blue/green vs. canary)
-```
-
-### 9. Update Your README
+### 8. Update Your README
 
 Update your README to reflect that Day 10 is complete, mention that ADRs are now linked to the architecture, and add links to the specific ADR files so reviewers can jump directly to the decisions.
 
-### 10. Commit Your Work
+### 9. Commit Your Work
 
 ```bash
-git add architectures/ecommerce-platform.json docs/adr docs/decision-timeline.md README.md
+git add architectures/ecommerce-platform.json docs/adr README.md
 git commit -m "Day 10: Link ADRs to architecture for decision traceability"
 git tag day-10
 ```
@@ -242,7 +225,6 @@ git tag day-10
 - `docs/adr/0001-use-message-queue-for-async-processing.md`
 - `docs/adr/0002-use-oauth2-for-api-authentication.md`
 - `docs/adr/README.md` - ADR index
-- `docs/decision-timeline.md` - Decision visualization
 - Updated `README.md` - Day 10 marked complete
 
 ✅ **Validation:**
@@ -268,18 +250,19 @@ git tag | grep -q "day-10"
 
 ## Resources
 
-- [CALM ADR Example](https://github.com/finos/architecture-as-code/tree/main/calm/release/1.0-rc1/prototype/adr-example.json)
-- [ADR Templates](https://github.com/joelparkerhenderson/architecture_decision_record)
-- [When to Write ADRs](https://adr.github.io/)
+- [MADR - Markdown Any Decision Records](https://adr.github.io/madr/)
+- [ADR GitHub Organization](https://adr.github.io/)
+- [ADR Templates Collection](https://github.com/joelparkerhenderson/architecture_decision_record)
 
 ## Tips
 
 - Write ADRs when making significant architectural decisions
 - Include both positive and negative consequences
-- Link ADRs from CALM to create bidirectional traceability
+- Link ADRs from CALM to create traceability from decisions to implementation
 - Use consistent numbering (0001, 0002, etc.)
-- Keep ADRs immutable - supersede old decisions rather than editing
-- ADRs can be markdown, PDF, or links to wiki pages
+- Keep ADRs immutable - supersede old decisions rather than editing them
+- **Flexibility:** ADRs can be local markdown, links to a wiki, or URLs to an external ADR repository
+- If you already have ADRs elsewhere, just add those URLs to the `adrs` array
 
 ## Next Steps
 Tomorrow (Day 11) you'll generate documentation with the docify command!
