@@ -285,20 +285,5 @@ Your Day 6 submission should include a commit tagged `day-6` containing:
 }
 ```
 
-**Relationship-level:**
-```json
-{
-  "metadata": {
-    "latency-sla": "< 50ms",
-    "throughput-sla": "1000 req/sec",
-    "monitoring": true,
-    "circuit-breaker": true,
-    "retry-policy": "exponential-backoff",
-    "connection-pool-size": 20,
-    "timeout": "5s"
-  }
-}
-```
-
 ## Next Steps
 Tomorrow (Day 7) you'll bring everything together by creating a complete e-commerce microservice architecture with multiple nodes, relationships, interfaces, and metadata - a real-world example you can use as a reference!
