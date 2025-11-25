@@ -80,6 +80,7 @@ node_modules/
 *.log
 docs/generated/
 .vscode/settings.json
+**/.docusaurus/
 ```
 
 ### 7. Make Your First Commit
