@@ -78,10 +78,12 @@ Copilot will generate the file. **Important:** Don't blindly accept it! Review a
 calm validate -a architectures/my-first-architecture.json
 ```
 
-If validation fails:
+If validation fails with errors:
 - Read the error message carefully
 - Ask Copilot to fix it: `Fix the validation errors in architectures/my-first-architecture.json`
 - Validate again
+
+_Note that warnings about nodes not being referenced in any relationship are fine - you only have one node so far._
 
 ### 6. Understand What Was Created
 
