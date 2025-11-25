@@ -144,7 +144,9 @@ git tag | grep -q "day-2"
         "name": "Your Service Name",
         "description": "What your service does"
       }
-    ]
+    ],
+    ,
+    "relationships": []
   }
   ```
 - Ask Copilot follow-up questions if you don't understand something
