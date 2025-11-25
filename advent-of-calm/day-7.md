@@ -136,7 +136,7 @@ Use the tree view to explore:
 
 **Steps:**
 1. Open the CALM sidebar (click CALM icon in Activity Bar)
-2. Expand **Nodes** - you should see all 8 nodes
+2. Expand **Nodes** - you should see all 9 nodes
 3. Expand **Relationships** - you should see all 8+ relationships
 4. Click on different elements to see them in the diagram
 5. Use **search** to find specific nodes (try searching "order")
@@ -166,7 +166,7 @@ calm validate -a architectures/ecommerce-platform.json
 
 You should see:
 - ✅ No validation errors
-- 8 nodes total (2 actors, 4 services, 2 databases, 1 system)
+- 9 nodes total (2 actors, 4 services, 2 databases, 1 system)
 - 8+ relationships
 - Interfaces on all services and databases
 - Metadata at multiple levels
@@ -204,11 +204,10 @@ Your Day 7 submission should include a commit tagged `day-7` containing:
 
 ✅ **Required Files:**
 - `architectures/ecommerce-platform.json` - Complete, valid CALM architecture with:
-  - 8 nodes (2 actors, 4 services, 2 databases, 1 system)
+  - 9 nodes (2 actors, 4 services, 2 databases, 1 system)
   - 8+ relationships (interacts, connects, composed-of)
   - Interfaces on all services and databases
   - Metadata at architecture, node, and relationship levels
-- `docs/ecommerce/` - Generated documentation
 - `docs/screenshots/day-7-ecommerce.png` - Visualization screenshot
 - Updated `README.md` - Day 7 marked as complete
 
