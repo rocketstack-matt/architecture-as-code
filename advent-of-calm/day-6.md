@@ -170,20 +170,7 @@ Use the object format for metadata.
 }
 ```
 
-### 5. Understand Common Metadata Patterns
-
-Ask Copilot about best practices:
-
-**Prompt:**
-```text
-What are common metadata properties used in enterprise architectures? Give me examples for:
-- Ownership and governance
-- Deployment and infrastructure
-- Compliance and security
-- Cost management
-```
-
-### 6. Try the Array Format (Optional)
+### 5. Try the Array Format (Optional)
 
 Experiment with the array format to understand the difference.
 
@@ -192,15 +179,7 @@ Experiment with the array format to understand the difference.
 Show me how the metadata on my service node would look using the array format instead of the object format. Explain when I would choose one over the other.
 ```
 
-### 7. Validate Your Architecture
-
-```bash
-calm validate -a architectures/my-first-architecture.json
-```
-
-You should see validation succeed with metadata at multiple levels.
-
-### 8. Update Your README
+### 6. Update Your README
 
 Update your README.md progress:
 ```markdown
@@ -212,7 +191,7 @@ Update your README.md progress:
 - [x] Day 6: Document with Metadata
 ```
 
-### 9. Commit Your Work
+### 7. Commit Your Work
 
 ```bash
 git add architectures/my-first-architecture.json README.md
@@ -220,7 +199,7 @@ git commit -m "Day 6: Add metadata at architecture, node, and relationship level
 git tag day-6
 ```
 
-## Deliverables / Validation Criteria
+## Deliverables 
 
 Your Day 6 submission should include a commit tagged `day-6` containing:
 
@@ -230,15 +209,6 @@ Your Day 6 submission should include a commit tagged `day-6` containing:
   - At least one node with metadata (service node recommended)
   - At least one relationship with metadata (connects relationship recommended)
 - Updated `README.md` - Day 5 marked as complete
-
-✅ **Validation:**
-```bash
-# Architecture validates without errors
-calm validate -a architectures/my-first-architecture.json
-
-# Check git tag exists
-git tag | grep -q "day-6"
-```
 
 ## Resources
 - [CALM Core Schema - Metadata Definition](https://github.com/finos/architecture-as-code/blob/main/calm/release/1.0/meta/core.json#L309-L322)
