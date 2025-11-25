@@ -171,20 +171,7 @@ You should see:
 - Interfaces on all services and databases
 - Metadata at multiple levels
 
-### 8. Generate Documentation Preview
-
-Get a quick documentation preview:
-
-```bash
-calm docify -a architectures/ecommerce-platform.json -o docs/ecommerce
-cd docs/ecommerce
-npm install
-npm run start
-```
-
-This will open your architecture documentation in a browser. You'll see a professional-looking site with all your nodes, relationships, interfaces, and metadata beautifully formatted.
-
-### 9. Compare Architectures
+### 8. Compare Architectures
 
 You now have two complete architectures. Compare them:
 
@@ -197,7 +184,7 @@ Compare my two architectures:
 What did I learn? Which approach (incremental vs all-at-once) works better for different scenarios?
 ```
 
-### 10. Update Your README
+### 9. Update Your README
 
 Update your README.md progress:
 ```markdown
@@ -206,7 +193,7 @@ Update your README.md progress:
 ```
 
 ```bash
-git add architectures/ecommerce-platform.json docs/ecommerce docs/screenshots/day-7-ecommerce.png README.md
+git add architectures/ecommerce-platform.json README.md
 git commit -m "Day 7: Build complete e-commerce microservice architecture with visualization"
 git tag day-7
 ```
