@@ -151,7 +151,7 @@ Update the service node interface in architectures/my-first-architecture.json to
 
 Replace the inline interface properties with:
 - Keep the unique-id
-- Add a definition-url property pointing to "file://./patterns/rest-api-interface.json"
+- Add a definition-url property pointing to "https://my-enterprise/patterns/rest-api-interface.json"
 - Move the existing properties (host, port, path, authentication) into a "config" object
 
 This demonstrates how to use external interface definitions for standardization.
@@ -159,11 +159,7 @@ This demonstrates how to use external interface definitions for standardization.
 
 ### 9. Validate Your Architecture
 
-```bash
-calm validate -a architectures/my-first-architecture.json
-```
-
-You should see validation succeed with interfaces properly defined.
+At present, the CALM tooling does not follow external URL definitions (except for docify, which we'll cover later). For now, just know that by externalising this configuration you're opening up the reuse possibilities of your architectures.
 
 ### 10. Update Your README
 
@@ -190,15 +186,6 @@ Your Day 5 submission should include a commit tagged `day-5` containing:
 - `patterns/rest-api-interface.json` - Interface schema referenced by service
 - `docs/screenshots/day-5-interfaces.png` - Visualization showing interfaces
 - Updated `README.md` - Day 5 marked as complete
-
-✅ **Validation:**
-```bash
-# Architecture validates without errors
-calm validate -a architectures/my-first-architecture.json
-
-# Check git tag exists
-git tag | grep -q "day-5"
-```
 
 ## Resources
 - [CALM Interface Schema](https://github.com/finos/architecture-as-code/blob/main/calm/release/1.0/meta/interface.json)
