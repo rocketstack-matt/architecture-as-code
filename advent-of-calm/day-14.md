@@ -1,360 +1,150 @@
-# Day 14: Generate Documentation with Docify
+# Day 14: Reverse-Engineer a Pattern from Your E-Commerce Architecture
 
 ## Overview
-Transform your CALM architecture into browsable HTML documentation using the docify command.
+Transform your existing e-commerce architecture into a reusable pattern that others can use to generate similar systems.
 
 ## Objective and Rationale
-- **Objective:** Use `calm docify` to generate comprehensive documentation website from your architecture
-- **Rationale:** Machine-readable architecture (JSON) needs human-readable outputs. Docify generates documentation automatically, ensuring docs stay in sync with architecture. Essential for stakeholder communication and onboarding.
+- **Objective:** Create a pattern based on your e-commerce architecture from Day 7, then test it by generating and validating new architectures
+- **Rationale:** Patterns don't always start from scratch - often you have a great architecture and want to make it reusable. Learn to reverse-engineer architectures into patterns, enabling teams to share proven designs and enforce consistency.
 
 ## Requirements
 
-### 1. Understand Docify
+### 1. Understand Pattern Extraction
 
-The `calm docify` command generates documentation in multiple modes:
-- **Website mode (default):** Full HTML website with navigation
-- **Template mode:** Single file using custom template
-- **Template-dir mode:** Multiple files using template bundle
+Your Day 7 architecture has actual values - to make it a pattern, wrap structural values in `const` and use `prefixItems`.
 
-### 2. Generate Default Documentation Website
+**What to constrain:**
+- ✅ Structure (IDs, node types, relationship connections)
+- ✅ Security defaults (HTTPS protocols, required security metadata)
+- ❌ Deployment details (specific hosts, ports) - let users customize
 
-```bash
-calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-docs
+### 2. Review Your E-Commerce Architecture
+
+Open `architectures/ecommerce-platform.json` from Day 7.
+
+**Prompt:**
+```text
+Analyze architectures/ecommerce-platform.json and tell me:
+
+1. How many nodes does it have and what are their unique-ids?
+2. How many relationships and what types?
+3. What structure should I preserve in a pattern (IDs, types, connections)?
+4. What should I leave flexible for customization (hosts, ports, specific metadata)?
 ```
 
-This creates a complete HTML website with:
-- Index page with architecture overview
-- Node details pages
-- Relationship visualization
-- Flow diagrams
-- Control and metadata display
+### 3. Create the E-Commerce Pattern
 
-### 3. Explore Generated Documentation
+**File:** `patterns/ecommerce-platform-pattern.json`
+
+**Prompt:**
+```text
+Create patterns/ecommerce-platform-pattern.json based on architectures/ecommerce-platform.json
+
+Follow the same pattern structure as web-app-pattern.json but with all the nodes and relationships from my e-commerce architecture.
+
+Preserve as const:
+- All unique-ids
+- All names  
+- All node-types
+- All descriptions
+- All relationship-type structures
+- All protocols
+
+Set minItems and maxItems to match the exact counts.
+Use prefixItems to define the exact structure.
+```
+
+### 4. Test Generation
+
+Generate a new architecture from your pattern:
+
+```bash
+calm generate -p patterns/ecommerce-platform-pattern.json -o architectures/ecommerce-variation.json
+```
+
+### 5. Visualize Both Versions
+
+Compare the original and generated:
 
 **Steps:**
-1. Open `docs/generated/ecommerce-docs/index.html` in a browser
-2. Navigate through different sections:
-   - Architecture overview
-   - Node catalog
-   - Relationships
-   - Flows
-   - Controls
-3. **Take screenshots** of:
-   - Main index page
-   - A node detail page
-   - Flow visualization (if available)
+1. Open `architectures/ecommerce-platform.json` and view preview
+2. **Take a screenshot**
+3. Open `architectures/ecommerce-variation.json` and view preview
+4. **Take a screenshot**
+5. Compare - structure should be identical, some values will be placeholders
 
-### 4. Customize Output with URL Mapping
-
-If you have local ADR files, map them for documentation:
+### 6. Validate Both Against the Pattern
 
 ```bash
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --output docs/generated/ecommerce-docs-with-adrs \
-  --url-to-local-file-mapping docs/adr
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-variation.json
 ```
 
-This makes local ADR references clickable in generated docs.
+Both should pass! ✅
 
-### 5. Create a Custom Template
+### 7. Update Your Pattern to Require Controls
 
-Handlebars templates allow custom documentation formats.
+Your e-commerce architecture now has controls from Day 8. Update the pattern to enforce them.
 
-**File:** `templates/architecture-summary.hbs`
+**Prompt:**
+```text
+Update patterns/ecommerce-platform-pattern.json to require the security and performance controls at the architecture level.
 
-**Content:**
-```handlebars
-# {{metadata.title}} Architecture Summary
-
-**Version:** {{metadata.version}}  
-**Owner:** {{metadata.owner}}
-
-## Overview
-{{metadata.description}}
-
-## Components
-
-This architecture contains **{{nodes.length}}** nodes:
-
-{{#each nodes}}
-- **{{this.name}}** ({{this.node-type.name}}): {{this.description}}
-{{/each}}
-
-## Integrations
-
-This architecture has **{{relationships.length}}** connections:
-
-{{#each relationships}}
-- {{this.description}}
-  - Protocol: {{this.relationship-type.connects.protocol}}
-{{/each}}
-
-## Flows
-
-{{#if flows}}
-{{#each flows}}
-### {{this.name}}
-{{this.description}}
-
-Steps:
-{{#each this.transitions}}
-{{this.sequence-number}}. {{this.summary}}
-{{/each}}
-
-{{/each}}
-{{else}}
-No flows defined yet.
-{{/if}}
-
-## Controls
-
-{{#if controls}}
-{{#each controls}}
-### {{@key}}
-{{this.description}}
-
-{{/each}}
-{{else}}
-No controls defined yet.
-{{/if}}
-
----
-*Generated from CALM architecture on {{metadata.timestamp}}*
+Add to the pattern's properties section:
+- controls with const value matching the security and performance controls from your architecture
+- Add controls to the required array at top level
 ```
 
-### 6. Generate Documentation Using Custom Template
+### 8. Test Pattern Validation with Controls
 
 ```bash
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --template templates/architecture-summary.hbs \
-  --output docs/generated/architecture-summary.md
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
 ```
 
-Open `docs/generated/architecture-summary.md` - it's a markdown summary!
+Should pass! ✅
 
-### 7. Create a Node Catalog Template
-
-**File:** `templates/node-catalog.hbs`
-
-**Content:**
-```handlebars
-# Node Catalog
-
-## Architecture: {{metadata.title}}
-
-Total Nodes: {{nodes.length}}
-
----
-
-{{#each nodes}}
-## {{this.name}}
-
-**ID:** `{{this.unique-id}}`  
-**Type:** {{this.node-type.name}}  
-**Description:** {{this.description}}
-
-{{#if this.interfaces}}
-### Interfaces
-{{#each this.interfaces}}
-- **{{this.unique-id}}**
-  {{#if this.host}}
-  - Host: {{this.host}}
-  {{/if}}
-  {{#if this.port}}
-  - Port: {{this.port}}
-  {{/if}}
-  {{#if this.url}}
-  - URL: {{this.url}}
-  {{/if}}
-{{/each}}
-{{else}}
-No interfaces defined.
-{{/if}}
-
-{{#if this.controls}}
-### Controls
-{{#each this.controls}}
-- **{{@key}}:** {{this.description}}
-{{/each}}
-{{/if}}
-
-{{#if this.metadata}}
-### Metadata
-{{#each this.metadata}}
-- **{{@key}}:** {{this}}
-{{/each}}
-{{/if}}
-
----
-
-{{/each}}
-```
-
-### 8. Generate Node Catalog
+### 9. Commit Your Work
 
 ```bash
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --template templates/node-catalog.hbs \
-  --output docs/generated/node-catalog.md
-```
-
-### 9. Create a Documentation README
-
-**File:** `docs/generated/README.md`
-
-**Content:**
-```markdown
-# Generated Documentation
-
-This directory contains auto-generated documentation from CALM architectures.
-
-## Available Documentation
-
-### Full Website
-- **Location:** `ecommerce-docs/index.html`
-- **Generated with:** `calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-docs`
-- **Content:** Complete browsable website with all architecture details
-
-### Architecture Summary
-- **Location:** `architecture-summary.md`
-- **Template:** `templates/architecture-summary.hbs`
-- **Content:** High-level overview with counts and lists
-
-### Node Catalog
-- **Location:** `node-catalog.md`
-- **Template:** `templates/node-catalog.hbs`
-- **Content:** Detailed listing of all nodes with interfaces and controls
-
-## Regenerating Documentation
-
-To update documentation after architecture changes:
-
-\`\`\`bash
-# Full website
-calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-docs
-
-# Custom templates
-calm docify --architecture architectures/ecommerce-platform.json --template templates/architecture-summary.hbs --output docs/generated/architecture-summary.md
-calm docify --architecture architectures/ecommerce-platform.json --template templates/node-catalog.hbs --output docs/generated/node-catalog.md
-\`\`\`
-
-## Benefits
-
-1. **Always Up-to-Date:** Regenerate from source of truth
-2. **Multiple Formats:** Website, markdown, custom formats
-3. **Stakeholder Communication:** Human-readable architecture
-4. **Onboarding:** New team members can browse documentation
-```
-
-### 10. Add Documentation Generation Script
-
-**File:** `scripts/generate-docs.sh`
-
-**Content:**
-```bash
-#!/bin/bash
-set -e
-
-echo "🏗️  Generating CALM documentation..."
-
-# Full website
-echo "📖 Generating website documentation..."
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --output docs/generated/ecommerce-docs \
-  --url-to-local-file-mapping docs/adr
-
-# Architecture summary
-echo "📄 Generating architecture summary..."
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --template templates/architecture-summary.hbs \
-  --output docs/generated/architecture-summary.md
-
-# Node catalog
-echo "📋 Generating node catalog..."
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --template templates/node-catalog.hbs \
-  --output docs/generated/node-catalog.md
-
-echo "✅ Documentation generation complete!"
-echo "   View at: docs/generated/ecommerce-docs/index.html"
-```
-
-Make it executable:
-```bash
-chmod +x scripts/generate-docs.sh
-```
-
-### 11. Test Documentation Generation
-
-```bash
-./scripts/generate-docs.sh
-```
-
-Verify all documentation was generated successfully.
-
-### 12. Update Your README
-
-Document Day 14 progress in your README: mark the checklist, describe the new documentation outputs, and link to `docs/generated/README.md` or the screenshots so stakeholders know where to browse the generated sites.
-
-### 13. Commit Your Work
-
-```bash
-git add templates/ docs/generated/ scripts/generate-docs.sh README.md
-git commit -m "Day 14: Generate documentation with docify and custom templates"
+git add patterns/ecommerce-platform-pattern.json architectures/ecommerce-variation.json patterns/README.md docs/screenshots README.md
+git commit -m "Day 14: Reverse-engineer e-commerce architecture into reusable pattern"
 git tag day-14
 ```
 
 ## Deliverables
 
-✅ **Required:**
-- `docs/generated/ecommerce-docs/` - Full website documentation
-- `docs/generated/architecture-summary.md` - Custom summary
-- `docs/generated/node-catalog.md` - Custom node catalog
-- `templates/architecture-summary.hbs` - Custom template
-- `templates/node-catalog.hbs` - Custom template
-- `scripts/generate-docs.sh` - Documentation generation script
-- `docs/generated/README.md` - Documentation guide
-- Screenshots of generated documentation
+✅ **Required Files:**
+- `patterns/ecommerce-platform-pattern.json` - Pattern with controls enforcement
+- `architectures/ecommerce-variation.json` - Generated from pattern
+- Screenshots showing both architectures
 - Updated `README.md` - Day 14 marked complete
 
 ✅ **Validation:**
 ```bash
-# Verify generated documentation exists
-test -f docs/generated/ecommerce-docs/index.html
-test -f docs/generated/architecture-summary.md
-test -f docs/generated/node-catalog.md
+# Verify pattern exists
+test -f patterns/ecommerce-platform-pattern.json
 
-# Verify templates exist
-test -f templates/architecture-summary.hbs
-test -f templates/node-catalog.hbs
+# Verify generated architecture
+test -f architectures/ecommerce-variation.json
 
-# Verify script exists and is executable
-test -x scripts/generate-docs.sh
-
-# Run generation
-./scripts/generate-docs.sh
+# Validate both architectures against pattern
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-variation.json
 
 # Check tag
 git tag | grep -q "day-14"
 ```
 
 ## Resources
-- [Docify Documentation](https://github.com/finos/architecture-as-code/tree/main/cli#docify)
-- [Handlebars Templates](https://handlebarsjs.com/guide/)
-- [CALM Template Examples](https://github.com/finos/architecture-as-code/tree/main/cli/test_fixtures/template)
+
+- [CALM Pattern Documentation](https://github.com/finos/architecture-as-code/tree/main/calm/pattern)
+- [JSON Schema prefixItems](https://json-schema.org/understanding-json-schema/reference/array#tupleValidation)
 
 ## Tips
-- Regenerate documentation after every architecture change
-- Use custom templates for different audiences (executives vs. developers)
-- Add documentation generation to CI/CD pipeline
-- Templates can access all CALM properties (nodes, relationships, flows, controls)
-- Use `--url-to-local-file-mapping` to make local file references clickable
+
+- Start with structure (IDs, types) as const, leave details flexible
+- Patterns that enforce controls create governance-compliant architectures by default
+- Test both generation and validation to ensure your pattern works both ways
 
 ## Next Steps
 Tomorrow (Day 15) you'll create a comprehensive custom template bundle!

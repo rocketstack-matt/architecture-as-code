@@ -1,177 +1,208 @@
-# Day 8: Create Your First Pattern - CALM's Superpower
+# Day 8: Add Controls for Non-Functional Requirements
 
 ## Overview
-Create a CALM pattern that instantly generates architecture scaffolds AND enforces governance rules - CALM's dual superpower.
+Document security, performance, and compliance requirements using CALM's controls feature to capture non-functional requirements (NFRs).
 
 ## Objective and Rationale
-- **Objective:** Create a simple pattern for a web application architecture that can generate scaffolds and validate compliance
-- **Rationale:** Patterns are CALM's superpower - one pattern does two things: (1) Generate compliant architecture in seconds (productivity), (2) Validate architectures follow standards (governance). Learn how `const`, `prefixItems`, and JSON Schema constraints enable both.
+- **Objective:** Add security and performance controls to your e-commerce architecture to document non-functional requirements
+- **Rationale:** Controls enable you to capture non-functional requirements (NFRs) by documenting security, compliance, performance, and operational needs. They connect technical architectures to regulatory and policy frameworks, making compliance auditable and NFRs explicit and traceable.
 
 ## Requirements
 
-### 1. Understand CALM's Dual Superpower
+### 1. Understand Controls
 
-**One Pattern = Two Powers:**
+Controls in CALM consist of:
+- **Domain key:** Category (e.g., `security`, `compliance`, `performance`, `operational`)
+- **Description:** What the control addresses
+- **Requirements:** Array of requirement specifications with:
+  - `requirement-url`: Link to the requirement definition
+  - Plus ONE of:
+    - `config-url`: Link to external configuration, OR
+    - `config`: Inline configuration object
 
-**Power 1 - Productivity (Generation):**
-```bash
-calm generate -p my-pattern.json -o new-service.json
-```
-Result: Instant architecture scaffold with all best practices baked in
+> **Important:** Each requirement MUST specify how it's implemented - either via `config-url` or inline `config`. This enforces that controls are not just declared but actually configured.
 
-**Power 2 - Governance (Validation):**
-```bash
-calm validate -p my-pattern.json -a existing-service.json
-```
-Result: Automated compliance checking against your standards
+Controls can be applied at multiple levels:
+- **Architecture level:** Apply to the entire system
+- **Node level:** Apply to specific components
+- **Relationship level:** Apply to specific connections between components
+- **Flow level:** Apply to business processes and data flows
 
-**How the same pattern does both:**
-- **`const: "api-gateway"`** → Generation: creates node with ID "api-gateway" | Validation: requires ID must be "api-gateway"
-- **`minItems: 3`** → Generation: creates 3 items | Validation: requires exactly 3 items
-- **`prefixItems: [...]`** → Generation: creates these exact items | Validation: checks these items exist
+### 2. Add an Architecture-Level Security Control
 
-### 2. Create a Simple Web Application Pattern
-
-You'll create a pattern for a standard 3-tier web app:
-- Frontend (webclient)
-- API Service (service) 
-- Database (database)
-
-**File:** `patterns/web-app-pattern.json`
+Open your `architectures/ecommerce-platform.json` from Day 7.
 
 **Prompt:**
 ```text
-Create a new file at patterns/web-app-pattern.json
+Add a controls section at the top level of architectures/ecommerce-platform.json
 
-This pattern defines a standard 3-tier web application architecture.
+Add a "security" control with:
+- description: "Data encryption and secure communication requirements"
+- requirements array with two items:
+  1. requirement-url: "https://internal-policy.example.com/security/encryption-at-rest"
+     config (inline): { "algorithm": "AES-256", "scope": "all-data-stores" }
+  2. requirement-url: "https://internal-policy.example.com/security/tls-1-3-minimum"
+     config-url: "https://configs.example.com/security/tls-config.yaml"
 
-The pattern should have:
-
-1. Schema setup:
-   - $schema: "https://calm.finos.org/release/1.0/meta/calm.json"
-   - $id: "https://example.com/patterns/web-app.json"
-   - title: "Standard Web Application Pattern"
-   - description: "Three-tier web application with frontend, API, and database"
-   - type: "object"
-
-2. Exactly 3 nodes using prefixItems (with minItems: 3, maxItems: 3):
-   - Node 1: unique-id "web-frontend", node-type "webclient", name "Web Frontend", description "User-facing web application"
-   - Node 2: unique-id "api-service", node-type "service", name "API Service", description "Backend API service"  
-   - Node 3: unique-id "app-database", node-type "database", name "Application Database", description "Primary data storage"
-
-3. Exactly 2 relationships using prefixItems (with minItems: 2, maxItems: 2):
-   - Relationship 1: unique-id "frontend-to-api", connects web-frontend to api-service, protocol "HTTPS", description "Frontend calls API"
-   - Relationship 2: unique-id "api-to-database", connects api-service to app-database, protocol "JDBC", description "API stores data"
-
-Use const for all unique-id, name, description, node-type properties.
-Use const for the entire relationship-type object.
-Each node and relationship must reference the base CALM schema using $ref.
-Set required: ["nodes", "relationships"] at the top level.
-Set required: ["description"] on each relationship.
-
-Refer to the pattern-creation.md guide in .github/chatmodes/CALM.chatmode.md for detailed pattern structure examples.
+Place it after the metadata section and before nodes.
 ```
 
-### 3. Test Generation
-
-Generate an architecture from your pattern:
-
-```bash
-calm generate -p patterns/web-app-pattern.json -o architectures/generated-webapp.json
-```
-
-Open `architectures/generated-webapp.json` and observe:
-- ✅ Has exactly 3 nodes with the IDs, names, descriptions from your pattern
-- ✅ Has exactly 2 relationships connecting them
-- ✅ Ready for enhancement with interfaces and metadata
-
-### 4. Visualize the Generated Architecture
-
-**Steps:**
-1. Open `architectures/generated-webapp.json` in VSCode
-2. Open preview (Ctrl+Shift+C / Cmd+Shift+C)
-3. See the 3-tier architecture visualized
-4. **Take a screenshot** of the generated architecture
-
-This shows how patterns create instant, visual architectures!
-
-### 5. Enhance the Generated Architecture
-
-The generated architecture has the basic structure, but you can enhance it:
+### 3. Add an Architecture-Level Performance Control
 
 **Prompt:**
 ```text
-Update architectures/generated-webapp.json to add:
-- Interfaces to the service and database nodes with realistic host, port values
-- Metadata at the architecture level with owner, version, created date
-- Any additional properties that make it production-ready
+Add a "performance" control at the architecture level of architectures/ecommerce-platform.json
 
-Keep the unique-ids, names, and core descriptions as they are (from the pattern).
+Add with:
+- description: "System-wide performance and scalability requirements"
+- requirements array with two items:
+  1. requirement-url: "https://internal-policy.example.com/performance/response-time-sla"
+     config (inline): { "p99-latency-ms": 200, "p95-latency-ms": 100 }
+  2. requirement-url: "https://internal-policy.example.com/performance/availability-target"
+     config-url: "https://configs.example.com/infra/ha-config.yaml"
+
+Place it alongside the security control in the controls section.
 ```
 
-### 6. Test Validation
+### 4. Add a Node-Level Compliance Control
+
+Add a control to the `payment-service` node.
+
+**Prompt:**
+```text
+Add a controls section to the payment-service node in architectures/ecommerce-platform.json
+
+Add a "compliance" control with:
+- description: "PCI-DSS compliance for payment processing"
+- requirements array with one item:
+  - requirement-url: "https://www.pcisecuritystandards.org/documents/PCI-DSS-v4.0"
+    config-url: "https://configs.example.com/compliance/pci-dss-config.json"
+```
+
+### 5. Add a Node-Level Performance Control
+
+Add a performance control to the `api-gateway` node.
+
+**Prompt:**
+```text
+Add a controls section to the api-gateway node in architectures/ecommerce-platform.json
+
+Add a "performance" control with:
+- description: "API Gateway rate limiting and caching requirements"
+- requirements array with two items:
+  1. requirement-url: "https://internal-policy.example.com/performance/rate-limiting"
+     config-url: "https://configs.example.com/gateway/rate-limits.yaml"
+  2. requirement-url: "https://internal-policy.example.com/performance/caching-policy"
+     config (inline): { "default-ttl-seconds": 300, "cache-control": "private" }
+```
+
+### 6. Validate
 
 ```bash
-calm validate -p patterns/web-app-pattern.json -a architectures/generated-webapp.json
+calm validate -a architectures/ecommerce-platform.json
 ```
 
 Should pass! ✅
 
-**Test Governance by Breaking Rules**
+### 7. Create Documentation
 
-**Prompt:**
-```text
-Create architectures/broken-webapp.json by copying generated-webapp.json and changing the unique-id of "web-frontend" to "my-custom-frontend"
+**File:** `docs/controls-guide.md`
+
+**Content:**
+```markdown
+# CALM Controls Guide
+
+## Purpose
+Controls document non-functional requirements (NFRs) including security, compliance, performance, and operational needs in architecture.
+
+## Control Domains
+
+| Domain | Purpose | Example Requirements |
+|--------|---------|---------------------|
+| security | Data protection, access control | Encryption, TLS, authentication |
+| compliance | Regulatory adherence | PCI-DSS, GDPR, SOC2 |
+| performance | Non-functional requirements | SLAs, rate limits, availability |
+| operational | Runtime concerns | Logging, monitoring, backup |
+
+## Controls in This Architecture
+
+### Architecture-Level Controls
+
+**Security**
+- Encryption at rest: https://internal-policy.example.com/security/encryption-at-rest (inline config)
+- TLS 1.3 minimum: https://configs.example.com/security/tls-config.yaml
+
+**Performance**
+- Response time SLA: https://internal-policy.example.com/performance/response-time-sla (inline config)
+- Availability target: https://configs.example.com/infra/ha-config.yaml
+
+### Node-Level Controls
+
+**Payment Service - Compliance**
+- PCI-DSS: https://www.pcisecuritystandards.org/documents/PCI-DSS-v4.0
+- Configuration: https://configs.example.com/compliance/pci-dss-config.json
+
+**API Gateway - Performance**
+- Rate limiting: https://configs.example.com/gateway/rate-limits.yaml
+- Caching policy: https://internal-policy.example.com/performance/caching-policy (inline config)
+
+## Benefits
+
+1. **Audit Trail:** Links architecture to compliance requirements
+2. **NFR Tracking:** Makes non-functional requirements explicit and measurable
+3. **Traceability:** Connects technical implementation to policy
+4. **SLA Documentation:** Makes performance requirements explicit and trackable
 ```
 
-Validate:
-```bash
-calm validate -p patterns/web-app-pattern.json -a architectures/broken-webapp.json
-```
+### 8. Update Your README
 
-Should fail! ❌ The pattern catches the violation.
-
-Delete the broken file:
-```bash
-rm architectures/broken-webapp.json
-```
-
-### 8. Document the Superpower
-
-**File:** `patterns/README.md`
-
-**Prompt:**
-```text
-Create patterns/README.md explaining:
-
-1. The Dual Superpower: Patterns both generate AND validate
-2. How to use web-app-pattern.json for generation and validation
-3. What it enforces and why
-4. Time savings example
-```
+Mark Day 8 as complete in your progress checklist and add a short note about the new controls plus a link to `docs/controls-guide.md` so collaborators know where to find the governance details.
 
 ### 9. Commit Your Work
 
 ```bash
-git add patterns/web-app-pattern.json architectures/generated-webapp.json patterns/README.md docs/screenshots/day-8-pattern.png README.md
-git commit -m "Day 8: Create web app pattern - generation and validation superpower"
+git add architectures/ecommerce-platform.json docs/controls-guide.md README.md
+git commit -m "Day 8: Add security and performance controls for NFRs"
 git tag day-8
 ```
 
-## Deliverables / Validation Criteria
+## Deliverables
 
-Your Day 8 submission should include a commit tagged `day-8` containing:
+✅ **Required:**
+- `architectures/ecommerce-platform.json` - With architecture and node-level controls (security + performance)
+- `docs/controls-guide.md` - Control documentation
+- Updated `README.md` - Day 8 marked complete
 
-✅ **Required Files:**
-- `patterns/web-app-pattern.json` - Pattern defining 3-tier web app
-- `architectures/generated-webapp.json` - Architecture generated from pattern
-- `patterns/README.md` - Documentation
-- `docs/screenshots/day-8-pattern.png` - Visualization
-- Updated `README.md` - Day 8 marked as complete
+✅ **Validation:**
+```bash
+# Verify controls exist in architecture
+grep -q '"controls"' architectures/ecommerce-platform.json
+
+# Verify security control
+grep -A 5 '"security"' architectures/ecommerce-platform.json | grep -q 'encryption'
+
+# Verify performance control
+grep -A 5 '"performance"' architectures/ecommerce-platform.json | grep -q 'response-time\|rate-limiting'
+
+# Verify compliance control
+grep -A 5 '"compliance"' architectures/ecommerce-platform.json | grep -q 'PCI-DSS'
+
+# Validate
+calm validate -a architectures/ecommerce-platform.json
+
+# Check tag
+git tag | grep -q "day-8"
+```
 
 ## Resources
-- [CALM Pattern Documentation](https://github.com/finos/architecture-as-code/tree/main/calm/pattern)
-- [JSON Schema prefixItems](https://json-schema.org/understanding-json-schema/reference/array#tupleValidation)
+- [CALM Controls Schema](https://github.com/finos/architecture-as-code/blob/main/calm/draft/2025-03/meta/control.json)
+- [PCI-DSS Standards](https://www.pcisecuritystandards.org/)
+
+## Tips
+- Use meaningful URLs that point to actual policy documents
+- Controls make architecture auditable and traceable to non-functional requirements
+- Consider controls for: authentication, authorization, data retention, logging, latency, throughput
+- NFRs captured in controls help teams understand and validate system quality attributes
 
 ## Next Steps
-Tomorrow (Day 9) you'll reverse-engineer your e-commerce architecture into a pattern!
+Tomorrow (Day 9) you'll create your first CALM pattern - the superpower for generation and validation!

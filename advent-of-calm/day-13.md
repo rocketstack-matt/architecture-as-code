@@ -1,291 +1,178 @@
-# Day 13: Link to an ADR
+# Day 13: Create Your First Pattern - CALM's Superpower
 
 ## Overview
-Connect architectural decisions to your CALM architecture by linking Architecture Decision Records.
+Create a CALM pattern that instantly generates architecture scaffolds AND enforces governance rules - CALM's dual superpower.
 
 ## Objective and Rationale
-- **Objective:** Create ADR documents and link them to your architecture using the `adrs` property
-- **Rationale:** Architecture Decision Records capture the "why" behind design choices. Linking them to CALM architectures creates traceability from decisions to implementation, essential for onboarding, audits, and understanding system evolution.
+- **Objective:** Create a simple pattern for a web application architecture that can generate scaffolds and validate compliance
+- **Rationale:** Patterns are CALM's superpower - one pattern does two things: (1) Generate compliant architecture in seconds (productivity), (2) Validate architectures follow standards (governance). Learn how `const`, `prefixItems`, and JSON Schema constraints enable both.
 
 ## Requirements
 
-### 1. Understand ADRs in CALM
+### 1. Understand CALM's Dual Superpower
 
-The `adrs` property is a top-level array in CALM architectures containing URLs to decision records:
-- Can reference local markdown files
-- Can reference remote documentation
-- Links decisions to technical implementation
+**One Pattern = Two Powers:**
 
-### 2. Create Your ADR Directory
-
+**Power 1 - Productivity (Generation):**
 ```bash
-mkdir -p docs/adr
+calm generate -p my-pattern.json -o new-service.json
 ```
+Result: Instant architecture scaffold with all best practices baked in
 
-### 3. Create Your First ADR
-
-Use the popular ADR format (title, status, context, decision, consequences).
-
-**File:** `docs/adr/0001-use-message-queue-for-async-processing.md`
-
-**Content:**
-```markdown
-# 1. Use Message Queue for Asynchronous Order Processing
-
-Date: 2024-12-15
-
-## Status
-Accepted
-
-## Context
-Our e-commerce platform needs to handle order processing asynchronously to:
-- Improve user experience with fast order confirmation
-- Decouple order capture from payment processing
-- Handle traffic spikes without overloading payment services
-- Enable retry logic for failed payment attempts
-
-## Decision
-We will introduce a RabbitMQ message broker between the Order Service and Payment Service.
-
-**Technical Details:**
-- Protocol: AMQP
-- Broker: RabbitMQ 3.12+
-- Message format: JSON
-- Durability: Persistent messages with acknowledgments
-
-## Consequences
-
-### Positive
-- **Resilience:** Payment service failures don't block order submission
-- **Scalability:** Can scale payment processing independently
-- **User Experience:** Immediate order confirmation
-- **Retries:** Failed payments can be retried automatically
-
-### Negative
-- **Complexity:** Adds another system component to manage
-- **Eventual Consistency:** Order status updates are asynchronous
-- **Operational Overhead:** Requires monitoring, backlog management
-
-### Mitigations
-- Implement comprehensive message monitoring
-- Add dead-letter queues for failed messages
-- Provide customer-facing order status tracking
+**Power 2 - Governance (Validation):**
+```bash
+calm validate -p my-pattern.json -a existing-service.json
 ```
+Result: Automated compliance checking against your standards
 
-### 4. Create a Second ADR
+**How the same pattern does both:**
+- **`const: "api-gateway"`** → Generation: creates node with ID "api-gateway" | Validation: requires ID must be "api-gateway"
+- **`minItems: 3`** → Generation: creates 3 items | Validation: requires exactly 3 items
+- **`prefixItems: [...]`** → Generation: creates these exact items | Validation: checks these items exist
 
-**File:** `docs/adr/0002-use-oauth2-for-api-authentication.md`
+### 2. Create a Simple Web Application Pattern
 
-**Content:**
-```markdown
-# 2. Use OAuth2 for API Authentication
+You'll create a pattern for a standard 3-tier web app:
+- Frontend (webclient)
+- API Service (service) 
+- Database (database)
 
-Date: 2024-12-15
-
-## Status
-Accepted
-
-## Context
-The API Gateway requires a secure, standardized authentication mechanism for:
-- Web application clients
-- Mobile application clients
-- Third-party API integrations
-
-## Decision
-Implement OAuth2 with JWT tokens for all API authentication.
-
-**Technical Details:**
-- Standard: OAuth 2.0 (RFC 6749)
-- Token format: JWT (RFC 7519)
-- Grant types: Authorization Code, Client Credentials
-- Token expiry: 1 hour access tokens, 30 day refresh tokens
-- Audiences: api.example.com, mobile.example.com
-
-## Consequences
-
-### Positive
-- **Industry Standard:** Well-understood, widely supported
-- **Flexibility:** Supports multiple client types
-- **Stateless:** JWTs contain claims, no server-side session storage
-- **Ecosystem:** Compatible with existing OAuth2 libraries
-
-### Negative
-- **Token Management:** Clients must handle refresh logic
-- **Token Size:** JWTs larger than session cookies
-- **Revocation:** Immediate revocation requires additional infrastructure
-
-### Mitigations
-- Short-lived access tokens minimize revocation issues
-- Implement token refresh flows
-- Add token introspection endpoint for validation
-```
-
-### 5. Link ADRs to Your Architecture
+**File:** `patterns/web-app-pattern.json`
 
 **Prompt:**
 ```text
-Add an adrs array at the top level of architectures/ecommerce-platform.json (after the $schema and before metadata).
+Create a new file at patterns/web-app-pattern.json
 
-Add these URLs:
-- "docs/adr/0001-use-message-queue-for-async-processing.md"
-- "docs/adr/0002-use-oauth2-for-api-authentication.md"
+This pattern defines a standard 3-tier web application architecture.
 
-These are relative paths from the repository root.
+The pattern should have:
+
+1. Schema setup:
+   - $schema: "https://calm.finos.org/release/1.0/meta/calm.json"
+   - $id: "https://example.com/patterns/web-app.json"
+   - title: "Standard Web Application Pattern"
+   - description: "Three-tier web application with frontend, API, and database"
+   - type: "object"
+
+2. Exactly 3 nodes using prefixItems (with minItems: 3, maxItems: 3):
+   - Node 1: unique-id "web-frontend", node-type "webclient", name "Web Frontend", description "User-facing web application"
+   - Node 2: unique-id "api-service", node-type "service", name "API Service", description "Backend API service"  
+   - Node 3: unique-id "app-database", node-type "database", name "Application Database", description "Primary data storage"
+
+3. Exactly 2 relationships using prefixItems (with minItems: 2, maxItems: 2):
+   - Relationship 1: unique-id "frontend-to-api", connects web-frontend to api-service, protocol "HTTPS", description "Frontend calls API"
+   - Relationship 2: unique-id "api-to-database", connects api-service to app-database, protocol "JDBC", description "API stores data"
+
+Use const for all unique-id, name, description, node-type properties.
+Use const for the entire relationship-type object.
+Each node and relationship must reference the base CALM schema using $ref.
+Set required: ["nodes", "relationships"] at the top level.
+Set required: ["description"] on each relationship.
+
+Refer to the pattern-creation.md guide in .github/chatmodes/CALM.chatmode.md for detailed pattern structure examples.
 ```
 
-### 6. Validate with ADRs
+### 3. Test Generation
+
+Generate an architecture from your pattern:
 
 ```bash
-calm validate -a architectures/ecommerce-platform.json
+calm generate -p patterns/web-app-pattern.json -o architectures/generated-webapp.json
+```
+
+Open `architectures/generated-webapp.json` and observe:
+- ✅ Has exactly 3 nodes with the IDs, names, descriptions from your pattern
+- ✅ Has exactly 2 relationships connecting them
+- ✅ Ready for enhancement with interfaces and metadata
+
+### 4. Visualize the Generated Architecture
+
+**Steps:**
+1. Open `architectures/generated-webapp.json` in VSCode
+2. Open preview (Ctrl+Shift+C / Cmd+Shift+C)
+3. See the 3-tier architecture visualized
+4. **Take a screenshot** of the generated architecture
+
+This shows how patterns create instant, visual architectures!
+
+### 5. Enhance the Generated Architecture
+
+The generated architecture has the basic structure, but you can enhance it:
+
+**Prompt:**
+```text
+Update architectures/generated-webapp.json to add:
+- Interfaces to the service and database nodes with realistic host, port values
+- Metadata at the architecture level with owner, version, created date
+- Any additional properties that make it production-ready
+
+Keep the unique-ids, names, and core descriptions as they are (from the pattern).
+```
+
+### 6. Test Validation
+
+```bash
+calm validate -p patterns/web-app-pattern.json -a architectures/generated-webapp.json
 ```
 
 Should pass! ✅
 
-### 7. Create an ADR Index
+**Test Governance by Breaking Rules**
 
-**File:** `docs/adr/README.md`
-
-**Content:**
-```markdown
-# Architecture Decision Records
-
-This directory contains Architecture Decision Records (ADRs) for the e-commerce platform.
-
-## Format
-We follow the format described in [Michael Nygard's ADR template](https://github.com/joelparkerhenderson/architecture_decision_record/blob/main/templates/decision-record-template-by-michael-nygard/index.md):
-
-- Title
-- Status (Proposed, Accepted, Deprecated, Superseded)
-- Context
-- Decision
-- Consequences
-
-## Index
-
-### Active
-
-| ADR | Title | Date |
-|-----|-------|------|
-| [0001](0001-use-message-queue-for-async-processing.md) | Use Message Queue for Asynchronous Order Processing | 2024-12-15 |
-| [0002](0002-use-oauth2-for-api-authentication.md) | Use OAuth2 for API Authentication | 2024-12-15 |
-
-### Superseded
-None yet.
-
-## Creating New ADRs
-
-Use the numbering sequence: 0003, 0004, etc.
-
-Filename format: `NNNN-short-title-with-hyphens.md`
-
-Link the ADR in `architectures/ecommerce-platform.json` in the `adrs` array.
-
-## Benefits
-
-1. **Traceability:** Link decisions to architecture implementation
-2. **Onboarding:** New team members understand "why" not just "what"
-3. **Auditing:** Decision history for compliance and reviews
-4. **Evolution:** Track how architecture decisions change over time
+**Prompt:**
+```text
+Create architectures/broken-webapp.json by copying generated-webapp.json and changing the unique-id of "web-frontend" to "my-custom-frontend"
 ```
 
-### 8. Link ADRs in Generated Documentation
+Validate:
+```bash
+calm validate -p patterns/web-app-pattern.json -a architectures/broken-webapp.json
+```
+
+Should fail! ❌ The pattern catches the violation.
+
+Delete the broken file:
+```bash
+rm architectures/broken-webapp.json
+```
+
+### 7. Document the Superpower
+
+**File:** `patterns/README.md`
+
+**Prompt:**
+```text
+Create patterns/README.md explaining:
+
+1. The Dual Superpower: Patterns both generate AND validate
+2. How to use web-app-pattern.json for generation and validation
+3. What it enforces and why
+4. Time savings example
+```
+
+### 8. Commit Your Work
 
 ```bash
-calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-with-adrs
-```
-
-Open `docs/generated/ecommerce-with-adrs/index.html` - ADRs should appear in the documentation.
-
-### 9. Create a Decision Log Visualization
-
-**File:** `docs/decision-timeline.md`
-
-**Content:**
-```markdown
-# Architecture Decision Timeline
-
-## December 2024
-
-### Week 3
-- **2024-12-15:** [ADR-0001] Adopted message queue for async processing
-  - Impact: Added RabbitMQ node to architecture
-  - Relationships: order-service → message-broker → payment-service
-  
-- **2024-12-15:** [ADR-0002] Adopted OAuth2 for authentication
-  - Impact: Added oauth2-audience-interface to api-gateway
-  - Security control: Links to internal OAuth2 policy
-
-## Decision Categories
-
-### Integration Patterns (1 ADR)
-- Asynchronous messaging via AMQP
-
-### Security & Authentication (1 ADR)
-- OAuth2 with JWT tokens
-
-## Future Decisions Needed
-
-- [ ] Database replication strategy
-- [ ] Caching layer (Redis vs. Memcached)
-- [ ] Monitoring and observability platform
-- [ ] Deployment strategy (blue/green vs. canary)
-```
-
-### 10. Update Your README
-
-Update your README to reflect that Day 13 is complete, mention that ADRs are now linked to the architecture, and add links to the specific ADR files so reviewers can jump directly to the decisions.
-
-### 11. Commit Your Work
-
-```bash
-git add architectures/ecommerce-platform.json docs/adr docs/decision-timeline.md docs/generated README.md
-git commit -m "Day 13: Link ADRs to architecture for decision traceability"
+git add patterns/web-app-pattern.json architectures/generated-webapp.json patterns/README.md docs/screenshots/day-13-pattern.png README.md
+git commit -m "Day 13: Create web app pattern - generation and validation superpower"
 git tag day-13
 ```
 
-## Deliverables
+## Deliverables / Validation Criteria
 
-✅ **Required:**
-- `architectures/ecommerce-platform.json` - With adrs array
-- `docs/adr/0001-use-message-queue-for-async-processing.md`
-- `docs/adr/0002-use-oauth2-for-api-authentication.md`
-- `docs/adr/README.md` - ADR index
-- `docs/decision-timeline.md` - Decision visualization
-- Updated `README.md` - Day 13 marked complete
+Your Day 13 submission should include a commit tagged `day-13` containing:
 
-✅ **Validation:**
-```bash
-# Verify ADRs array exists
-grep -q '"adrs"' architectures/ecommerce-platform.json
-
-# Verify ADR files exist
-test -f docs/adr/0001-use-message-queue-for-async-processing.md
-test -f docs/adr/0002-use-oauth2-for-api-authentication.md
-test -f docs/adr/README.md
-
-# Check ADR links in architecture
-grep -A 2 '"adrs"' architectures/ecommerce-platform.json | grep -q '0001'
-grep -A 2 '"adrs"' architectures/ecommerce-platform.json | grep -q '0002'
-
-# Validate
-calm validate -a architectures/ecommerce-platform.json
-
-# Check tag
-git tag | grep -q "day-13"
-```
+✅ **Required Files:**
+- `patterns/web-app-pattern.json` - Pattern defining 3-tier web app
+- `architectures/generated-webapp.json` - Architecture generated from pattern
+- `patterns/README.md` - Documentation
+- `docs/screenshots/day-13-pattern.png` - Visualization
+- Updated `README.md` - Day 13 marked as complete
 
 ## Resources
-- [CALM ADR Example](https://github.com/finos/architecture-as-code/tree/main/calm/release/1.0-rc1/prototype/adr-example.json)
-- [ADR Templates](https://github.com/joelparkerhenderson/architecture_decision_record)
-- [When to Write ADRs](https://adr.github.io/)
 
-## Tips
-- Write ADRs when making significant architectural decisions
-- Include both positive and negative consequences
-- Link ADRs from CALM to create bidirectional traceability
-- Use consistent numbering (0001, 0002, etc.)
-- Keep ADRs immutable - supersede old decisions rather than editing
-- ADRs can be markdown, PDF, or links to wiki pages
+- [CALM Pattern Documentation](https://github.com/finos/architecture-as-code/tree/main/calm/pattern)
+- [JSON Schema prefixItems](https://json-schema.org/understanding-json-schema/reference/array#tupleValidation)
 
 ## Next Steps
-Tomorrow (Day 14) you'll generate documentation with the docify command!
+Tomorrow (Day 14) you'll reverse-engineer your e-commerce architecture into a pattern!

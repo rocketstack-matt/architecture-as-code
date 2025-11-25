@@ -234,4 +234,4 @@ git tag | grep -q "day-12"
 - Document protocol choices in your interface catalog
 
 ## Next Steps
-Tomorrow (Day 13) you'll link your architecture to Architecture Decision Records (ADRs)!
+Tomorrow (Day 13) you'll create your first CALM pattern - the superpower for generation and validation!

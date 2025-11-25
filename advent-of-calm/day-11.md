@@ -1,207 +1,362 @@
-# Day 11: Model a Business Flow
+# Day 11: Generate Documentation with Docify
 
 ## Overview
-Map business processes to technical architecture using flows, connecting business intent to implementation.
+Transform your CALM architecture into browsable HTML documentation using the docify command.
 
 ## Objective and Rationale
-- **Objective:** Create a flow that traces an order processing business process across your e-commerce architecture
-- **Rationale:** Flows bridge business and technology by showing how business processes map to technical components. Essential for business-IT alignment, impact analysis, and understanding system behavior.
+- **Objective:** Use `calm docify` to generate comprehensive documentation website from your architecture
+- **Rationale:** Machine-readable architecture (JSON) needs human-readable outputs. Docify generates documentation automatically, ensuring docs stay in sync with architecture. Essential for stakeholder communication and onboarding.
 
 ## Requirements
 
-### 1. Understand Flows
+### 1. Understand Docify
 
-Flows consist of:
-- **unique-id:** Identifier for the flow
-- **name:** Business process name
-- **description:** What the flow represents
-- **transitions:** Ordered steps referencing relationships
-  - `relationship-unique-id`: Which connection is used
-  - `sequence-number`: Order in the flow (1, 2, 3...)
-  - `summary`: What happens in this step
-  - `direction`: `source-to-destination` or `destination-to-source`
+The `calm docify` command generates documentation in multiple modes:
+- **Website mode (default):** Full HTML website with navigation
+- **Template mode:** Single file using custom template
+- **Template-dir mode:** Multiple files using template bundle
 
-### 2. Map Your E-Commerce Order Flow
-
-Open `architectures/ecommerce-platform.json`.
-
-Identify the relationships for the order flow:
-- Frontend → API Gateway
-- API Gateway → Order Service
-- Order Service → Payment Service
-- Payment Service → Database
-
-**Prompt:**
-```text
-Add a flows array at the top level of architectures/ecommerce-platform.json (after controls, before nodes).
-
-Create a flow with:
-- unique-id: "order-processing-flow"
-- name: "Customer Order Processing"
-- description: "End-to-end flow from customer placing an order to payment confirmation"
-- transitions array with 4 transitions:
-  1. relationship-unique-id: "frontend-to-gateway", sequence-number: 1, summary: "Customer submits order via web interface", direction: "source-to-destination"
-  2. relationship-unique-id: "gateway-to-order", sequence-number: 2, summary: "API Gateway routes order to Order Service", direction: "source-to-destination"
-  3. relationship-unique-id: "order-to-payment", sequence-number: 3, summary: "Order Service initiates payment processing", direction: "source-to-destination"
-  4. relationship-unique-id: "payment-to-db", sequence-number: 4, summary: "Payment Service records transaction in database", direction: "source-to-destination"
-
-Use the actual relationship unique-ids from your architecture.
-```
-
-### 3. Validate Flow Structure
+### 2. Generate Default Documentation Website
 
 ```bash
-calm validate -a architectures/ecommerce-platform.json
+calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-docs
 ```
 
-Should pass! ✅
+This creates a complete HTML website with:
+- Index page with architecture overview
+- Node details pages
+- Relationship visualization
+- Flow diagrams
+- Control and metadata display
 
-### 4. Add a Second Flow: User Authentication
-
-**Prompt:**
-```text
-Add a second flow to the flows array in architectures/ecommerce-platform.json:
-
-- unique-id: "user-authentication-flow"
-- name: "User Login Authentication"
-- description: "User authentication and session establishment"
-- transitions (adjust relationship IDs to match your architecture):
-  1. Frontend → API Gateway: "User submits credentials"
-  2. API Gateway → User Service: "Validate credentials"
-  3. User Service → Database: "Retrieve user account data"
-  4. User Service → API Gateway (destination-to-source): "Return authentication token"
-  5. API Gateway → Frontend (destination-to-source): "Deliver session token to user"
-```
-
-### 5. Visualize Flows
-
-The VSCode preview may show flows as annotations or overlays.
+### 3. Explore Generated Documentation
 
 **Steps:**
-1. Save `architectures/ecommerce-platform.json`
-2. Open preview (Ctrl+Shift+C)
-3. Look for flow indicators on the diagram
-4. **Take a screenshot** showing the architecture with flows
+1. Open `docs/generated/ecommerce-docs/index.html` in a browser
+2. Navigate through different sections:
+   - Architecture overview
+   - Node catalog
+   - Relationships
+   - Flows
+   - Controls
+3. **Take screenshots** of:
+   - Main index page
+   - A node detail page
+   - Flow visualization (if available)
 
-### 6. Generate Flow Documentation
+### 4. Customize Output with URL Mapping
 
-Use docify to generate flow documentation.
+If you have local ADR files, map them for documentation:
 
 ```bash
-calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-with-flows
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --output docs/generated/ecommerce-docs-with-adrs \
+  --url-to-local-file-mapping docs/adr
 ```
 
-**Steps:**
-1. Open `docs/generated/ecommerce-with-flows/index.html` in a browser
-2. Look for flow descriptions in the generated documentation
-3. **Take a screenshot** of the flow documentation
+This makes local ADR references clickable in generated docs.
 
-### 7. Add Flow Controls (Optional Advanced)
+### 5. Create a Custom Template
 
-Flows can have their own controls!
+Handlebars templates allow custom documentation formats.
 
-**Prompt:**
-```text
-Add a controls section to the order-processing-flow in architectures/ecommerce-platform.json:
+**File:** `templates/architecture-summary.hbs`
 
-Add an "audit" control with:
-- description: "All order processing steps must be logged for audit compliance"
-- requirements:
-  - control-requirement-url: "https://internal-policy.example.com/audit/transaction-logging"
+**Content:**
+```handlebars
+# {{metadata.title}} Architecture Summary
+
+**Version:** {{metadata.version}}  
+**Owner:** {{metadata.owner}}
+
+## Overview
+{{metadata.description}}
+
+## Components
+
+This architecture contains **{{nodes.length}}** nodes:
+
+{{#each nodes}}
+- **{{this.name}}** ({{this.node-type.name}}): {{this.description}}
+{{/each}}
+
+## Integrations
+
+This architecture has **{{relationships.length}}** connections:
+
+{{#each relationships}}
+- {{this.description}}
+  - Protocol: {{this.relationship-type.connects.protocol}}
+{{/each}}
+
+## Flows
+
+{{#if flows}}
+{{#each flows}}
+### {{this.name}}
+{{this.description}}
+
+Steps:
+{{#each this.transitions}}
+{{this.sequence-number}}. {{this.summary}}
+{{/each}}
+
+{{/each}}
+{{else}}
+No flows defined yet.
+{{/if}}
+
+## Controls
+
+{{#if controls}}
+{{#each controls}}
+### {{@key}}
+{{this.description}}
+
+{{/each}}
+{{else}}
+No controls defined yet.
+{{/if}}
+
+---
+*Generated from CALM architecture on {{metadata.timestamp}}*
 ```
 
-### 8. Document Your Flows
+### 6. Generate Documentation Using Custom Template
 
-**File:** `docs/flows-guide.md`
+```bash
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --template templates/architecture-summary.hbs \
+  --output docs/generated/architecture-summary.md
+```
+
+Open `docs/generated/architecture-summary.md` - it's a markdown summary!
+
+### 7. Create a Node Catalog Template
+
+**File:** `templates/node-catalog.hbs`
+
+**Content:**
+```handlebars
+# Node Catalog
+
+## Architecture: {{metadata.title}}
+
+Total Nodes: {{nodes.length}}
+
+---
+
+{{#each nodes}}
+## {{this.name}}
+
+**ID:** `{{this.unique-id}}`  
+**Type:** {{this.node-type.name}}  
+**Description:** {{this.description}}
+
+{{#if this.interfaces}}
+### Interfaces
+{{#each this.interfaces}}
+- **{{this.unique-id}}**
+  {{#if this.host}}
+  - Host: {{this.host}}
+  {{/if}}
+  {{#if this.port}}
+  - Port: {{this.port}}
+  {{/if}}
+  {{#if this.url}}
+  - URL: {{this.url}}
+  {{/if}}
+{{/each}}
+{{else}}
+No interfaces defined.
+{{/if}}
+
+{{#if this.controls}}
+### Controls
+{{#each this.controls}}
+- **{{@key}}:** {{this.description}}
+{{/each}}
+{{/if}}
+
+{{#if this.metadata}}
+### Metadata
+{{#each this.metadata}}
+- **{{@key}}:** {{this}}
+{{/each}}
+{{/if}}
+
+---
+
+{{/each}}
+```
+
+### 8. Generate Node Catalog
+
+```bash
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --template templates/node-catalog.hbs \
+  --output docs/generated/node-catalog.md
+```
+
+### 9. Create a Documentation README
+
+**File:** `docs/generated/README.md`
 
 **Content:**
 ```markdown
-# Business Flows
+# Generated Documentation
 
-## Order Processing Flow
+This directory contains auto-generated documentation from CALM architectures.
 
-**ID:** order-processing-flow  
-**Purpose:** Track customer orders from placement to payment
+## Available Documentation
 
-### Steps
-1. Customer submits order (Frontend → API Gateway)
-2. Route to order processing (API Gateway → Order Service)
-3. Initiate payment (Order Service → Payment Service)
-4. Record transaction (Payment Service → Database)
+### Full Website
+- **Location:** `ecommerce-docs/index.html`
+- **Generated with:** `calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-docs`
+- **Content:** Complete browsable website with all architecture details
 
-### Controls
-- Transaction logging required for audit compliance
+### Architecture Summary
+- **Location:** `architecture-summary.md`
+- **Template:** `templates/architecture-summary.hbs`
+- **Content:** High-level overview with counts and lists
 
-## User Authentication Flow
+### Node Catalog
+- **Location:** `node-catalog.md`
+- **Template:** `templates/node-catalog.hbs`
+- **Content:** Detailed listing of all nodes with interfaces and controls
 
-**ID:** user-authentication-flow  
-**Purpose:** Authenticate users and establish sessions
+## Regenerating Documentation
 
-### Steps
-1. User submits credentials (Frontend → API Gateway)
-2. Validate credentials (API Gateway → User Service)
-3. Retrieve account (User Service → Database)
-4. Return token (User Service ← API Gateway)
-5. Deliver session (API Gateway ← Frontend)
+To update documentation after architecture changes:
+
+\`\`\`bash
+# Full website
+calm docify --architecture architectures/ecommerce-platform.json --output docs/generated/ecommerce-docs
+
+# Custom templates
+calm docify --architecture architectures/ecommerce-platform.json --template templates/architecture-summary.hbs --output docs/generated/architecture-summary.md
+calm docify --architecture architectures/ecommerce-platform.json --template templates/node-catalog.hbs --output docs/generated/node-catalog.md
+\`\`\`
 
 ## Benefits
 
-- **Business Alignment:** Maps technical architecture to business processes
-- **Impact Analysis:** Understand which components are involved in each business capability
-- **Compliance:** Attach specific controls to business-critical flows
-- **Documentation:** Auto-generate flow diagrams and descriptions
+1. **Always Up-to-Date:** Regenerate from source of truth
+2. **Multiple Formats:** Website, markdown, custom formats
+3. **Stakeholder Communication:** Human-readable architecture
+4. **Onboarding:** New team members can browse documentation
 ```
 
-### 9. Update Your README
+### 10. Add Documentation Generation Script
 
-Mark Day 11 as complete in your README checklist and mention the new flow artifacts (`docs/flows-guide.md` plus the generated `docs/generated/ecommerce-with-flows` output) so collaborators know where they can explore the business process context.
+**File:** `scripts/generate-docs.sh`
 
-### 10. Commit Your Work
+**Content:**
+```bash
+#!/bin/bash
+set -e
+
+echo "🏗️  Generating CALM documentation..."
+
+# Full website
+echo "📖 Generating website documentation..."
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --output docs/generated/ecommerce-docs \
+  --url-to-local-file-mapping docs/adr
+
+# Architecture summary
+echo "📄 Generating architecture summary..."
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --template templates/architecture-summary.hbs \
+  --output docs/generated/architecture-summary.md
+
+# Node catalog
+echo "📋 Generating node catalog..."
+calm docify \
+  --architecture architectures/ecommerce-platform.json \
+  --template templates/node-catalog.hbs \
+  --output docs/generated/node-catalog.md
+
+echo "✅ Documentation generation complete!"
+echo "   View at: docs/generated/ecommerce-docs/index.html"
+```
+
+Make it executable:
+```bash
+chmod +x scripts/generate-docs.sh
+```
+
+### 11. Test Documentation Generation
 
 ```bash
-git add architectures/ecommerce-platform.json docs/flows-guide.md docs/generated README.md
-git commit -m "Day 11: Model order processing and authentication flows"
+./scripts/generate-docs.sh
+```
+
+Verify all documentation was generated successfully.
+
+### 12. Update Your README
+
+Document Day 11 progress in your README: mark the checklist, describe the new documentation outputs, and link to `docs/generated/README.md` or the screenshots so stakeholders know where to browse the generated sites.
+
+### 13. Commit Your Work
+
+```bash
+git add templates/ docs/generated/ scripts/generate-docs.sh README.md
+git commit -m "Day 11: Generate documentation with docify and custom templates"
 git tag day-11
 ```
 
 ## Deliverables
 
 ✅ **Required:**
-- `architectures/ecommerce-platform.json` - With 2+ flows
-- `docs/flows-guide.md` - Flow documentation
-- `docs/generated/ecommerce-with-flows/` - Generated documentation
-- Screenshots of flow visualization
+- `docs/generated/ecommerce-docs/` - Full website documentation
+- `docs/generated/architecture-summary.md` - Custom summary
+- `docs/generated/node-catalog.md` - Custom node catalog
+- `templates/architecture-summary.hbs` - Custom template
+- `templates/node-catalog.hbs` - Custom template
+- `scripts/generate-docs.sh` - Documentation generation script
+- `docs/generated/README.md` - Documentation guide
+- Screenshots of generated documentation
 - Updated `README.md` - Day 11 marked complete
 
 ✅ **Validation:**
 ```bash
-# Verify flows exist
-grep -q '"flows"' architectures/ecommerce-platform.json
+# Verify generated documentation exists
+test -f docs/generated/ecommerce-docs/index.html
+test -f docs/generated/architecture-summary.md
+test -f docs/generated/node-catalog.md
 
-# Check both flows
-grep -q 'order-processing-flow' architectures/ecommerce-platform.json
-grep -q 'user-authentication-flow' architectures/ecommerce-platform.json
+# Verify templates exist
+test -f templates/architecture-summary.hbs
+test -f templates/node-catalog.hbs
 
-# Validate
-calm validate -a architectures/ecommerce-platform.json
+# Verify script exists and is executable
+test -x scripts/generate-docs.sh
 
-# Check documentation generated
-test -f docs/generated/ecommerce-with-flows/index.html
+# Run generation
+./scripts/generate-docs.sh
 
 # Check tag
 git tag | grep -q "day-11"
 ```
 
 ## Resources
-- [CALM Flow Schema](https://github.com/finos/architecture-as-code/blob/main/calm/draft/2025-03/meta/flow.json)
-- [Flow Examples](https://github.com/finos/architecture-as-code/tree/main/calm/release)
+
+- [Docify Documentation](https://github.com/finos/architecture-as-code/tree/main/cli#docify)
+- [Handlebars Templates](https://handlebarsjs.com/guide/)
+- [CALM Template Examples](https://github.com/finos/architecture-as-code/tree/main/cli/test_fixtures/template)
 
 ## Tips
-- Flows are ordered - sequence-number matters
-- Use bidirectional transitions for request-response patterns
-- Flows can reference the same relationships multiple times
-- Add flow-specific controls for critical business processes
-- Use meaningful summaries that describe business intent, not just technical details
+
+- Regenerate documentation after every architecture change
+- Use custom templates for different audiences (executives vs. developers)
+- Add documentation generation to CI/CD pipeline
+- Templates can access all CALM properties (nodes, relationships, flows, controls)
+- Use `--url-to-local-file-mapping` to make local file references clickable
 
 ## Next Steps
-Tomorrow (Day 12) you'll add multiple interface types to your nodes!
+Tomorrow (Day 12) you'll add multiple interface types to your architecture!

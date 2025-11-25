@@ -123,7 +123,38 @@ Applied to specific components or services:
 }
 ```
 
-### 3. Flow Level
+### 3. Relationship Level
+
+Applied to specific connections between components:
+
+```json
+{
+    "unique-id": "api-to-database",
+    "relationship-type": {
+        "connects": {
+            "source": { "node": "api-service" },
+            "destination": { "node": "customer-database" }
+        }
+    },
+    "controls": {
+        "data-in-transit": {
+            "description": "Encryption requirements for data transmitted between API and database",
+            "requirements": [
+                {
+                    "requirement-url": "https://schemas.company.com/security/tls-connection.json",
+                    "config": {
+                        "protocol": "TLS",
+                        "minimum-version": "1.3",
+                        "mutual-auth": true
+                    }
+                }
+            ]
+        }
+    }
+}
+```
+
+### 4. Flow Level
 
 Applied to business processes and data flows:
 
@@ -151,10 +182,11 @@ Applied to business processes and data flows:
 }
 ```
 
-### 4. Control Inheritance and Scope
+### 5. Control Inheritance and Scope
 
 - **Architecture-level controls** apply to all nodes, relationships, and flows unless overridden
 - **Node-level controls** apply specifically to that component and its interfaces
+- **Relationship-level controls** apply to specific connections between components
 - **Flow-level controls** apply to the entire business process flow
 - **More specific controls override general ones** when there are conflicts
 - **Controls are additive** - multiple levels can apply simultaneously
