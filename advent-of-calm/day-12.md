@@ -272,4 +272,4 @@ git tag | grep -q "day-12"
 
 ## Next Steps
 
-Tomorrow (Day 13) you'll add multiple interface types to your architecture!
+Tomorrow (Day 13) you'll use CALM as an operations advisor, adding support metadata and troubleshooting simulated outages!

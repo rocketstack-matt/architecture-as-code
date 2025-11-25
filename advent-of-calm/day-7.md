@@ -255,11 +255,11 @@ You now have:
 ## Next Steps
 
 **Week 2 Preview**: Next week you'll learn:
-- **Day 8**: Create patterns (CALM's superpower)
-- **Day 9**: Reverse-engineer patterns from architectures
-- **Day 10**: Add security controls
-- **Day 11**: Model business flows
-- **Day 12**: Add multiple interface types
-- **Day 13**: Link Architecture Decision Records
+- **Day 8**: Add controls for NFRs (security, performance, compliance)
+- **Day 9**: Model business flows through your architecture
+- **Day 10**: Link Architecture Decision Records (ADRs)
+- **Day 11**: Generate documentation with docify
+- **Day 12**: Use CALM as your expert architecture advisor
+- **Day 13**: Use CALM as your expert operations advisor
 
 Get ready to level up! 🚀
