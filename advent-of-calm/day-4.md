@@ -201,7 +201,8 @@ git tag | grep -q "day-4"
 - Check that the JSON file is valid (no syntax errors)
 - Make sure you're in a CALM architecture file (has nodes/relationships)
 - Try the keyboard shortcut: `Ctrl+Shift+C` / `Cmd+Shift+C`
-- Look for the command in the Command Palette (Ctrl+Shift+P, type "CALM")
+- Look for the command in the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P` , type "CALM")
+- If all else fails, you may need to restart the Extensions Host in VSCode (our CALM Preview is still in experimental mode and can be a little temperamental!) - (`Ctrl+Shift+P` / `Cmd+Shift+P` , type "Restart Extension Host")
 
 **"Changes aren't appearing in the preview"**
 - **Save the file** - preview updates on save, not on every keystroke
