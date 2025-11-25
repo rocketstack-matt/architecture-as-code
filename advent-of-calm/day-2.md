@@ -147,7 +147,6 @@ git tag | grep -q "day-2"
         "description": "What your service does"
       }
     ],
-    ,
     "relationships": []
   }
   ```
