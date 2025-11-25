@@ -128,17 +128,18 @@ You should see validation succeed with 4 nodes and 3 relationships.
 
 ### 6. Commit Your Work
 
-```bash
-git add architectures/my-first-architecture.json README.md
-git commit -m "Day 3: Add multiple nodes and relationship types (interacts, connects, composed-of)"
-git tag day-3
-```
-
 Update your README.md progress:
 ```markdown
 - [x] Day 1: Install CALM CLI and Initialize Repository
 - [x] Day 2: Create Your First Node
 - [x] Day 3: Connect Nodes with Relationships
+```
+
+Track what you've done:
+```bash
+git add architectures/my-first-architecture.json README.md
+git commit -m "Day 3: Add multiple nodes and relationship types (interacts, connects, composed-of)"
+git tag day-3
 ```
 
 ## Deliverables / Validation Criteria
