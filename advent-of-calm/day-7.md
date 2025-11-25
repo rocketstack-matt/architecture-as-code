@@ -103,7 +103,7 @@ Update architectures/ecommerce-platform.json to ensure it has exactly these rela
    - Inventory Service connects to Inventory Database
 
 3. Composed-of relationship:
-   - E-Commerce Platform is composed of: API Gateway, Order Service, Inventory Service, Payment Service
+   - E-Commerce Platform is composed of: API Gateway, Order Service, Inventory Service, Payment Service, Order Database, Inventory Database
 
 Check the existing relationships and:
 - Add any that are missing from the list above
