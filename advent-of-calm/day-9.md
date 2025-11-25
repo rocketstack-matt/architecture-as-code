@@ -25,11 +25,10 @@ Flows consist of:
 
 Open `architectures/ecommerce-platform.json`.
 
-Identify the relationships for the order flow:
-- Frontend → API Gateway
-- API Gateway → Order Service
-- Order Service → Payment Service
-- Payment Service → Database
+First, identify the relationship unique-ids from your Day 7 architecture that form the order flow path:
+- Customer → API Gateway (interacts relationship)
+- API Gateway → Order Service (connects relationship)
+- Order Service → Payment Service (connects relationship)
 
 **Prompt:**
 ```text
@@ -39,14 +38,15 @@ Create a flow with:
 - unique-id: "order-processing-flow"
 - name: "Customer Order Processing"
 - description: "End-to-end flow from customer placing an order to payment confirmation"
-- transitions array with 4 transitions:
-  1. relationship-unique-id: "frontend-to-gateway", sequence-number: 1, summary: "Customer submits order via web interface", direction: "source-to-destination"
-  2. relationship-unique-id: "gateway-to-order", sequence-number: 2, summary: "API Gateway routes order to Order Service", direction: "source-to-destination"
-  3. relationship-unique-id: "order-to-payment", sequence-number: 3, summary: "Order Service initiates payment processing", direction: "source-to-destination"
-  4. relationship-unique-id: "payment-to-db", sequence-number: 4, summary: "Payment Service records transaction in database", direction: "source-to-destination"
+- transitions array referencing the ACTUAL relationship unique-ids from my architecture:
+  1. The customer-to-gateway interacts relationship, sequence-number: 1, summary: "Customer submits order via web interface", direction: "source-to-destination"
+  2. The gateway-to-order-service connects relationship, sequence-number: 2, summary: "API Gateway routes order to Order Service", direction: "source-to-destination"  
+  3. The order-service-to-payment-service connects relationship, sequence-number: 3, summary: "Order Service initiates payment processing", direction: "source-to-destination"
 
-Use the actual relationship unique-ids from your architecture.
+Look up the exact relationship unique-ids from my relationships array and use those.
 ```
+
+> **Note:** Your relationship unique-ids may differ based on how Copilot named them in Day 7. The AI will look up your actual IDs.
 
 ### 3. Validate Flow Structure
 
@@ -62,26 +62,34 @@ Should pass! ✅
 ```text
 Add a second flow to the flows array in architectures/ecommerce-platform.json:
 
-- unique-id: "user-authentication-flow"
-- name: "User Login Authentication"
-- description: "User authentication and session establishment"
-- transitions (adjust relationship IDs to match your architecture):
-  1. Frontend → API Gateway: "User submits credentials"
-  2. API Gateway → User Service: "Validate credentials"
-  3. User Service → Database: "Retrieve user account data"
-  4. User Service → API Gateway (destination-to-source): "Return authentication token"
-  5. API Gateway → Frontend (destination-to-source): "Deliver session token to user"
+- unique-id: "inventory-check-flow"
+- name: "Inventory Stock Check"
+- description: "Admin checks and updates inventory stock levels"
+- transitions using the ACTUAL relationship unique-ids from my architecture:
+  1. Admin → API Gateway (interacts): "Admin requests inventory status", direction: "source-to-destination"
+  2. API Gateway → Inventory Service (connects): "Route to inventory service", direction: "source-to-destination"
+  3. Inventory Service → Inventory Database (connects): "Query current stock levels", direction: "source-to-destination"
+  4. Inventory Database → Inventory Service (same relationship): "Return stock data", direction: "destination-to-source"
+  5. Inventory Service → API Gateway (same relationship): "Return inventory report", direction: "destination-to-source"
+
+Look up the exact relationship unique-ids from my relationships array.
 ```
+
+> **Tip:** Notice how steps 4 and 5 reuse the same relationships but with `destination-to-source` direction - this models the response flowing back.
 
 ### 5. Visualize Flows
 
-The VSCode preview may show flows as annotations or overlays.
+Flows appear in the CALM Model Elements view and can be visualized as sequence diagrams.
 
 **Steps:**
 1. Save `architectures/ecommerce-platform.json`
-2. Open preview (Ctrl+Shift+C)
-3. Look for flow indicators on the diagram
-4. **Take a screenshot** showing the architecture with flows
+2. Open the **CALM Model Elements** view in the sidebar
+3. Expand the **Flows** section - you should see your two flows listed
+4. Click on a flow (e.g., `order-processing-flow`)
+5. The preview will now show both:
+   - The architecture diagram (as before)
+   - A **sequence diagram** showing the flow's transitions in order
+6. **Take a screenshot** showing the architecture with the flow sequence diagram
 
 ### 6. Add Flow Controls (Optional Advanced)
 
@@ -94,7 +102,8 @@ Add a controls section to the order-processing-flow in architectures/ecommerce-p
 Add an "audit" control with:
 - description: "All order processing steps must be logged for audit compliance"
 - requirements:
-  - control-requirement-url: "https://internal-policy.example.com/audit/transaction-logging"
+  - requirement-url: "https://internal-policy.example.com/audit/transaction-logging"
+    config (inline): { "log-level": "detailed", "retention-days": 365 }
 ```
 
 ### 7. Document Your Flows
@@ -111,25 +120,24 @@ Add an "audit" control with:
 **Purpose:** Track customer orders from placement to payment
 
 ### Steps
-1. Customer submits order (Frontend → API Gateway)
+1. Customer submits order (Customer → API Gateway)
 2. Route to order processing (API Gateway → Order Service)
 3. Initiate payment (Order Service → Payment Service)
-4. Record transaction (Payment Service → Database)
 
 ### Controls
 - Transaction logging required for audit compliance
 
-## User Authentication Flow
+## Inventory Check Flow
 
-**ID:** user-authentication-flow  
-**Purpose:** Authenticate users and establish sessions
+**ID:** inventory-check-flow  
+**Purpose:** Admin checks and updates inventory stock levels
 
 ### Steps
-1. User submits credentials (Frontend → API Gateway)
-2. Validate credentials (API Gateway → User Service)
-3. Retrieve account (User Service → Database)
-4. Return token (User Service ← API Gateway)
-5. Deliver session (API Gateway ← Frontend)
+1. Admin requests inventory status (Admin → API Gateway)
+2. Route to inventory service (API Gateway → Inventory Service)
+3. Query current stock (Inventory Service → Inventory Database)
+4. Return stock data (response flow)
+5. Return inventory report (response flow)
 
 ## Benefits
 
@@ -147,7 +155,7 @@ Mark Day 9 as complete in your README checklist and mention the new flow artifac
 
 ```bash
 git add architectures/ecommerce-platform.json docs/flows-guide.md README.md
-git commit -m "Day 9: Model order processing and authentication flows"
+git commit -m "Day 9: Model order processing and inventory check flows"
 git tag day-9
 ```
 
@@ -166,7 +174,7 @@ grep -q '"flows"' architectures/ecommerce-platform.json
 
 # Check both flows
 grep -q 'order-processing-flow' architectures/ecommerce-platform.json
-grep -q 'user-authentication-flow' architectures/ecommerce-platform.json
+grep -q 'inventory-check-flow' architectures/ecommerce-platform.json
 
 # Validate
 calm validate -a architectures/ecommerce-platform.json
