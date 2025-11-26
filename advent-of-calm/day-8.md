@@ -106,6 +106,10 @@ Should pass! ✅
 
 ### 7. Create Documentation
 
+For the purposes of your learning record, create a document detailing the purpose of controls.
+
+Later on in your Advent of CALM journey we will explore getting CALM to create documentation detailing your architecture and its controls.
+
 **File:** `docs/controls-guide.md`
 
 **Content:**
