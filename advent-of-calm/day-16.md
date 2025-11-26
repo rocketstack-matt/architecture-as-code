@@ -1,557 +1,151 @@
-# Day 16: Create a Custom Template Bundle
+# Day 16: Reverse-Engineer a Pattern from Your E-Commerce Architecture
 
 ## Overview
-Build a comprehensive template bundle to generate multiple documentation artifacts from your architecture.
+Transform your existing e-commerce architecture into a reusable pattern that others can use to generate similar systems.
 
 ## Objective and Rationale
-- **Objective:** Create a template bundle with multiple Handlebars templates for different documentation outputs
-- **Rationale:** Different stakeholders need different views. Template bundles allow you to generate technical docs, executive summaries, security assessments, and integration guides from the same source architecture.
+- **Objective:** Create a pattern based on your e-commerce architecture from Day 7, then test it by generating and validating new architectures
+- **Rationale:** Patterns don't always start from scratch - often you have a great architecture and want to make it reusable. Learn to reverse-engineer architectures into patterns, enabling teams to share proven designs and enforce consistency.
 
 ## Requirements
 
-### 1. Understand Template Bundles
+### 1. Understand Pattern Extraction
 
-A template bundle is a directory containing:
-- Multiple `.hbs` (Handlebars) template files
-- Each template generates a different output file
-- Use `--template-dir` to generate all at once
+Your Day 7 architecture has actual values - to make it a pattern, wrap structural values in `const` and use `prefixItems`.
 
-### 2. Create Template Bundle Directory
+**What to constrain:**
+- ✅ Structure (IDs, node types, relationship connections)
+- ✅ Security defaults (HTTPS protocols, required security metadata)
+- ❌ Deployment details (specific hosts, ports) - let users customize
+
+### 2. Review Your E-Commerce Architecture
+
+Open `architectures/ecommerce-platform.json` from Day 7.
+
+**Prompt:**
+```text
+Analyze architectures/ecommerce-platform.json and tell me:
+
+1. How many nodes does it have and what are their unique-ids?
+2. How many relationships and what types?
+3. What structure should I preserve in a pattern (IDs, types, connections)?
+4. What should I leave flexible for customization (hosts, ports, specific metadata)?
+```
+
+### 3. Create the E-Commerce Pattern
+
+**File:** `patterns/ecommerce-platform-pattern.json`
+
+**Prompt:**
+```text
+Create patterns/ecommerce-platform-pattern.json based on architectures/ecommerce-platform.json
+
+Follow the same pattern structure as web-app-pattern.json but with all the nodes and relationships from my e-commerce architecture.
+
+Preserve as const:
+- All unique-ids
+- All names  
+- All node-types
+- All descriptions
+- All relationship-type structures
+- All protocols
+
+Set minItems and maxItems to match the exact counts.
+Use prefixItems to define the exact structure.
+```
+
+### 4. Test Generation
+
+Generate a new architecture from your pattern:
 
 ```bash
-mkdir -p templates/comprehensive-bundle
+calm generate -p patterns/ecommerce-platform-pattern.json -o architectures/ecommerce-variation.json
 ```
 
-### 3. Create Executive Summary Template
+### 5. Visualize Both Versions
 
-**File:** `templates/comprehensive-bundle/executive-summary.hbs`
+Compare the original and generated:
 
-**Content:**
-```handlebars
-# Executive Summary: {{metadata.title}}
+**Steps:**
+1. Open `architectures/ecommerce-platform.json` and view preview
+2. **Take a screenshot**
+3. Open `architectures/ecommerce-variation.json` and view preview
+4. **Take a screenshot**
+5. Compare - structure should be identical, some values will be placeholders
 
-**Document Version:** {{metadata.version}}  
-**Last Updated:** {{metadata.timestamp}}  
-**Architecture Owner:** {{metadata.owner}}
-
-## System Overview
-
-{{metadata.description}}
-
-## System Metrics
-
-- **Total Components:** {{nodes.length}}
-- **Integration Points:** {{relationships.length}}
-- **Business Processes:** {{#if flows}}{{flows.length}}{{else}}0{{/if}}
-- **Security Controls:** {{#if controls}}Documented below{{else}}0{{/if}}
-
-## Component Breakdown
-
-{{#if nodes}}
-{{#each nodes}}
-- **{{this.name}}** ({{this.node-type.name}}) - {{this.description}}
-{{/each}}
-{{else}}
-No components defined yet.
-{{/if}}
-
-## Security & Compliance
-
-{{#if controls}}
-This architecture implements the following security and compliance controls:
-
-{{#each controls}}
-### {{@key}}
-{{this.description}}
-
-{{#if this.requirements}}
-Requirements:
-{{#each this.requirements}}
-- {{this.control-requirement-url}}{{#if this.control-config-url}} (Config: {{this.control-config-url}}){{/if}}
-{{/each}}
-{{/if}}
-
-{{/each}}
-{{else}}
-No formal controls documented yet.
-{{/if}}
-
-## Business Processes
-
-{{#if flows}}
-{{#each flows}}
-- **{{this.name}}:** {{this.description}} ({{this.transitions.length}} steps)
-{{/each}}
-{{else}}
-No business flows documented yet.
-{{/if}}
-
-## Recommendations
-
-- Regular architecture reviews recommended quarterly
-- Update architecture documentation when adding new services
-- Review security controls annually
-
----
-*This executive summary was auto-generated from the CALM architecture model.*
-```
-
-### 4. Create Technical Integration Guide Template
-
-**File:** `templates/comprehensive-bundle/integration-guide.hbs`
-
-**Content:**
-```handlebars
-# Integration Guide: {{metadata.title}}
-
-## Overview
-
-This guide provides technical integration details for the {{metadata.title}} architecture.
-
-## Service Endpoints
-
-{{#each nodes}}
-{{#if this.interfaces}}
-### {{this.name}}
-
-**Service Type:** {{this.node-type.name}}  
-**Description:** {{this.description}}
-
-#### Available Interfaces
-
-{{#each this.interfaces}}
-**Interface ID:** `{{this.unique-id}}`
-
-{{#if this.url}}
-- **Type:** REST API
-- **URL:** `{{this.url}}`
-- **Usage:** Base URL for all API calls
-{{/if}}
-
-{{#if this.host}}
-{{#if this.port}}
-- **Type:** Network Service
-- **Host:** `{{this.host}}`
-- **Port:** `{{this.port}}`
-- **Connection String:** `{{this.host}}:{{this.port}}`
-{{/if}}
-{{/if}}
-
-{{#if this.audiences}}
-- **Type:** OAuth2 Configuration
-- **Audiences:** {{#each this.audiences}}`{{this}}` {{/each}}
-{{/if}}
-
-{{/each}}
-
-{{#if this.metadata}}
-#### Configuration
-{{#each this.metadata}}
-- **{{@key}}:** {{this}}
-{{/each}}
-{{/if}}
-
----
-
-{{/if}}
-{{/each}}
-
-## Integration Patterns
-
-{{#each relationships}}
-### {{this.description}}
-
-**Connection:** {{this.relationship-type.connects.source-node}} → {{this.relationship-type.connects.destination-node}}  
-**Protocol:** {{this.relationship-type.connects.protocol}}
-
-{{#if this.relationship-type.connects.interfaces}}
-**Interfaces Used:** {{#each this.relationship-type.connects.interfaces}}`{{this}}` {{/each}}
-{{/if}}
-
-{{/each}}
-
-## Authentication
-
-{{#each nodes}}
-{{#each this.interfaces}}
-{{#if this.audiences}}
-### {{../name}} - OAuth2
-
-This service uses OAuth2 authentication.
-
-**Accepted Audiences:**
-{{#each this.audiences}}
-- `{{this}}`
-{{/each}}
-
-**Token Requirements:**
-- Valid JWT token in Authorization header
-- Format: `Authorization: Bearer <token>`
-- Token must include appropriate audience claim
-
-{{/if}}
-{{/each}}
-{{/each}}
-
----
-*Generated from CALM architecture. Contact {{metadata.owner}} for questions.*
-```
-
-### 5. Create Security Assessment Template
-
-**File:** `templates/comprehensive-bundle/security-assessment.hbs`
-
-**Content:**
-```handlebars
-# Security Assessment Report
-
-**Architecture:** {{metadata.title}}  
-**Assessment Date:** {{metadata.timestamp}}  
-**Classification:** {{#if metadata.classification}}{{metadata.classification}}{{else}}Not Specified{{/if}}
-
-## Control Summary
-
-{{#if controls}}
-This architecture has implemented the following control domains.
-
-{{#each controls}}
-## Control Domain: {{@key}}
-
-**Description:** {{this.description}}
-
-### Requirements
-
-{{#each this.requirements}}
-#### Requirement {{@index}}
-- **Requirement URL:** {{this.control-requirement-url}}
-{{#if this.control-config-url}}
-- **Configuration:** {{this.control-config-url}}
-- **Status:** ✅ Configured
-{{else}}
-- **Status:** ⚠️ Configuration needed
-{{/if}}
-
-{{/each}}
-
-{{/each}}
-
-{{else}}
-⚠️ **WARNING:** No security controls documented at the architecture level.
-{{/if}}
-
-## Component Security Analysis
-
-{{#each nodes}}
-### {{this.name}}
-
-**Type:** {{this.node-type.name}}  
-**Controls:** {{#if this.controls}}✅ Implemented{{else}}❌ Not Implemented{{/if}}
-
-{{#if this.controls}}
-{{#each this.controls}}
-#### {{@key}}
-{{this.description}}
-
-{{#each this.requirements}}
-- {{this.control-requirement-url}}
-{{/each}}
-
-{{/each}}
-{{else}}
-⚠️ No component-level controls defined.
-{{/if}}
-
----
-
-{{/each}}
-
-## Security Recommendations
-
-{{#unless controls}}
-1. **Critical:** Define architecture-level security controls
-2. **Critical:** Implement encryption and authentication requirements
-{{/unless}}
-
-3. Review and update security controls quarterly
-4. Ensure all external interfaces use secure protocols (HTTPS, TLS)
-5. Document incident response procedures
-
-## Protocol Security
-
-{{#each relationships}}
-{{#if this.relationship-type.connects.protocol}}
-- {{this.relationship-type.connects.source-node}} → {{this.relationship-type.connects.destination-node}}: **{{this.relationship-type.connects.protocol}}** {{#if (eq this.relationship-type.connects.protocol "HTTPS")}}✅{{else if (eq this.relationship-type.connects.protocol "HTTP")}}⚠️ Insecure{{else}}ℹ️{{/if}}
-{{/if}}
-{{/each}}
-
----
-*This security assessment is auto-generated. Manual review required.*
-```
-
-### 6. Create Flow Documentation Template
-
-**File:** `templates/comprehensive-bundle/flow-documentation.hbs`
-
-**Content:**
-```handlebars
-# Business Flow Documentation
-
-**Architecture:** {{metadata.title}}
-
-{{#if flows}}
-This architecture documents **{{flows.length}}** business flow(s).
-
-{{#each flows}}
-## {{this.name}}
-
-**Flow ID:** `{{this.unique-id}}`  
-**Description:** {{this.description}}
-
-### Process Steps
-
-{{#each this.transitions}}
-**Step {{this.sequence-number}}:** {{this.summary}}  
-- **Relationship:** `{{this.relationship-unique-id}}`
-- **Direction:** {{this.direction}}
-
-{{/each}}
-
-### Flow Controls
-
-{{#if this.controls}}
-{{#each this.controls}}
-#### {{@key}}
-{{this.description}}
-
-Requirements:
-{{#each this.requirements}}
-- {{this.control-requirement-url}}
-{{/each}}
-
-{{/each}}
-{{else}}
-No specific controls defined for this flow.
-{{/if}}
-
----
-
-{{/each}}
-
-{{else}}
-No business flows documented in this architecture.
-
-**Recommendation:** Document key business processes as flows to:
-- Enable business-IT alignment
-- Support impact analysis
-- Facilitate compliance mapping
-{{/if}}
-
----
-*Generated from CALM architecture model.*
-```
-
-### 7. Create Deployment Checklist Template
-
-**File:** `templates/comprehensive-bundle/deployment-checklist.hbs`
-
-**Content:**
-```handlebars
-# Deployment Checklist: {{metadata.title}}
-
-## Pre-Deployment
-
-### Infrastructure
-{{#each nodes}}
-- [ ] **{{this.name}}** ({{this.node-type.name}})
-  {{#if this.interfaces}}
-  {{#each this.interfaces}}
-  {{#if this.host}}
-  - [ ] Verify {{this.host}} is accessible
-  {{/if}}
-  {{#if this.port}}
-  - [ ] Ensure port {{this.port}} is open
-  {{/if}}
-  {{#if this.url}}
-  - [ ] Validate URL {{this.url}} is configured
-  {{/if}}
-  {{/each}}
-  {{/if}}
-{{/each}}
-
-### Integrations
-{{#each relationships}}
-- [ ] **{{this.description}}**
-  - Protocol: {{this.relationship-type.connects.protocol}}
-  - Source: {{this.relationship-type.connects.source-node}}
-  - Destination: {{this.relationship-type.connects.destination-node}}
-{{/each}}
-
-### Security Controls
-{{#if controls}}
-{{#each controls}}
-- [ ] **{{@key}}**: {{this.description}}
-  {{#each this.requirements}}
-  - [ ] Verify {{this.control-requirement-url}}
-  {{/each}}
-{{/each}}
-{{else}}
-- [ ] **WARNING:** Define security controls before deployment
-{{/if}}
-
-## Post-Deployment
-
-### Verification
-{{#each flows}}
-- [ ] **Test {{this.name}}**
-  {{#each this.transitions}}
-  - [ ] Step {{this.sequence-number}}: {{this.summary}}
-  {{/each}}
-{{/each}}
-
-### Monitoring
-- [ ] Set up health checks for all services
-- [ ] Configure alerting
-- [ ] Verify logging is operational
-
-### Documentation
-- [ ] Update runbooks
-- [ ] Document connection strings
-- [ ] Share integration guide with teams
-
----
-**Deployment Owner:** {{metadata.owner}}  
-**Version:** {{metadata.version}}
-```
-
-### 8. Generate All Documentation from Bundle
+### 6. Validate Both Against the Pattern
 
 ```bash
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --template-dir templates/comprehensive-bundle \
-  --output docs/generated/comprehensive
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-variation.json
 ```
 
-This generates all templates at once in the `docs/generated/comprehensive/` directory.
+Both should pass! ✅
 
-### 9. Create Bundle README
+### 7. Update Your Pattern to Require Controls
 
-**File:** `templates/comprehensive-bundle/README.md`
+Your e-commerce architecture now has controls from Day 8. Update the pattern to enforce them.
 
-**Content:**
-```markdown
-# Comprehensive Documentation Template Bundle
+**Prompt:**
+```text
+Update patterns/ecommerce-platform-pattern.json to require the security and performance controls at the architecture level.
 
-This template bundle generates complete documentation sets from CALM architectures.
-
-## Templates
-
-| Template | Output | Audience |
-|----------|--------|----------|
-| `executive-summary.hbs` | `executive-summary.md` | Executives, stakeholders |
-| `integration-guide.hbs` | `integration-guide.md` | Developers, integrators |
-| `security-assessment.hbs` | `security-assessment.md` | Security team, auditors |
-| `flow-documentation.hbs` | `flow-documentation.md` | Business analysts, PMs |
-| `deployment-checklist.hbs` | `deployment-checklist.md` | DevOps, SRE |
-
-## Usage
-
-\`\`\`bash
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --template-dir templates/comprehensive-bundle \
-  --output docs/generated/comprehensive
-\`\`\`
-
-## Customization
-
-Edit any `.hbs` file to customize output for your organization's needs.
-
-### Handlebars Features Used
-
-- `{{#if}}` - Conditional rendering
-- `{{#each}}` - Iteration over arrays
-- `{{@key}}` - Object property names
-- `{{metadata.property}}` - Dot notation access
+Add to the pattern's properties section:
+- controls with const value matching the security and performance controls from your architecture
+- Add controls to the required array at top level
 ```
 
-### 10. Update Documentation Script
+### 8. Test Pattern Validation with Controls
 
 ```bash
-cat >> scripts/generate-docs.sh << 'EOF'
-
-# Comprehensive template bundle
-echo "📦 Generating comprehensive documentation bundle..."
-calm docify \
-  --architecture architectures/ecommerce-platform.json \
-  --template-dir templates/comprehensive-bundle \
-  --output docs/generated/comprehensive
-
-echo "✅ All documentation generated!"
-echo "   Comprehensive docs: docs/generated/comprehensive/"
-EOF
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
 ```
 
-### 11. Test Bundle Generation
+Should pass! ✅
+
+### 9. Commit Your Work
 
 ```bash
-chmod +x scripts/generate-docs.sh
-./scripts/generate-docs.sh
-```
-
-Verify all files in `docs/generated/comprehensive/` were created.
-
-### 12. Update Your README
-
-Summarize the new comprehensive template bundle in your README before committing. Mark Day 16 complete, list the five templates plus `docs/generated/comprehensive`, and mention that `scripts/generate-docs.sh` now handles the bundle.
-
-### 13. Commit Your Work
-
-```bash
-git add templates/comprehensive-bundle docs/generated/comprehensive scripts/generate-docs.sh README.md
-git commit -m "Day 16: Create comprehensive template bundle for multi-stakeholder documentation"
+git add patterns/ecommerce-platform-pattern.json architectures/ecommerce-variation.json patterns/README.md docs/screenshots README.md
+git commit -m "Day 16: Reverse-engineer e-commerce architecture into reusable pattern"
 git tag day-16
 ```
 
 ## Deliverables
 
-✅ **Required:**
-- `templates/comprehensive-bundle/` directory with 5 templates
-- `docs/generated/comprehensive/` with all generated docs
-- `templates/comprehensive-bundle/README.md`
-- Updated `scripts/generate-docs.sh`
+✅ **Required Files:**
+- `patterns/ecommerce-platform-pattern.json` - Pattern with controls enforcement
+- `architectures/ecommerce-variation.json` - Generated from pattern
+- Screenshots showing both architectures
 - Updated `README.md` - Day 16 marked complete
 
 ✅ **Validation:**
 ```bash
-# Verify templates exist
-test -f templates/comprehensive-bundle/executive-summary.hbs
-test -f templates/comprehensive-bundle/integration-guide.hbs
-test -f templates/comprehensive-bundle/security-assessment.hbs
-test -f templates/comprehensive-bundle/flow-documentation.hbs
-test -f templates/comprehensive-bundle/deployment-checklist.hbs
+# Verify pattern exists
+test -f patterns/ecommerce-platform-pattern.json
 
-# Generate bundle
-calm docify --architecture architectures/ecommerce-platform.json --template-dir templates/comprehensive-bundle --output docs/generated/comprehensive
+# Verify generated architecture
+test -f architectures/ecommerce-variation.json
 
-# Verify all outputs
-test -f docs/generated/comprehensive/executive-summary.md
-test -f docs/generated/comprehensive/integration-guide.md
+# Validate both architectures against pattern
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-platform.json
+calm validate -p patterns/ecommerce-platform-pattern.json -a architectures/ecommerce-variation.json
 
 # Check tag
 git tag | grep -q "day-16"
 ```
 
 ## Resources
-- [Handlebars Documentation](https://handlebarsjs.com/)
-- [CALM Template System](https://github.com/finos/architecture-as-code/tree/main/cli#templates)
+
+- [CALM Pattern Documentation](https://github.com/finos/architecture-as-code/tree/main/calm/pattern)
+- [JSON Schema prefixItems](https://json-schema.org/understanding-json-schema/reference/array#tupleValidation)
 
 ## Tips
-- Create templates for each stakeholder type
-- Use conditionals (`{{#if}}`) to handle optional sections gracefully
-- Test templates with minimal and maximal architectures
-- Template bundles enable "single source, multiple outputs"
-- Consider CI/CD integration to auto-publish documentation
+
+- Start with structure (IDs, types) as const, leave details flexible
+- Patterns that enforce controls create governance-compliant architectures by default
+- Test both generation and validation to ensure your pattern works both ways
 
 ## Next Steps
-Tomorrow (Day 17) you'll use AI to perform advanced architecture refactoring!
+
+Tomorrow (Day 17) you'll use advanced AI-powered techniques to refactor and optimize your architecture!

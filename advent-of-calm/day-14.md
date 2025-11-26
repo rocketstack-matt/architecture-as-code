@@ -1,178 +1,377 @@
-# Day 14: Create Your First Pattern - CALM's Superpower
+# Day 14: Generate Operations Documentation with Docify
 
 ## Overview
-Create a CALM pattern that instantly generates architecture scaffolds AND enforces governance rules - CALM's dual superpower.
+
+Use CALM docify to generate support documentation and incident report templates directly from your architecture's operational metadata.
 
 ## Objective and Rationale
-- **Objective:** Create a simple pattern for a web application architecture that can generate scaffolds and validate compliance
-- **Rationale:** Patterns are CALM's superpower - one pattern does two things: (1) Generate compliant architecture in seconds (productivity), (2) Validate architectures follow standards (governance). Learn how `const`, `prefixItems`, and JSON Schema constraints enable both.
+
+- **Objective:** Create Handlebars templates that generate runbooks, on-call guides, and incident report templates from your architecture metadata
+- **Rationale:** Yesterday you enriched your architecture with operational metadata (owners, health endpoints, failure modes, escalation paths). Today, use docify to transform that metadata into ready-to-use operations documents. This ensures your support docs always match your actual architecture - no more stale wikis!
 
 ## Requirements
 
-### 1. Understand CALM's Dual Superpower
+### 1. Understand the Ops Documentation Goal
 
-**One Pattern = Two Powers:**
+Your Day 13 architecture now contains:
 
-**Power 1 - Productivity (Generation):**
-```bash
-calm generate -p my-pattern.json -o new-service.json
-```
-Result: Instant architecture scaffold with all best practices baked in
+- Owner and on-call contacts per service
+- Health endpoints and runbook links
+- Failure modes with symptoms and remediation
+- Business impact per flow
+- Monitoring dashboard links
 
-**Power 2 - Governance (Validation):**
-```bash
-calm validate -p my-pattern.json -a existing-service.json
-```
-Result: Automated compliance checking against your standards
+Today you'll create templates that extract this into:
 
-**How the same pattern does both:**
-- **`const: "api-gateway"`** → Generation: creates node with ID "api-gateway" | Validation: requires ID must be "api-gateway"
-- **`minItems: 3`** → Generation: creates 3 items | Validation: requires exactly 3 items
-- **`prefixItems: [...]`** → Generation: creates these exact items | Validation: checks these items exist
+1. **Service Runbook** - Per-service troubleshooting guide
+2. **On-Call Quick Reference** - Single-page contact sheet
+3. **Incident Report Template** - Pre-filled incident form
 
-### 2. Create a Simple Web Application Pattern
-
-You'll create a pattern for a standard 3-tier web app:
-- Frontend (webclient)
-- API Service (service) 
-- Database (database)
-
-**File:** `patterns/web-app-pattern.json`
-
-**Prompt:**
-```text
-Create a new file at patterns/web-app-pattern.json
-
-This pattern defines a standard 3-tier web application architecture.
-
-The pattern should have:
-
-1. Schema setup:
-   - $schema: "https://calm.finos.org/release/1.0/meta/calm.json"
-   - $id: "https://example.com/patterns/web-app.json"
-   - title: "Standard Web Application Pattern"
-   - description: "Three-tier web application with frontend, API, and database"
-   - type: "object"
-
-2. Exactly 3 nodes using prefixItems (with minItems: 3, maxItems: 3):
-   - Node 1: unique-id "web-frontend", node-type "webclient", name "Web Frontend", description "User-facing web application"
-   - Node 2: unique-id "api-service", node-type "service", name "API Service", description "Backend API service"  
-   - Node 3: unique-id "app-database", node-type "database", name "Application Database", description "Primary data storage"
-
-3. Exactly 2 relationships using prefixItems (with minItems: 2, maxItems: 2):
-   - Relationship 1: unique-id "frontend-to-api", connects web-frontend to api-service, protocol "HTTPS", description "Frontend calls API"
-   - Relationship 2: unique-id "api-to-database", connects api-service to app-database, protocol "JDBC", description "API stores data"
-
-Use const for all unique-id, name, description, node-type properties.
-Use const for the entire relationship-type object.
-Each node and relationship must reference the base CALM schema using $ref.
-Set required: ["nodes", "relationships"] at the top level.
-Set required: ["description"] on each relationship.
-
-Refer to the pattern-creation.md guide in .github/chatmodes/CALM.chatmode.md for detailed pattern structure examples.
-```
-
-### 3. Test Generation
-
-Generate an architecture from your pattern:
+### 2. Create the Ops Template Directory
 
 ```bash
-calm generate -p patterns/web-app-pattern.json -o architectures/generated-webapp.json
+mkdir -p templates/ops
 ```
 
-Open `architectures/generated-webapp.json` and observe:
-- ✅ Has exactly 3 nodes with the IDs, names, descriptions from your pattern
-- ✅ Has exactly 2 relationships connecting them
-- ✅ Ready for enhancement with interfaces and metadata
+### 3. Create the Service Runbook Template
 
-### 4. Visualize the Generated Architecture
+**File:** `templates/ops/service-runbook.md`
 
-**Steps:**
-1. Open `architectures/generated-webapp.json` in VSCode
-2. Open preview (Ctrl+Shift+C / Cmd+Shift+C)
-3. See the 3-tier architecture visualized
-4. **Take a screenshot** of the generated architecture
+**Content:**
 
-This shows how patterns create instant, visual architectures!
+```handlebars
+# Service Runbooks
 
-### 5. Enhance the Generated Architecture
+Generated from architecture: {{metadata.name}}
+Generated on: {{now}}
 
-The generated architecture has the basic structure, but you can enhance it:
+---
 
-**Prompt:**
-```text
-Update architectures/generated-webapp.json to add:
-- Interfaces to the service and database nodes with realistic host, port values
-- Metadata at the architecture level with owner, version, created date
-- Any additional properties that make it production-ready
+{{#each nodes}}
+{{#if (eq node-type "service")}}
+## {{name}}
 
-Keep the unique-ids, names, and core descriptions as they are (from the pattern).
+**Unique ID:** `{{unique-id}}`
+**Type:** {{node-type}}
+
+### Ownership
+
+| Field | Value |
+|-------|-------|
+| Owner | {{metadata.owner}} |
+| On-Call Slack | {{metadata.oncall-slack}} |
+| Tier | {{metadata.tier}} |
+| Runbook | {{metadata.runbook}} |
+
+### Health & Monitoring
+
+- **Health Endpoint:** `{{metadata.health-endpoint}}`
+- **Dashboard:** {{metadata.dashboard}}
+- **Log Query:** `{{metadata.log-query}}`
+
+### Dependencies
+
+{{#if metadata.dependencies}}
+This service depends on:
+{{#each metadata.dependencies}}
+- {{this}}
+{{/each}}
+{{else}}
+No dependencies documented.
+{{/if}}
+
+### Known Failure Modes
+
+{{#if metadata.failure-modes}}
+{{#each metadata.failure-modes}}
+#### {{symptom}}
+
+| Aspect | Details |
+|--------|---------|
+| **Likely Cause** | {{likely-cause}} |
+| **How to Check** | {{check}} |
+| **Remediation** | {{remediation}} |
+| **Escalation** | {{escalation}} |
+
+{{/each}}
+{{else}}
+No failure modes documented yet.
+{{/if}}
+
+---
+
+{{/if}}
+{{/each}}
+
+## Quick Links
+
+| Service | Health Check | Dashboard | Runbook |
+|---------|--------------|-----------|---------|
+{{#each nodes}}
+{{#if (eq node-type "service")}}
+| {{name}} | `{{metadata.health-endpoint}}` | [Dashboard]({{metadata.dashboard}}) | [Runbook]({{metadata.runbook}}) |
+{{/if}}
+{{/each}}
 ```
 
-### 6. Test Validation
+### 4. Create the On-Call Quick Reference Template
+
+**File:** `templates/ops/oncall-reference.md`
+
+**Content:**
+
+```handlebars
+# On-Call Quick Reference
+
+**Architecture:** {{metadata.name}}
+**Generated:** {{now}}
+
+## Service Contacts
+
+| Service | Owner | On-Call Channel | Tier |
+|---------|-------|-----------------|------|
+{{#each nodes}}
+{{#if (eq node-type "service")}}
+| {{name}} | {{metadata.owner}} | {{metadata.oncall-slack}} | {{metadata.tier}} |
+{{/if}}
+{{/each}}
+
+## Database Contacts
+
+| Database | DBA Contact | Backup Schedule | Restore Time |
+|----------|-------------|-----------------|--------------|
+{{#each nodes}}
+{{#if (eq node-type "database")}}
+| {{name}} | {{metadata.dba-contact}} | {{metadata.backup-schedule}} | {{metadata.restore-time}} |
+{{/if}}
+{{/each}}
+
+## Critical Flows & Business Impact
+
+{{#each flows}}
+### {{name}}
+
+- **Business Impact:** {{metadata.business-impact}}
+- **SLA:** {{metadata.sla}}
+- **Degraded Behavior:** {{metadata.degraded-behavior}}
+- **Customer Communication:** {{metadata.customer-communication}}
+
+**Flow Path:**
+{{#each transitions}}
+{{@index}}. {{relationship-unique-id}}
+{{/each}}
+
+---
+
+{{/each}}
+
+## Monitoring Links
+
+{{#if metadata.monitoring}}
+| Resource | Link |
+|----------|------|
+| Grafana Dashboard | {{metadata.monitoring.grafana-dashboard}} |
+| Kibana Logs | {{metadata.monitoring.kibana-logs}} |
+| PagerDuty | {{metadata.monitoring.pagerduty-service}} |
+| Status Page | {{metadata.monitoring.statuspage}} |
+{{/if}}
+
+## Escalation Matrix
+
+| Tier | Response Time | Escalation Path |
+|------|---------------|-----------------|
+| tier-1 | 15 minutes | Page immediately, all-hands |
+| tier-2 | 30 minutes | Page on-call, notify manager |
+| tier-3 | 2 hours | Slack notification, next business day OK |
+```
+
+### 5. Create the Flow Support Guide Template
+
+Generate support documentation organized by business flows - helping support teams understand end-to-end processes.
+
+**File:** `templates/ops/flow-support-guide.md`
+
+**Content:**
+
+```handlebars
+# Business Flow Support Guide
+
+**Architecture:** {{metadata.name}}
+**Generated:** {{now}}
+
+This guide documents each business flow, the services involved, and troubleshooting steps for support teams.
+
+---
+
+{{#each flows}}
+## {{name}}
+
+**Description:** {{description}}
+
+### Business Impact
+
+| Aspect | Details |
+|--------|---------|
+| **Impact** | {{metadata.business-impact}} |
+| **SLA** | {{metadata.sla}} |
+| **Degraded Mode** | {{metadata.degraded-behavior}} |
+| **Customer Message** | {{metadata.customer-communication}} |
+
+### Flow Path
+
+This flow traverses the following relationships:
+
+| Step | Relationship | Description |
+|------|--------------|-------------|
+{{#each transitions}}
+| {{sequence-number}} | `{{relationship-unique-id}}` | {{description}} |
+{{/each}}
+
+### Troubleshooting Checklist
+
+When this flow is degraded:
+
+1. Check the health endpoints for each service in the flow
+2. Review circuit breaker status between services
+3. Check message broker queue depths (if async)
+4. Review recent deployments to services in this flow
+5. Check database replication lag
+
+### Escalation
+
+If this flow is critical (tier-1), escalate immediately to the service owners.
+
+---
+
+{{/each}}
+
+## Quick Reference: All Flows
+
+| Flow | Business Impact | SLA |
+|------|-----------------|-----|
+{{#each flows}}
+| {{name}} | {{metadata.business-impact}} | {{metadata.sla}} |
+{{/each}}
+```
+
+### 6. Generate the Operations Documents
 
 ```bash
-calm validate -p patterns/web-app-pattern.json -a architectures/generated-webapp.json
+# Generate service runbooks
+calm docify -a architectures/ecommerce-platform.json \
+  -t templates/ops/service-runbook.md \
+  -o docs/ops/service-runbooks.md
+
+# Generate on-call quick reference
+calm docify -a architectures/ecommerce-platform.json \
+  -t templates/ops/oncall-reference.md \
+  -o docs/ops/oncall-reference.md
+
+# Generate flow support guide
+calm docify -a architectures/ecommerce-platform.json \
+  -t templates/ops/flow-support-guide.md \
+  -o docs/ops/flow-support-guide.md
 ```
 
-Should pass! ✅
+### 7. Review Generated Documents
 
-**Test Governance by Breaking Rules**
+Open each generated document and verify:
 
-**Prompt:**
-```text
-Create architectures/broken-webapp.json by copying generated-webapp.json and changing the unique-id of "web-frontend" to "my-custom-frontend"
+- Service runbooks contain all your services with their failure modes
+- On-call reference has correct contacts and escalation info
+- Flow support guide documents each business flow with its impact and troubleshooting steps
+
+**Take screenshots** of each generated document for your deliverables.
+
+### 8. Integrate with CI/CD for Always Up-to-Date Docs
+
+Now that you can generate documentation from your architecture, integrate it into your CI/CD pipeline so docs are always current.
+
+**Key insight:** Your architecture is the source of truth. When it changes, your docs should automatically regenerate.
+
+**Options for integration:**
+
+1. **On every PR:** Regenerate docs and commit them back
+2. **On merge to main:** Regenerate and deploy to documentation site
+3. **Scheduled:** Regenerate nightly to catch any drift
+
+**Example GitHub Actions step:**
+
+```yaml
+- name: Generate operations documentation
+  run: |
+    calm docify -a architectures/ecommerce-platform.json \
+      -t templates/ops/service-runbook.md \
+      -o docs/ops/service-runbooks.md
+    calm docify -a architectures/ecommerce-platform.json \
+      -t templates/ops/oncall-reference.md \
+      -o docs/ops/oncall-reference.md
+    calm docify -a architectures/ecommerce-platform.json \
+      -t templates/ops/flow-support-guide.md \
+      -o docs/ops/flow-support-guide.md
 ```
 
-Validate:
+**Benefits:**
+- Documentation never goes stale
+- No manual effort to keep docs updated
+- Changes to architecture automatically reflected
+- Single source of truth for both code and docs
+
+### 9. Commit Your Work
+
 ```bash
-calm validate -p patterns/web-app-pattern.json -a architectures/broken-webapp.json
-```
-
-Should fail! ❌ The pattern catches the violation.
-
-Delete the broken file:
-```bash
-rm architectures/broken-webapp.json
-```
-
-### 7. Document the Superpower
-
-**File:** `patterns/README.md`
-
-**Prompt:**
-```text
-Create patterns/README.md explaining:
-
-1. The Dual Superpower: Patterns both generate AND validate
-2. How to use web-app-pattern.json for generation and validation
-3. What it enforces and why
-4. Time savings example
-```
-
-### 8. Commit Your Work
-
-```bash
-git add patterns/web-app-pattern.json architectures/generated-webapp.json patterns/README.md docs/screenshots/day-14-pattern.png README.md
-git commit -m "Day 14: Create web app pattern - generation and validation superpower"
+git add templates/ops/ docs/ops/
+git commit -m "Day 14: Generate operations documentation with docify templates"
 git tag day-14
 ```
 
-## Deliverables / Validation Criteria
+## Deliverables
 
-Your Day 14 submission should include a commit tagged `day-14` containing:
+✅ **Required:**
 
-✅ **Required Files:**
-- `patterns/web-app-pattern.json` - Pattern defining 3-tier web app
-- `architectures/generated-webapp.json` - Architecture generated from pattern
-- `patterns/README.md` - Documentation
-- `docs/screenshots/day-14-pattern.png` - Visualization
-- Updated `README.md` - Day 14 marked as complete
+- `templates/ops/service-runbook.md` - Handlebars template for service runbooks
+- `templates/ops/oncall-reference.md` - On-call quick reference template
+- `templates/ops/flow-support-guide.md` - Flow-based support guide template
+- `docs/ops/service-runbooks.md` - Generated service runbooks
+- `docs/ops/oncall-reference.md` - Generated on-call reference
+- `docs/ops/flow-support-guide.md` - Generated flow support guide
+- Screenshots of generated documents
+- Updated `README.md` - Day 14 marked complete
+
+✅ **Validation:**
+
+```bash
+# Verify templates exist
+ls templates/ops/*.md
+
+# Verify generated docs exist
+ls docs/ops/*.md
+
+# Verify content was generated
+grep -q "failure-modes" docs/ops/service-runbooks.md
+grep -q "On-Call" docs/ops/oncall-reference.md
+grep -q "Business Flow" docs/ops/flow-support-guide.md
+
+# Check tag
+git tag | grep -q "day-14"
+```
 
 ## Resources
 
-- [CALM Pattern Documentation](https://github.com/finos/architecture-as-code/tree/main/calm/pattern)
-- [JSON Schema prefixItems](https://json-schema.org/understanding-json-schema/reference/array#tupleValidation)
+- [Handlebars Templating](https://handlebarsjs.com/guide/)
+- [CALM Docify Documentation](https://github.com/finos/architecture-as-code/tree/main/cli#docify)
+- [Incident Management Templates](https://www.atlassian.com/incident-management/postmortem/templates)
+- [Google SRE Runbook Best Practices](https://sre.google/sre-book/effective-troubleshooting/)
+
+## Tips
+
+- Regenerate docs whenever architecture changes - add to CI/CD
+- Keep templates generic; let architecture metadata provide specifics
+- Add more failure modes as you learn from incidents
+- Link incident reports back to architecture to close the feedback loop
+- Consider templating different formats (HTML, PDF) for different audiences
+- The incident report checkboxes help ensure nothing is missed during stressful incidents
 
 ## Next Steps
-Tomorrow (Day 15) you'll reverse-engineer your e-commerce architecture into a pattern!
+
+Tomorrow (Day 15) you'll create your first CALM pattern - turning architecture into reusable, enforceable templates!

@@ -36,7 +36,7 @@ Enrich your key services with support information.
 **Prompt:**
 
 ```text
-Add operational metadata to my e-commerce architecture nodes. For each service (order-service, inventory-service, payment-service), add metadata including:
+Add operational metadata to my e-commerce architecture nodes. For each service (load-balancer, api-gateway-1, api-gateway-2, order-service, inventory-service, payment-service), add metadata including:
 
 1. "owner": team name responsible (e.g., "platform-team", "payments-team")
 2. "oncall-slack": Slack channel for incidents (e.g., "#oncall-platform")
@@ -289,4 +289,4 @@ git tag | grep -q "day-13"
 
 ## Next Steps
 
-Tomorrow (Day 14) you'll create your first reusable pattern to standardize architecture components!
+Tomorrow (Day 14) you'll use docify to generate operations documentation - runbooks, on-call guides, and incident report templates from your architecture metadata!
