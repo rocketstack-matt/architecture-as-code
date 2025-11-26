@@ -108,6 +108,10 @@ Add an "audit" control with:
 
 ### 7. Document Your Flows
 
+For the purposes of your learning record, create a document detailing the purpose of flows and their detail.
+
+Later on in your Advent of CALM journey we will explore getting CALM to create documentation detailing your architecture and its flows.
+
 **File:** `docs/flows-guide.md`
 
 **Content:**
