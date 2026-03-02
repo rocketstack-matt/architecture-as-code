@@ -3,9 +3,23 @@ import { difference } from 'lodash';
 
 /**
  * Checks that the input value exists as an interface with matching unique ID defined under a node in the document.
+ * Supports both "interface" (singular string) and "interfaces" (array) forms in connects relationships.
  */
 export function interfaceIdExistsOnNode(input, _, context) {
-    if (!input || !input.interfaces) {
+    if (!input) {
+        return [];
+    }
+
+    // Support both "interface" (singular string) and "interfaces" (array) forms
+    const desiredInterfaces: string[] = [];
+    if (input.interfaces && Array.isArray(input.interfaces)) {
+        desiredInterfaces.push(...input.interfaces);
+    }
+    if (typeof input.interface === 'string') {
+        desiredInterfaces.push(input.interface);
+    }
+
+    if (desiredInterfaces.length === 0) {
         return [];
     }
 
@@ -24,7 +38,6 @@ export function interfaceIdExistsOnNode(input, _, context) {
     }
 
     // all of these must be present on the referenced node
-    const desiredInterfaces = input.interfaces;
 
     const node = nodeMatch[0];
 

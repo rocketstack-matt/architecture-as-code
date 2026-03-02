@@ -124,4 +124,65 @@ describe('interfaceIdExistsOnNode', () => {
         expect(result[0].message).toBe(`Referenced interface with ID '${input.interfaces[1]}' was not defined on the node with ID '${input.node}'.`);
         expect(result[0].path).toEqual(['/relationships/0/connects/destination']);
     });
+
+    it('should return an empty array when the singular interface field exists on the node', () => {
+        const input = { node: 'node1', interface: 'intf1' };
+        const context = {
+            document: {
+                data: {
+                    nodes: [
+                        {
+                            'unique-id': 'node1',
+                            'interfaces': [
+                                {'unique-id': 'intf1'}
+                            ]
+                        }
+                    ]
+                }
+            }
+        };
+
+        const result = interfaceIdExistsOnNode(input, null, context);
+        expect(result).toEqual([]);
+    });
+
+    it('should return a message when the singular interface field references an interface not defined on the target node', () => {
+        const input = { node: 'node1', interface: 'intf2' };
+        const context = {
+            document: {
+                data: {
+                    nodes: [
+                        {
+                            'unique-id': 'node1',
+                            'interfaces': [
+                                {'unique-id': 'intf1'}
+                            ]
+                        }
+                    ]
+                }
+            },
+            path: ['/relationships/0/connects/destination']
+        };
+
+        const result = interfaceIdExistsOnNode(input, null, context);
+        expect(result.length).toBe(1);
+        expect(result[0].message).toBe(`Referenced interface with ID '${input.interface}' was not defined on the node with ID '${input.node}'.`);
+        expect(result[0].path).toEqual(['/relationships/0/connects/destination']);
+    });
+
+    it('should return a message when the singular interface field is used but the target node has no interfaces', () => {
+        const input = { node: 'node1', interface: 'intf1' };
+        const context = {
+            document: {
+                data: {
+                    nodes: [{'unique-id': 'node1'}]
+                }
+            },
+            path: ['/relationships/0/connects/destination']
+        };
+
+        const result = interfaceIdExistsOnNode(input, null, context);
+        expect(result.length).toBe(1);
+        expect(result[0].message).toBe(`Node with unique-id ${input.node} has no interfaces defined, expected interfaces [${input.interface}].`);
+    });
 });
