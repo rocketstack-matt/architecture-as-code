@@ -34,6 +34,19 @@ export const BlockArchitectureWidget: CalmWidget<
     registerHelpers: registerGlobalTemplateHelpers,
 };
 
-export type { BlockArchOptions, BlockArchVM } from './types';
+export type {
+    BlockArchOptions,
+    BlockArchVM,
+    VMLeafNode,
+    VMContainer,
+    VMEdge,
+    VMAttach,
+    VMInterface,
+    VMControl,
+    VMRiskItem,
+    VMMitigationItem,
+    VMFlow,
+    VMFlowTransition,
+} from './types';
 
 export { transformToBlockArchVM, BlockArchVMBuilder };

@@ -143,4 +143,10 @@ describe('options-parser', () => {
         expect(parseOptions({ 'render-node-type-shapes': false }).renderNodeTypeShapes).toBe(false);
         expect(parseOptions({ 'render-node-type-shapes': true }).renderNodeTypeShapes).toBe(true);
     });
+
+    it('enrich-for-reactflow: false by default; true only when explicitly true', () => {
+        expect(parseOptions().enrichForReactFlow).toBe(false);
+        expect(parseOptions({ 'enrich-for-reactflow': false }).enrichForReactFlow).toBe(false);
+        expect(parseOptions({ 'enrich-for-reactflow': true }).enrichForReactFlow).toBe(true);
+    });
 });

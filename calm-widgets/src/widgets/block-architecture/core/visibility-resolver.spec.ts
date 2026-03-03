@@ -91,6 +91,7 @@ describe('resolveVisibilityWithStrategies functional', () => {
         collapseRelationships: false,
         theme: 'light',
         layoutEngine: 'elk',
+        enrichForReactFlow: false,
         ...over,
     });
 

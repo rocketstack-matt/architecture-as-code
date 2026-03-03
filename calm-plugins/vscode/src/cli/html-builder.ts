@@ -23,11 +23,13 @@ export class HtmlBuilder {
     const nonce = getNonce()
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'main.global.js'))
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'preview.css'))
+    const webviewCssUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'main.css'))
     const htmlPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'preview.html')
     let html = fs.readFileSync(htmlPath.fsPath, 'utf8')
     html = html
         .replace(/{{cspSource}}/g, webview.cspSource)
         .replace(/{{styleUri}}/g, String(styleUri))
+        .replace(/{{webviewCssUri}}/g, String(webviewCssUri))
         .replace(/{{scriptUri}}/g, String(scriptUri))
         .replace(/{{nonce}}/g, nonce)
         .replace(/{{version}}/g, version)

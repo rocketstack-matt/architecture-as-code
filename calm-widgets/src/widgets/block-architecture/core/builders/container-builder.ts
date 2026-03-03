@@ -2,6 +2,7 @@ import { CalmNodeCanonicalModel } from '@finos/calm-models/canonical';
 import { VMContainer, VMLeafNode, VMAttach } from '../../types';
 import { labelFor } from '../utils';
 import { VMFactoryProvider } from '../factories/factory-provider';
+import { toVMControls } from '../factories/node-factory';
 
 /**
  * Recursively removes containers that have no nodes or child containers.
@@ -27,7 +28,8 @@ export function buildContainerForest(
     nodes: CalmNodeCanonicalModel[],
     parentOf: Map<string, string>,
     containerIdsToRender: Set<string>,
-    renderInterfaces: boolean
+    renderInterfaces: boolean,
+    enrichForReactFlow?: boolean
 ): { containers: VMContainer[]; attachments: VMAttach[]; looseNodes: VMLeafNode[] } {
     const byId = new Map(nodes.map(n => [n['unique-id'], n] as const));
     const attachments: VMAttach[] = [];
@@ -37,13 +39,21 @@ export function buildContainerForest(
     const vmContainers = new Map<string, VMContainer>();
     for (const id of containerIdsToRender) {
         const node = byId.get(id);
-        vmContainers.set(id, {
+        const container: VMContainer = {
             id,
             label: labelFor(node, id),
             nodeType: node?.['node-type'],
             nodes: [],
             containers: [],
-        });
+        };
+        if (enrichForReactFlow && node) {
+            if (node.description) container.description = node.description;
+            const vmControls = toVMControls(node.controls as Record<string, unknown> | undefined);
+            if (vmControls) container.controls = vmControls;
+            const metadata = node.metadata as Record<string, unknown> | undefined;
+            if (metadata) container.metadata = metadata;
+        }
+        vmContainers.set(id, container);
     }
 
     // Place nodes into containers when their parent is rendered; otherwise treat as loose
@@ -54,12 +64,12 @@ export function buildContainerForest(
         if (pid && containerIdsToRender.has(pid)) {
             const cont = vmContainers.get(pid);
             if (cont) {
-                const { node: leafNode, attachments: nodeAttachments } = nodeFactory.createLeafNode(n, renderInterfaces);
+                const { node: leafNode, attachments: nodeAttachments } = nodeFactory.createLeafNode(n, renderInterfaces, enrichForReactFlow);
                 cont.nodes.push(leafNode);
                 attachments.push(...nodeAttachments);
             }
         } else {
-            const { node: leafNode, attachments: nodeAttachments } = nodeFactory.createLeafNode(n, renderInterfaces);
+            const { node: leafNode, attachments: nodeAttachments } = nodeFactory.createLeafNode(n, renderInterfaces, enrichForReactFlow);
             looseNodes.push(leafNode);
             attachments.push(...nodeAttachments);
         }

@@ -35,6 +35,7 @@ describe('BlockArchitectureWidget', () => {
             collapseRelationships: false,
             theme: 'light',
             layoutEngine: 'elk',
+            enrichForReactFlow: false,
         });
 
         const fakeVM: BlockArchVM = { containers: [], edges: [], attachments: [], looseNodes: [], highlightNodeIds: [], warnings: [] };
@@ -74,6 +75,7 @@ describe('BlockArchitectureWidget', () => {
             collapseRelationships: false,
             theme: 'light',
             layoutEngine: 'elk',
+            enrichForReactFlow: false,
         });
         expect(builder).toBeInstanceOf(BlockArchVMBuilder);
     });

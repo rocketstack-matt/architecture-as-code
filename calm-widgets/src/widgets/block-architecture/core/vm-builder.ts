@@ -1,10 +1,11 @@
 import { CalmCoreCanonicalModel, CalmNodeCanonicalModel } from '@finos/calm-models/canonical';
 import { prettyLabel } from './utils';
-import { BlockArchVM, NormalizedOptions, VMContainer, VMLeafNode, VMAttach, VMEdge } from '../types';
+import { BlockArchVM, NormalizedOptions, VMContainer, VMLeafNode, VMAttach, VMEdge, VMFlow, VMFlowTransition } from '../types';
 import { buildParentHierarchy, ParentHierarchyResult } from './relationship-analyzer';
 import { resolveVisibilityWithStrategies, VisibilityResult } from './visibility-resolver';
 import { buildContainerForest, pruneEmptyContainers } from './builders/container-builder';
 import { buildInterfaceNameMap, buildEdges } from './builders/edge-builder';
+import { toVMControls } from './factories/node-factory';
 
 interface ContainerResult {
     containers: VMContainer[];
@@ -84,7 +85,8 @@ export class BlockArchVMBuilder {
             filteredNodes,
             this.parentHierarchyResult.parentOf,
             this.visibilityResult.containerIds,
-            this.options.renderInterfaces
+            this.options.renderInterfaces,
+            this.options.enrichForReactFlow
         );
 
         let looseNodes = initialLooseNodes;
@@ -110,6 +112,27 @@ export class BlockArchVMBuilder {
         const nodesById = new Map(nodes.map(n => [n['unique-id'], n] as const));
         const ifaceNames = buildInterfaceNameMap(nodes);
 
+        // Build flow transition lookup when enriching for ReactFlow
+        let flowTransitionsByRelId: Map<string, VMFlowTransition[]> | undefined;
+        if (this.options.enrichForReactFlow && this.context.flows) {
+            flowTransitionsByRelId = new Map();
+            for (const flow of this.context.flows) {
+                for (const t of flow.transitions ?? []) {
+                    const relId = t['relationship-unique-id'];
+                    if (!flowTransitionsByRelId.has(relId)) {
+                        flowTransitionsByRelId.set(relId, []);
+                    }
+                    flowTransitionsByRelId.get(relId)!.push({
+                        flowId: flow['unique-id'],
+                        flowName: flow.name,
+                        sequenceNumber: t['sequence-number'],
+                        description: t.description,
+                        direction: t.direction,
+                    });
+                }
+            }
+        }
+
         this.edges = this.options.edges === 'none'
             ? []
             : buildEdges(
@@ -118,7 +141,9 @@ export class BlockArchVMBuilder {
                 this.options.edgeLabels,
                 this.options.collapseRelationships,
                 ifaceNames,
-                nodesById
+                nodesById,
+                this.options.enrichForReactFlow,
+                flowTransitionsByRelId
             );
         return this;
     }
@@ -164,7 +189,7 @@ export class BlockArchVMBuilder {
         for (const id of this.options.focusNodes ?? []) highlightSet.add(id);
         const highlightNodeIds = Array.from(highlightSet);
 
-        return {
+        const vm: BlockArchVM = {
             containers: this.containerResult.containers,
             edges: this.edges,
             attachments: this.containerResult.attachments,
@@ -178,6 +203,37 @@ export class BlockArchVMBuilder {
             layoutEngine: this.options.layoutEngine,
             warnings: this.visibilityResult.warnings,
         };
+
+        if (this.options.enrichForReactFlow) {
+            // Populate architecture-level flows
+            if (this.context.flows && this.context.flows.length > 0) {
+                vm.flows = this.context.flows.map(f => {
+                    const vmFlow: VMFlow = {
+                        id: f['unique-id'],
+                        name: f.name,
+                        description: f.description,
+                        transitions: (f.transitions ?? []).map(t => ({
+                            flowId: f['unique-id'],
+                            flowName: f.name,
+                            sequenceNumber: t['sequence-number'],
+                            description: t.description,
+                            direction: t.direction,
+                        })),
+                    };
+                    const flowControls = toVMControls(f.controls as Record<string, unknown> | undefined);
+                    if (flowControls) vmFlow.controls = flowControls;
+                    const flowMetadata = f.metadata as Record<string, unknown> | undefined;
+                    if (flowMetadata) vmFlow.metadata = flowMetadata;
+                    return vmFlow;
+                });
+            }
+
+            // Populate architecture-level controls
+            const archControls = toVMControls(this.context.controls as Record<string, unknown> | undefined);
+            if (archControls) vm.controls = archControls;
+        }
+
+        return vm;
     }
 
     /**

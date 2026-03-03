@@ -73,4 +73,67 @@ describe('StandardVMNodeFactory', () => {
         expect(res.node.interfaces).toBeUndefined();
         expect(res.attachments).toHaveLength(0);
     });
+
+    it('does not populate enrichment fields when enrichForReactFlow is false', () => {
+        const f = new StandardVMNodeFactory();
+        const node: Partial<CalmNodeCanonicalModel> = {
+            'unique-id': 'n6',
+            name: 'Enriched Node',
+            description: 'A description',
+            controls: { 'ctrl-1': { description: 'Control 1', requirements: [] } },
+            metadata: { aigf: { 'risk-level': 'high', risks: [{ name: 'Risk1' }], mitigations: [{ name: 'Mit1' }] } },
+        };
+        const res = f.createLeafNode(node as CalmNodeCanonicalModel, false, false);
+        expect(res.node.description).toBeUndefined();
+        expect(res.node.controls).toBeUndefined();
+        expect(res.node.metadata).toBeUndefined();
+        expect(res.node.riskLevel).toBeUndefined();
+        expect(res.node.risks).toBeUndefined();
+        expect(res.node.mitigations).toBeUndefined();
+        expect(res.node.hasDetailedArchitecture).toBeUndefined();
+    });
+
+    it('populates enrichment fields when enrichForReactFlow is true', () => {
+        const f = new StandardVMNodeFactory();
+        const node: Partial<CalmNodeCanonicalModel> = {
+            'unique-id': 'n7',
+            name: 'Enriched Node',
+            description: 'A description',
+            'node-type': 'service',
+            controls: { 'ctrl-1': { description: 'Control 1', requirements: [] } },
+            metadata: {
+                aigf: {
+                    'risk-level': 'high',
+                    risks: [{ id: 'r1', name: 'Risk1', description: 'A risk' }],
+                    mitigations: [{ id: 'm1', name: 'Mit1', description: 'A mitigation' }],
+                },
+            },
+            details: { nodes: [], relationships: [] },
+        };
+        const res = f.createLeafNode(node as CalmNodeCanonicalModel, false, true);
+        expect(res.node.description).toBe('A description');
+        expect(res.node.controls).toEqual({ 'ctrl-1': { description: 'Control 1', requirements: [] } });
+        expect(res.node.metadata).toBeDefined();
+        expect(res.node.riskLevel).toBe('high');
+        expect(res.node.risks).toEqual([{ id: 'r1', name: 'Risk1', description: 'A risk' }]);
+        expect(res.node.mitigations).toEqual([{ id: 'm1', name: 'Mit1', description: 'A mitigation' }]);
+        expect(res.node.hasDetailedArchitecture).toBe(true);
+    });
+
+    it('handles string-only risks and mitigations in AIGF metadata', () => {
+        const f = new StandardVMNodeFactory();
+        const node: Partial<CalmNodeCanonicalModel> = {
+            'unique-id': 'n8',
+            name: 'Node8',
+            metadata: {
+                aigf: {
+                    risks: ['simple risk string'],
+                    mitigations: ['simple mitigation string'],
+                },
+            },
+        };
+        const res = f.createLeafNode(node as CalmNodeCanonicalModel, false, true);
+        expect(res.node.risks).toEqual([{ description: 'simple risk string' }]);
+        expect(res.node.mitigations).toEqual([{ description: 'simple mitigation string' }]);
+    });
 });

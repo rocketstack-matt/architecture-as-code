@@ -173,4 +173,63 @@ describe('StandardVMEdgeFactory', () => {
 
         expect(a).toEqual(b);
     });
+
+    it('does not add enrichment fields when enrichForReactFlow is false', () => {
+        const f = new StandardVMEdgeFactory();
+        const rel: CalmRelationshipCanonicalModel = {
+            'unique-id': 'r-enrich-off',
+            'relationship-type': {
+                connects: { source: { node: 'a' }, destination: { node: 'b' } }
+            },
+            description: 'test description',
+            protocol: 'HTTPS',
+            controls: { 'c1': { description: 'Ctrl', requirements: [] } },
+            metadata: { some: 'data' },
+        };
+        const edges = f.createEdge(rel, makeConfig({ enrichForReactFlow: false }));
+        expect(edges).toHaveLength(1);
+        expect(edges[0].description).toBeUndefined();
+        expect(edges[0].protocol).toBeUndefined();
+        expect(edges[0].relationshipType).toBeUndefined();
+        expect(edges[0].controls).toBeUndefined();
+        expect(edges[0].metadata).toBeUndefined();
+    });
+
+    it('populates enrichment fields on connects edge when enrichForReactFlow is true', () => {
+        const f = new StandardVMEdgeFactory();
+        const rel: CalmRelationshipCanonicalModel = {
+            'unique-id': 'r-enrich-on',
+            'relationship-type': {
+                connects: { source: { node: 'a' }, destination: { node: 'b' } }
+            },
+            description: 'Enriched edge',
+            protocol: 'HTTPS',
+            controls: { 'c1': { description: 'AuthCtrl', requirements: [] } },
+            metadata: { custom: 'field' },
+        };
+        const flowTransitionsByRelId = new Map([
+            ['r-enrich-on', [{ flowId: 'f1', flowName: 'Flow 1', sequenceNumber: 1, description: 'Step 1' }]]
+        ]);
+        const edges = f.createEdge(rel, makeConfig({ enrichForReactFlow: true, flowTransitionsByRelId }));
+        expect(edges).toHaveLength(1);
+        expect(edges[0].description).toBe('Enriched edge');
+        expect(edges[0].protocol).toBe('HTTPS');
+        expect(edges[0].relationshipType).toBe('connects');
+        expect(edges[0].controls).toEqual({ 'c1': { description: 'AuthCtrl', requirements: [] } });
+        expect(edges[0].metadata).toEqual({ custom: 'field' });
+        expect(edges[0].flowTransitions).toEqual([{ flowId: 'f1', flowName: 'Flow 1', sequenceNumber: 1, description: 'Step 1' }]);
+    });
+
+    it('populates enrichment fields on interacts edges when enrichForReactFlow is true', () => {
+        const f = new StandardVMEdgeFactory();
+        const rel: CalmRelationshipCanonicalModel = {
+            'unique-id': 'r-interacts-enrich',
+            'relationship-type': { interacts: { actor: 'user', nodes: ['svc1'] } },
+            description: 'user interacts',
+        };
+        const edges = f.createEdge(rel, makeConfig({ enrichForReactFlow: true }));
+        expect(edges).toHaveLength(1);
+        expect(edges[0].description).toBe('user interacts');
+        expect(edges[0].relationshipType).toBe('interacts');
+    });
 });

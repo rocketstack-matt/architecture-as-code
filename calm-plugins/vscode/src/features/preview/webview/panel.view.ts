@@ -2,6 +2,7 @@ import { PanelViewModel, TabsViewModel } from './panel.view-model'
 import { ModelTabView } from '../model-tab/view/model-tab.view'
 import { TemplateTabView } from '../template-tab/view/template-tab.view'
 import { DocifyTabView } from '../docify-tab/view/docify-tab.view'
+import { GraphTabView } from '../graph-tab/view/graph-tab.view'
 
 /**
  * TabsView - Manages the tab selection and coordinates child tab views
@@ -14,6 +15,11 @@ class TabsView {
     private modelTabView: ModelTabView
     private templateTabView: TemplateTabView
     private docifyTabView: DocifyTabView
+    private graphTabView: GraphTabView
+
+    // DOM elements for renderer switching
+    private docifyContent: HTMLElement
+    private graphContent: HTMLElement
 
     constructor(tabsViewModel: TabsViewModel, container: HTMLElement) {
         this.tabsViewModel = tabsViewModel
@@ -22,17 +28,20 @@ class TabsView {
         // Create child tab views using existing DOM elements
         const modelContainer = document.getElementById('model-content')!
         const templateContainer = document.getElementById('template-content')!
-        const docifyContainer = document.getElementById('docify-content')!
+        this.docifyContent = document.getElementById('docify-content')!
+        this.graphContent = document.getElementById('graph-content')!
 
         this.modelTabView = new ModelTabView(tabsViewModel.model, modelContainer)
         this.templateTabView = new TemplateTabView(tabsViewModel.template, templateContainer)
-        this.docifyTabView = new DocifyTabView(tabsViewModel.docify, docifyContainer, tabsViewModel.vscode)
+        this.docifyTabView = new DocifyTabView(tabsViewModel.docify, this.docifyContent, tabsViewModel.vscode)
+        this.graphTabView = new GraphTabView(tabsViewModel.graph, this.graphContent, tabsViewModel.vscode)
 
         // Initialize docify tab
         this.docifyTabView.initialize()
 
         this.bindTabEvents()
         this.bindViewModelEvents()
+        this.applyRendererVisibility(tabsViewModel.getRenderer())
     }
 
     private bindTabEvents(): void {
@@ -53,6 +62,17 @@ class TabsView {
         this.tabsViewModel.onTabChanged = (tabId: string) => {
             this.updateActiveTab(tabId)
         }
+        // Listen for renderer changes
+        this.tabsViewModel.onRendererChanged = (renderer: 'mermaid' | 'reactflow') => {
+            this.applyRendererVisibility(renderer)
+        }
+    }
+
+    /** Show/hide docify-content vs graph-content based on renderer setting */
+    private applyRendererVisibility(renderer: 'mermaid' | 'reactflow'): void {
+        const isReactFlow = renderer === 'reactflow'
+        this.docifyContent.style.display = isReactFlow ? 'none' : ''
+        this.graphContent.style.display = isReactFlow ? '' : 'none'
     }
 
     private updateActiveTab(activeTabId: string): void {
@@ -79,12 +99,14 @@ class TabsView {
         this.modelTabView.updateSelection(selectedId)
         this.templateTabView.updateSelection(selectedId)
         this.docifyTabView.updateSelection(selectedId)
+        this.graphTabView.updateSelection(selectedId)
     }
 
     dispose(): void {
         this.modelTabView.dispose()
         this.templateTabView.dispose()
         this.docifyTabView.dispose()
+        this.graphTabView.dispose()
     }
 }
 

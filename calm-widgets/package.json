@@ -18,7 +18,8 @@
     "documentation",
     "templates",
     "handlebars",
-    "widgets"
+    "widgets",
+    "reactflow"
   ],
   "author": "FINOS",
   "license": "Apache-2.0",
@@ -28,6 +29,24 @@
     "lodash": "^4.17.23"
   },
   "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "reactflow": "^11.11.0",
+    "@dagrejs/dagre": "^1.1.4"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "reactflow": ">=11.0.0",
+    "@dagrejs/dagre": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "react-dom": { "optional": true },
+    "reactflow": { "optional": true },
+    "@dagrejs/dagre": { "optional": true }
   },
   "files": [
     "dist/**/*",
@@ -38,6 +57,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./reactflow": {
+      "types": "./dist/reactflow.d.mts",
+      "import": "./dist/reactflow.mjs"
     },
     "./widgets": "./widgets"
   }

@@ -5,7 +5,7 @@ import { VMLeafNode, VMEdge, VMAttach, EdgeLabels } from '../../types';
  * Factory interface for creating view model nodes
  */
 export interface VMNodeFactory {
-    createLeafNode(node: CalmNodeCanonicalModel, renderInterfaces: boolean): { node: VMLeafNode; attachments: VMAttach[] };
+    createLeafNode(node: CalmNodeCanonicalModel, renderInterfaces: boolean, enrichForReactFlow?: boolean): { node: VMLeafNode; attachments: VMAttach[] };
 }
 
 /**
@@ -24,4 +24,6 @@ export interface EdgeConfig {
     collapseRelationships: boolean;
     ifaceNames: Map<string, Map<string, string>>;
     nodesById: Map<string, CalmNodeCanonicalModel>;
+    enrichForReactFlow?: boolean;
+    flowTransitionsByRelId?: Map<string, import('../../types').VMFlowTransition[]>;
 }

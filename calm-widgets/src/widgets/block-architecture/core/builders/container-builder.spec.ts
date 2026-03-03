@@ -75,6 +75,58 @@ describe('container-builder', () => {
         expect(attachments).toHaveLength(0);
     });
 
+    it('populates enrichment fields on containers when enrichForReactFlow is true', () => {
+        const fakeNodeFactory: VMNodeFactory = {
+            createLeafNode: (node: CalmNodeCanonicalModel, _renderInterfaces: boolean, _enrich?: boolean) => ({
+                node: { id: node['unique-id'], label: node.name || node['unique-id'] },
+                attachments: []
+            })
+        };
+        VMFactoryProvider.setFactories(fakeNodeFactory, undefined);
+
+        const nodes: CalmNodeCanonicalModel[] = [
+            {
+                'unique-id': 'c1', name: 'Container', 'node-type': 'system', description: 'A system',
+                controls: { 'ctrl': { description: 'System control', requirements: [] } },
+                metadata: { env: 'prod' },
+            },
+            { 'unique-id': 'n1', name: 'Child', 'node-type': 'service', description: '' },
+        ];
+        const parentOf = new Map<string, string>([['n1', 'c1']]);
+        const containerIds = new Set<string>(['c1']);
+
+        const { containers } = buildContainerForest(nodes, parentOf, containerIds, false, true);
+
+        expect(containers).toHaveLength(1);
+        expect(containers[0].description).toBe('A system');
+        expect(containers[0].controls).toEqual({ 'ctrl': { description: 'System control', requirements: [] } });
+        expect(containers[0].metadata).toEqual({ env: 'prod' });
+    });
+
+    it('does not populate container enrichment fields when enrichForReactFlow is false', () => {
+        const fakeNodeFactory: VMNodeFactory = {
+            createLeafNode: (node: CalmNodeCanonicalModel) => ({
+                node: { id: node['unique-id'], label: node.name || node['unique-id'] },
+                attachments: []
+            })
+        };
+        VMFactoryProvider.setFactories(fakeNodeFactory, undefined);
+
+        const nodes: CalmNodeCanonicalModel[] = [
+            { 'unique-id': 'c1', name: 'Container', 'node-type': 'system', description: 'A system' },
+            { 'unique-id': 'n1', name: 'Child', 'node-type': 'service', description: '' },
+        ];
+        const parentOf = new Map<string, string>([['n1', 'c1']]);
+        const containerIds = new Set<string>(['c1']);
+
+        const { containers } = buildContainerForest(nodes, parentOf, containerIds, false, false);
+
+        expect(containers).toHaveLength(1);
+        expect(containers[0].description).toBeUndefined();
+        expect(containers[0].controls).toBeUndefined();
+        expect(containers[0].metadata).toBeUndefined();
+    });
+
     it('creates container → container nesting when both are rendered', () => {
         const fakeNodeFactory: VMNodeFactory = {
             createLeafNode: (node: CalmNodeCanonicalModel) => ({

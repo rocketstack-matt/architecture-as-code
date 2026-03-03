@@ -1,6 +1,7 @@
 import { CalmModelViewModel } from '../model-tab/view-model/calm-model.view-model'
 import { TemplateViewModel } from '../template-tab/view-model/template.view-model'
 import { DocifyViewModel } from '../docify-tab/view-model/docify.view-model'
+import { GraphViewModel } from '../graph-tab/view-model/graph.view-model'
 
 export interface VsCodeApi {
     postMessage(msg: any): void;
@@ -11,18 +12,37 @@ export interface VsCodeApi {
  */
 export class TabsViewModel {
     private activeTab: 'docify-panel' | 'template-panel' | 'model-panel' = 'docify-panel'
+    private renderer: 'mermaid' | 'reactflow' = 'mermaid'
 
     // Child ViewModels
     public readonly model = new CalmModelViewModel()
     public readonly template = new TemplateViewModel()
     public readonly docify = new DocifyViewModel()
+    public readonly graph = new GraphViewModel()
     public readonly vscode: VsCodeApi
 
-    // Observer callback for tab changes
+    // Observer callbacks
     public onTabChanged: (tabId: string) => void = () => { }
+    public onRendererChanged: (renderer: 'mermaid' | 'reactflow') => void = () => { }
 
     constructor(vscode: VsCodeApi) {
         this.vscode = vscode
+    }
+
+    setRenderer(renderer: 'mermaid' | 'reactflow'): void {
+        const changed = this.renderer !== renderer
+        this.renderer = renderer
+        if (changed) {
+            this.onRendererChanged(renderer)
+        }
+        // Always request data for the docify tab (handles initial load and changes)
+        if (this.activeTab === 'docify-panel') {
+            this.requestDocifyData()
+        }
+    }
+
+    getRenderer(): 'mermaid' | 'reactflow' {
+        return this.renderer
     }
 
     setActiveTab(tabId: 'docify-panel' | 'template-panel' | 'model-panel'): void {
@@ -31,9 +51,18 @@ export class TabsViewModel {
             this.onTabChanged(tabId)
 
             // Request data when switching tabs
-            if (tabId === 'docify-panel') this.vscode.postMessage({ type: 'runDocify' })
+            if (tabId === 'docify-panel') this.requestDocifyData()
             if (tabId === 'template-panel') this.vscode.postMessage({ type: 'requestTemplateData' })
             if (tabId === 'model-panel') this.vscode.postMessage({ type: 'requestModelData' })
+        }
+    }
+
+    /** Request appropriate data for the Docify tab based on renderer setting */
+    private requestDocifyData(): void {
+        if (this.renderer === 'reactflow') {
+            this.vscode.postMessage({ type: 'requestGraphData' })
+        } else {
+            this.vscode.postMessage({ type: 'runDocify' })
         }
     }
 
@@ -52,6 +81,12 @@ export class TabsViewModel {
                 if (msg.data) {
                     // Update model ViewModel with data
                     this.model.setModelData(msg.data)
+                }
+                break
+            case 'graphData':
+                if (msg.data) {
+                    // Update graph ViewModel with canonical model data
+                    this.graph.setGraphData(msg.data)
                 }
                 break
             case 'templateData':
@@ -81,18 +116,22 @@ export class TabsViewModel {
                 // Update docify ViewModel with error
                 this.docify.setDocifyError(msg.message)
                 break
+            case 'rendererSetting':
+                this.setRenderer(msg.renderer === 'reactflow' ? 'reactflow' : 'mermaid')
+                break
             case 'select':
                 // Update all child ViewModels with selection
                 this.model.setSelectedId(msg.id)
                 this.template.setSelectedId(msg.id || 'none')
+                this.graph.setSelectedId(msg.id || undefined)
 
                 // Request fresh data for all tabs on selection change
                 this.vscode.postMessage({ type: 'requestModelData' })
                 this.vscode.postMessage({ type: 'requestTemplateData' })
 
-                // If on docify tab, refresh docify too
+                // If on docify tab, refresh with appropriate renderer
                 if (this.activeTab === 'docify-panel') {
-                    this.vscode.postMessage({ type: 'runDocify' })
+                    this.requestDocifyData()
                 }
                 break
         }
@@ -122,10 +161,8 @@ export class PanelViewModel {
      * Initialize the panel
      */
     initialize(): void {
-        // Signal that webview is ready
+        // Signal that webview is ready — extension host will respond with rendererSetting
+        // and initial data
         this.vscode.postMessage({ type: 'ready' })
-
-        // Request initial docify data
-        this.vscode.postMessage({ type: 'runDocify' })
     }
 }

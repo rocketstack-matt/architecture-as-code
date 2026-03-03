@@ -38,6 +38,7 @@ export function parseOptions(raw?: BlockArchOptions): NormalizedOptions {
         collapseRelationships: false,
         theme: 'light',
         layoutEngine: 'elk',
+        enrichForReactFlow: false,
     };
 
     if (!raw) return o;
@@ -106,6 +107,8 @@ export function parseOptions(raw?: BlockArchOptions): NormalizedOptions {
 
     // Parse layout engine (dagre or elk, default: elk)
     o.layoutEngine = pickEnum(raw['layout-engine'], ['dagre', 'elk'] as const, 'elk');
+
+    if (raw['enrich-for-reactflow']) o.enrichForReactFlow = true;
 
     return o;
 }

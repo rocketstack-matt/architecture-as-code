@@ -14,6 +14,7 @@ const baseOpts = (over: Partial<NormalizedOptions> = {}): NormalizedOptions => (
     collapseRelationships: false,
     theme: 'light',
     layoutEngine: 'elk',
+    enrichForReactFlow: false,
     ...over,
 });
 
@@ -121,5 +122,80 @@ describe('vm-builder', () => {
         };
         const vm = buildBlockArchVM(context, baseOpts());
         expect(Array.isArray(vm.warnings)).toBe(true);
+    });
+
+    it('does not populate enrichment fields when enrichForReactFlow is false', () => {
+        const context: CalmCoreCanonicalModel = {
+            nodes: [
+                { 'unique-id': 'n1', 'node-type': 'service', name: 'Svc', description: 'A service', controls: { 'c1': { description: 'Ctrl', requirements: [] } } },
+            ],
+            relationships: [],
+            flows: [{ 'unique-id': 'f1', name: 'Flow1', description: 'A flow', transitions: [] }],
+            controls: { 'arch-ctrl': { description: 'Arch control', requirements: [] } },
+        };
+        const vm = buildBlockArchVM(context, baseOpts({ enrichForReactFlow: false }));
+        expect(vm.flows).toBeUndefined();
+        expect(vm.controls).toBeUndefined();
+        // Loose node should not have enrichment fields
+        const node = vm.looseNodes.find(n => n.id === 'n1');
+        expect(node).toBeDefined();
+        expect(node!.description).toBeUndefined();
+        expect(node!.controls).toBeUndefined();
+    });
+
+    it('populates enrichment fields when enrichForReactFlow is true', () => {
+        const context: CalmCoreCanonicalModel = {
+            nodes: [
+                {
+                    'unique-id': 'n1', 'node-type': 'service', name: 'Svc', description: 'A service',
+                    controls: { 'c1': { description: 'Ctrl', requirements: [] } },
+                    metadata: { aigf: { 'risk-level': 'medium', risks: [{ name: 'R1' }], mitigations: [{ name: 'M1' }] } },
+                },
+                { 'unique-id': 'n2', 'node-type': 'database', name: 'DB', description: 'A database' },
+            ],
+            relationships: [
+                {
+                    'unique-id': 'r1',
+                    'relationship-type': { connects: { source: { node: 'n1' }, destination: { node: 'n2' } } },
+                    description: 'Svc to DB',
+                    protocol: 'JDBC',
+                    controls: { 'rc1': { description: 'Edge ctrl', requirements: [] } },
+                },
+            ],
+            flows: [{
+                'unique-id': 'f1', name: 'Flow1', description: 'Main flow',
+                transitions: [
+                    { 'relationship-unique-id': 'r1', 'sequence-number': 1, description: 'Step 1' },
+                ],
+            }],
+            controls: { 'arch-ctrl': { description: 'Arch control', requirements: [] } },
+        };
+        const vm = buildBlockArchVM(context, baseOpts({ enrichForReactFlow: true }));
+
+        // Architecture-level enrichment
+        expect(vm.flows).toBeDefined();
+        expect(vm.flows).toHaveLength(1);
+        expect(vm.flows![0].name).toBe('Flow1');
+        expect(vm.flows![0].transitions).toHaveLength(1);
+        expect(vm.controls).toEqual({ 'arch-ctrl': { description: 'Arch control', requirements: [] } });
+
+        // Node enrichment
+        const node = vm.looseNodes.find(n => n.id === 'n1');
+        expect(node).toBeDefined();
+        expect(node!.description).toBe('A service');
+        expect(node!.controls).toEqual({ 'c1': { description: 'Ctrl', requirements: [] } });
+        expect(node!.riskLevel).toBe('medium');
+        expect(node!.risks).toEqual([{ name: 'R1' }]);
+        expect(node!.mitigations).toEqual([{ name: 'M1' }]);
+
+        // Edge enrichment
+        const edge = vm.edges.find(e => e.id === 'r1');
+        expect(edge).toBeDefined();
+        expect(edge!.description).toBe('Svc to DB');
+        expect(edge!.protocol).toBe('JDBC');
+        expect(edge!.relationshipType).toBe('connects');
+        expect(edge!.controls).toEqual({ 'rc1': { description: 'Edge ctrl', requirements: [] } });
+        expect(edge!.flowTransitions).toHaveLength(1);
+        expect(edge!.flowTransitions![0].flowName).toBe('Flow1');
     });
 });

@@ -30,8 +30,10 @@ export class DocifyTabView {
         // Listen for docify results
         this.viewModel.onDocifyResult((result: { content: string; format: 'html' | 'markdown'; sourceFile: string }) => {
             this.renderResult(result).catch(error => {
+                const msg = error instanceof Error ? error.message : String(error)
                 console.error('Failed to render docify result:', error)
-                this.renderError('Failed to render result')
+                this.vscode.postMessage({ type: 'log', message: `[docify-tab] render error: ${msg}` })
+                this.renderError(msg)
             })
         })
 
@@ -54,8 +56,8 @@ export class DocifyTabView {
     private async renderResult(result: { content: string; format: 'html' | 'markdown'; sourceFile: string }): Promise<void> {
         const { content, format, sourceFile } = result
         
-        // Clean up old diagram controls
-        this.cleanupDiagramControls()
+        // Clean up old diagram controls — may fail if SVGs were in a hidden tab
+        try { this.cleanupDiagramControls() } catch { /* SVG matrix not invertible when hidden */ }
 
         if (format === 'html') {
             (this.container as any).innerHTML = content

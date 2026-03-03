@@ -18,6 +18,7 @@ import {
   RunDocifyCmd,
   RequestModelDataCmd,
   RequestTemplateDataCmd,
+  RequestGraphDataCmd,
   RefreshAllCmd,
   ToggleLabelsCmd,
   LogCmd,
@@ -26,6 +27,7 @@ import {
 import { PreviewViewModel } from './preview.view-model'
 import { Logger } from '../../core/ports/logger'
 import { GraphData } from "../../models/model";
+import { transformToBlockArchVM } from '@finos/calm-widgets'
 
 /** ---------- main panel ---------- */
 export class CalmPreviewPanel {
@@ -141,6 +143,7 @@ export class CalmPreviewPanel {
     this.commands.register(new RunDocifyCmd(this))
     this.commands.register(new RequestModelDataCmd(this))
     this.commands.register(new RequestTemplateDataCmd(this))
+    this.commands.register(new RequestGraphDataCmd(this))
     this.commands.register(new RefreshAllCmd(this))
     this.commands.register(new ToggleLabelsCmd(this))
     this.commands.register(new LogCmd(this))
@@ -295,6 +298,14 @@ export class CalmPreviewPanel {
   public handleReady() {
     this.log.info('[preview] handleReady() called - webview is ready')
     this.viewModel.handleReady()
+    // Send renderer setting to webview so it knows which renderer to use
+    this.sendRendererSetting()
+  }
+
+  private sendRendererSetting() {
+    const renderer = vscode.workspace.getConfiguration('calm.preview').get<string>('renderer', 'mermaid')
+    this.log.info(`[preview] Sending renderer setting: ${renderer}`)
+    this.post({ type: 'rendererSetting', renderer })
   }
 
   public handleRunDocify() {
@@ -309,11 +320,16 @@ export class CalmPreviewPanel {
     this.viewModel.handleRequestTemplateData()
   }
 
+  public handleRequestGraphData() {
+    this.handleRequestGraphDataImpl()
+  }
+
   public handleRefreshAll() {
     this.log.info('[preview] handleRefreshAll() called - refreshing all tabs')
     this.handleRequestModelData()
     this.handleRequestTemplateData()
     this.handleRunDocify()
+    this.handleRequestGraphData()
   }
 
   public async handleToggleLabels(showLabels: boolean) {
@@ -352,6 +368,31 @@ export class CalmPreviewPanel {
     } catch (error) {
       this.log.error?.('[preview] Error reading model data: ' + String(error))
       this.post({ type: 'modelData', data: null })
+    }
+  }
+
+  private async handleRequestGraphDataImpl() {
+    const uri = this.getCurrentUri()
+    if (!uri) { this.post({ type: 'graphData', data: null }); return }
+
+    try {
+      const state = this.viewModel.getPreviewState()
+      const fileInfo = detectFileType(uri.fsPath)
+      const isTemplate = fileInfo.type === FileType.TemplateFile && fileInfo.isValid
+      const fileToRead = isTemplate && fileInfo.architecturePath ? fileInfo.architecturePath : uri.fsPath
+
+      this.log.info(`[preview] handleRequestGraphData - reading: ${fileToRead}`)
+
+      const rawModelData = await this.modelService.readModelAsync(fileToRead)
+
+      // Build the enriched BlockArchVM on the extension side (Node environment)
+      // to avoid pulling Node-only dependencies into the browser webview bundle.
+      const vm = transformToBlockArchVM(rawModelData, { 'enrich-for-reactflow': true })
+      this.post({ type: 'graphData', data: vm })
+      this.log.info(`[preview] Sent graph VM for: ${state.selectedId || 'none'}`)
+    } catch (error) {
+      this.log.error?.('[preview] Error reading graph data: ' + String(error))
+      this.post({ type: 'graphData', data: null })
     }
   }
 

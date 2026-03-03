@@ -12,8 +12,13 @@
   />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="{{styleUri}}" rel="stylesheet" />
+  <link href="{{webviewCssUri}}" rel="stylesheet" />
   <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    body { display: flex; flex-direction: column; }
     .tab-content[hidden]{display:none!important}
+    #container { flex: 1; overflow: auto; position: relative; }
+    #graph-content { height: 100%; width: 100%; }
     #detailsPre {
       margin-top: 8px; padding: 8px;
       border: 1px solid var(--vscode-editorWidget-border);
@@ -52,8 +57,9 @@
 
   <div id="container">
 
-    <div id="docify-panel" class="tab-content active">
+    <div id="docify-panel" class="tab-content active" style="height:100%;">
       <div id="docify-content"></div>
+      <div id="graph-content" style="height:100%;width:100%;display:none;"></div>
     </div>
 
     <div id="template-panel" class="tab-content">

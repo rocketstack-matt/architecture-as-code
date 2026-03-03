@@ -2,6 +2,32 @@ import { CalmRelationshipCanonicalModel, toKindView, CalmRelationshipTypeKindVie
 import { VMEdge } from '../../types';
 import { VMEdgeFactory, EdgeConfig } from './vm-factory-interfaces';
 import { labelFor, ifaceId, pickIface } from '../utils';
+import { toVMControls } from './node-factory';
+
+/**
+ * Extracts the top-level relationship-type key name (e.g., 'connects', 'interacts')
+ */
+function extractRelationshipTypeName(relType: CalmRelationshipCanonicalModel['relationship-type']): string | undefined {
+    if (!relType || typeof relType !== 'object') return undefined;
+    const keys = Object.keys(relType);
+    return keys.length > 0 ? keys[0] : undefined;
+}
+
+/**
+ * Adds enrichment fields to a VM edge from the source relationship
+ */
+function enrichEdge(edge: VMEdge, rel: CalmRelationshipCanonicalModel, config: EdgeConfig): void {
+    if (rel.description) edge.description = rel.description;
+    if (rel.protocol) edge.protocol = rel.protocol;
+    const relTypeName = extractRelationshipTypeName(rel['relationship-type']);
+    if (relTypeName) edge.relationshipType = relTypeName;
+    const vmControls = toVMControls(rel.controls as Record<string, unknown> | undefined);
+    if (vmControls) edge.controls = vmControls;
+    const metadata = rel.metadata as Record<string, unknown> | undefined;
+    if (metadata) edge.metadata = metadata;
+    const flowTransitions = config.flowTransitionsByRelId?.get(rel['unique-id']);
+    if (flowTransitions && flowTransitions.length > 0) edge.flowTransitions = flowTransitions;
+}
 
 /**
  * Standard implementation of VMEdgeFactory for creating edges from relationships
@@ -42,7 +68,13 @@ export class StandardVMEdgeFactory implements VMEdgeFactory {
             label = this.generateEdgeLabel(rel, srcNode, dstNode, srcIface, dstIface, config);
         }
 
-        return { id: rel['unique-id'], source, target, label };
+        const edge: VMEdge = { id: rel['unique-id'], source, target, label };
+
+        if (config.enrichForReactFlow) {
+            enrichEdge(edge, rel, config);
+        }
+
+        return edge;
     }
 
     private createInteractsEdges(
@@ -56,12 +88,18 @@ export class StandardVMEdgeFactory implements VMEdgeFactory {
             if (config.edgeLabelMode === 'description') {
                 label = rel.description || 'interacts';
             }
-            edges.push({
+            const edge: VMEdge = {
                 id: `${rel['unique-id']}::${n}`,
                 source: kind.actor,
                 target: n,
                 label
-            });
+            };
+
+            if (config.enrichForReactFlow) {
+                enrichEdge(edge, rel, config);
+            }
+
+            edges.push(edge);
         }
         return edges;
     }

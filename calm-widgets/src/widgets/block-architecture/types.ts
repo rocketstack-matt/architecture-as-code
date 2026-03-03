@@ -64,15 +64,90 @@ export interface BlockArchOptions {
     ['theme']?: string;
     ['theme-colors']?: string | ThemeColors;
     ['layout-engine']?: LayoutEngine;
+    ['enrich-for-reactflow']?: boolean;
 }
 
 /** -----------------------------
  * VM Types
  * ------------------------------ */
 export type VMInterface = { id: string; label: string };
-export type VMLeafNode = { id: string; label: string; nodeType?: string; interfaces?: VMInterface[] };
-export type VMContainer = { id: string; label: string; nodeType?: string; nodes: VMLeafNode[]; containers: VMContainer[] };
-export type VMEdge = { id: string; source: string; target: string; label?: string };
+
+export interface VMControl {
+    description: string;
+    requirements?: Array<{ 'requirement-url': string } & Record<string, unknown>>;
+}
+
+export interface VMRiskItem {
+    id?: string;
+    name?: string;
+    description?: string;
+}
+
+export interface VMMitigationItem {
+    id?: string;
+    name?: string;
+    description?: string;
+}
+
+export interface VMFlowTransition {
+    flowId: string;
+    flowName: string;
+    sequenceNumber: number;
+    description: string;
+    direction?: 'source-to-destination' | 'destination-to-source';
+}
+
+export interface VMFlow {
+    id: string;
+    name: string;
+    description: string;
+    transitions: VMFlowTransition[];
+    controls?: Record<string, VMControl>;
+    metadata?: Record<string, unknown>;
+}
+
+export type VMLeafNode = {
+    id: string;
+    label: string;
+    nodeType?: string;
+    interfaces?: VMInterface[];
+    // Enrichment fields (populated when enrichForReactFlow is true)
+    description?: string;
+    controls?: Record<string, VMControl>;
+    metadata?: Record<string, unknown>;
+    riskLevel?: string;
+    risks?: VMRiskItem[];
+    mitigations?: VMMitigationItem[];
+    hasDetailedArchitecture?: boolean;
+};
+
+export type VMContainer = {
+    id: string;
+    label: string;
+    nodeType?: string;
+    nodes: VMLeafNode[];
+    containers: VMContainer[];
+    // Enrichment fields (populated when enrichForReactFlow is true)
+    description?: string;
+    controls?: Record<string, VMControl>;
+    metadata?: Record<string, unknown>;
+};
+
+export type VMEdge = {
+    id: string;
+    source: string;
+    target: string;
+    label?: string;
+    // Enrichment fields (populated when enrichForReactFlow is true)
+    description?: string;
+    protocol?: string;
+    relationshipType?: string;
+    controls?: Record<string, VMControl>;
+    metadata?: Record<string, unknown>;
+    flowTransitions?: VMFlowTransition[];
+    direction?: 'forward' | 'backward';
+};
+
 export type VMAttach = { from: string; to: string };
 
 export type BlockArchVM = {
@@ -88,6 +163,9 @@ export type BlockArchVM = {
     themeColors?: ThemeColors;
     layoutEngine?: LayoutEngine;
     warnings?: string[];
+    // Enrichment fields (populated when enrichForReactFlow is true)
+    flows?: VMFlow[];
+    controls?: Record<string, VMControl>;
 };
 
 /** -----------------------------
@@ -115,6 +193,7 @@ export type NormalizedOptions = {
     theme: string;
     themeColors?: ThemeColors;
     layoutEngine: LayoutEngine;
+    enrichForReactFlow?: boolean;
 };
 
 

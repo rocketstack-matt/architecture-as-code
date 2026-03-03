@@ -2,7 +2,7 @@ import {
     CalmNodeCanonicalModel,
     CalmRelationshipCanonicalModel,
 } from '@finos/calm-models/canonical';
-import { VMEdge, EdgeLabels } from '../../types';
+import { VMEdge, EdgeLabels, VMFlowTransition } from '../../types';
 import { VMFactoryProvider } from '../factories/factory-provider';
 import { EdgeConfig } from '../factories/vm-factory-interfaces';
 
@@ -68,7 +68,9 @@ export function buildEdges(
     edgeLabelMode: EdgeLabels,
     collapseRelationships: boolean,
     ifaceNames: Map<string, Map<string, string>>,
-    nodesById: Map<string, CalmNodeCanonicalModel>
+    nodesById: Map<string, CalmNodeCanonicalModel>,
+    enrichForReactFlow?: boolean,
+    flowTransitionsByRelId?: Map<string, VMFlowTransition[]>
 ): VMEdge[] {
     const edgeFactory = VMFactoryProvider.getEdgeFactory();
     const config: EdgeConfig = {
@@ -76,7 +78,9 @@ export function buildEdges(
         edgeLabelMode,
         collapseRelationships,
         ifaceNames,
-        nodesById
+        nodesById,
+        enrichForReactFlow,
+        flowTransitionsByRelId
     };
 
     // First, create all edges from individual relationships and maintain mapping

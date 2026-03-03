@@ -60,6 +60,13 @@ export class CalmExtensionController {
           vm.configurationChanged();
         }
       }
+      if (e.affectsConfiguration('calm.preview.renderer')) {
+        log.info?.('[extension] Configuration changed: calm.preview.renderer')
+        const previewPanel = previewPanelFactory.get()
+        if (previewPanel) {
+          previewPanel.sendRendererSetting()
+        }
+      }
     }))
 
     let _isCurrentlyInTemplateMode = false
