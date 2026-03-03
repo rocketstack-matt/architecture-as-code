@@ -387,7 +387,8 @@ export class CalmPreviewPanel {
 
       // Build the enriched BlockArchVM on the extension side (Node environment)
       // to avoid pulling Node-only dependencies into the browser webview bundle.
-      const vm = transformToBlockArchVM(rawModelData, { 'enrich-for-reactflow': true })
+      const layout = vscode.workspace.getConfiguration('calm.preview').get<string>('layout', 'elk')
+      const vm = transformToBlockArchVM(rawModelData, { 'enrich-for-reactflow': true, 'layout-engine': layout as 'dagre' | 'elk' })
       this.post({ type: 'graphData', data: vm })
       this.log.info(`[preview] Sent graph VM for: ${state.selectedId || 'none'}`)
     } catch (error) {

@@ -2,6 +2,7 @@
 export { vmToReactFlow } from './adapter/vm-to-reactflow';
 export type { ReactFlowData, ReactFlowOptions } from './adapter/vm-to-reactflow';
 export { getLayoutedElements, createTopLevelLayout } from './adapter/layout-utils';
+export { applyElkLayout } from './adapter/elk-layout';
 export { getEdgeParams, calculateOffsetPositions } from './adapter/floating-edges';
 export { GRAPH_LAYOUT } from './adapter/constants';
 

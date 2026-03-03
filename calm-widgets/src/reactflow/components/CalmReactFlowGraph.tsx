@@ -85,9 +85,13 @@ export function CalmReactFlowGraph({
     const nodeTypes = useMemo(() => ({ custom: CustomNode, group: SystemGroupNode }), []);
 
     useEffect(() => {
-        const { nodes: parsedNodes, edges: parsedEdges } = vmToReactFlow(vm);
-        setNodes(parsedNodes);
-        setEdges(parsedEdges);
+        let cancelled = false;
+        vmToReactFlow(vm).then(({ nodes, edges }) => {
+            if (!cancelled) { setNodes(nodes); setEdges(edges); }
+        }).catch((err) => {
+            console.error('[CalmReactFlowGraph] layout error:', err);
+        });
+        return () => { cancelled = true; };
     }, [vm, setNodes, setEdges]);
 
     const onNodesChange = useCallback(

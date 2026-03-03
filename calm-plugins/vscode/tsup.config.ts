@@ -51,6 +51,7 @@ export default defineConfig([
             'react-dom',
             'reactflow',
             '@dagrejs/dagre',
+            'elkjs',
             '@finos/calm-widgets/reactflow',
         ],
         esbuildOptions(options) {

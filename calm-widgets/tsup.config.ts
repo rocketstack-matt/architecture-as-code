@@ -19,7 +19,7 @@ export default defineConfig([
         },
         splitting: false,
         sourcemap: true,
-        external: ['react', 'react-dom', 'reactflow', '@dagrejs/dagre'],
+        external: ['react', 'react-dom', 'reactflow', '@dagrejs/dagre', 'elkjs'],
         esbuildOptions(options) {
             options.jsx = 'automatic';
         },

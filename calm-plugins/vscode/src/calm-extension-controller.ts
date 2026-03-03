@@ -67,6 +67,14 @@ export class CalmExtensionController {
           previewPanel.sendRendererSetting()
         }
       }
+      if (e.affectsConfiguration('calm.preview.layout')) {
+        log.info?.('[extension] Configuration changed: calm.preview.layout - refreshing graph view')
+        const previewPanel = previewPanelFactory.get()
+        if (previewPanel) {
+          const vm = previewPanelFactory.getViewModel()
+          vm.configurationChanged()
+        }
+      }
     }))
 
     let _isCurrentlyInTemplateMode = false

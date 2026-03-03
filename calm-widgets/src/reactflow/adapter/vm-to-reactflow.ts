@@ -17,16 +17,17 @@ export interface ReactFlowOptions {
 }
 
 /**
- * Converts a BlockArchVM into ReactFlow nodes and edges with Dagre layout applied.
+ * Build ReactFlow nodes and edges from a BlockArchVM (before layout).
  */
-export function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): ReactFlowData {
+function buildReactFlowElements(vm: BlockArchVM): {
+    allNodes: Node[];
+    allEdges: Edge[];
+    nodeToContainer: Map<string, string>;
+} {
     const allNodes: Node[] = [];
     const allEdges: Edge[] = [];
-
-    // Track which node IDs live inside which container (for edge routing)
     const nodeToContainer = new Map<string, string>();
 
-    // Process containers recursively
     function processContainer(container: VMContainer, parentId?: string): void {
         const groupNode: Node = {
             id: container.id,
@@ -49,7 +50,6 @@ export function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): Reac
 
         allNodes.push(groupNode);
 
-        // Process leaf nodes inside this container
         for (const leaf of container.nodes) {
             const nodeData: ReactFlowNodeData = {
                 id: leaf.id,
@@ -77,18 +77,15 @@ export function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): Reac
             nodeToContainer.set(leaf.id, container.id);
         }
 
-        // Recurse into nested containers
         for (const child of container.containers) {
             processContainer(child, container.id);
         }
     }
 
-    // Process top-level containers
     for (const container of vm.containers) {
         processContainer(container);
     }
 
-    // Process loose nodes
     for (const leaf of vm.looseNodes) {
         const nodeData: ReactFlowNodeData = {
             id: leaf.id,
@@ -111,7 +108,6 @@ export function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): Reac
         });
     }
 
-    // Process edges
     for (const vmEdge of vm.edges) {
         const isInteracts = vmEdge.relationshipType === 'interacts';
 
@@ -157,8 +153,24 @@ export function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): Reac
         allEdges.push(edge);
     }
 
-    // Apply layout
-    return applyLayout(allNodes, allEdges, nodeToContainer);
+    return { allNodes, allEdges, nodeToContainer };
+}
+
+/**
+ * Converts a BlockArchVM into ReactFlow nodes and edges with layout applied.
+ *
+ * Uses the `vm.layoutEngine` setting to choose between Dagre (sync, default)
+ * and ELK (async, better for complex hierarchical diagrams).
+ */
+export async function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): Promise<ReactFlowData> {
+    const { allNodes, allEdges, nodeToContainer } = buildReactFlowElements(vm);
+
+    if (vm.layoutEngine === 'elk') {
+        const { applyElkLayout } = await import('./elk-layout');
+        return applyElkLayout(vm, allNodes, allEdges);
+    }
+
+    return applyDagreLayout(allNodes, allEdges, nodeToContainer);
 }
 
 /**
@@ -206,9 +218,9 @@ function getGroupProcessingOrder(allNodes: Node[]): string[] {
 }
 
 /**
- * Multi-pass layout: lay out groups bottom-up, then top-level nodes.
+ * Multi-pass Dagre layout: lay out groups bottom-up, then top-level nodes.
  */
-function applyLayout(
+function applyDagreLayout(
     allNodes: Node[],
     allEdges: Edge[],
     nodeToContainer: Map<string, string>

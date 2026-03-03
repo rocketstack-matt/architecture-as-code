@@ -34,19 +34,22 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "reactflow": "^11.11.0",
-    "@dagrejs/dagre": "^1.1.4"
+    "@dagrejs/dagre": "^1.1.4",
+    "elkjs": "^0.9.3"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
     "reactflow": ">=11.0.0",
-    "@dagrejs/dagre": ">=1.0.0"
+    "@dagrejs/dagre": ">=1.0.0",
+    "elkjs": ">=0.9.0"
   },
   "peerDependenciesMeta": {
     "react": { "optional": true },
     "react-dom": { "optional": true },
     "reactflow": { "optional": true },
-    "@dagrejs/dagre": { "optional": true }
+    "@dagrejs/dagre": { "optional": true },
+    "elkjs": { "optional": true }
   },
   "files": [
     "dist/**/*",
