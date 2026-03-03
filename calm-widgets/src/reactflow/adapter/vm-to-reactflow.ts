@@ -131,6 +131,7 @@ export function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): Reac
             source: vmEdge.source,
             target: vmEdge.target,
             type: 'smoothstep',
+            label: vmEdge.label,
             animated: true,
             markerEnd: { type: MarkerType.ArrowClosed, color: isInteracts ? THEME.colors.edge.interacts : THEME.colors.edge.default },
             style: {
@@ -138,6 +139,17 @@ export function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): Reac
                 strokeWidth: 2,
                 ...(isInteracts ? { strokeDasharray: '5 5' } : {}),
             },
+            labelStyle: {
+                fontSize: 12,
+                fontWeight: 500,
+                fill: THEME.colors.foreground,
+            },
+            labelBgStyle: {
+                fill: THEME.colors.card,
+                fillOpacity: 0.9,
+            },
+            labelBgPadding: [6, 4] as [number, number],
+            labelBgBorderRadius: 4,
             data: edgeData,
         };
 
