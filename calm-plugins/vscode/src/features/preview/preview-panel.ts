@@ -182,6 +182,11 @@ export class CalmPreviewPanel {
           this.log.info(`[preview] Posting select message for: ${state.selectedId}`)
           this.post({ type: 'select', id: state.selectedId })
         }
+        // Push graph data for the ReactFlow renderer (Mermaid is handled via docify)
+        const renderer = vscode.workspace.getConfiguration('calm.preview').get<string>('renderer', 'mermaid')
+        if (renderer === 'reactflow') {
+          this.handleRequestGraphDataImpl()
+        }
       }
     })
 

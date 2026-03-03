@@ -5,8 +5,10 @@ import ReactFlow, {
     Background,
     Controls,
     MiniMap,
+    ReactFlowProvider,
     useNodesState,
     useEdgesState,
+    useReactFlow,
     NodeChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -70,7 +72,16 @@ function calculateGroupBounds(
     };
 }
 
-export function CalmReactFlowGraph({
+export function CalmReactFlowGraph(props: CalmReactFlowGraphProps) {
+    return (
+        // @ts-expect-error ReactFlow v11 types incompatible with @types/react@19
+        <ReactFlowProvider>
+            <CalmReactFlowGraphInner {...props} />
+        </ReactFlowProvider>
+    );
+}
+
+function CalmReactFlowGraphInner({
     vm,
     onNodeClick,
     onEdgeClick,
@@ -80,6 +91,7 @@ export function CalmReactFlowGraph({
 }: CalmReactFlowGraphProps) {
     const [nodes, setNodes, onNodesChangeBase] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const { fitView } = useReactFlow();
 
     const edgeTypes = useMemo(() => ({ custom: FloatingEdge }), []);
     const nodeTypes = useMemo(() => ({ custom: CustomNode, group: SystemGroupNode }), []);
@@ -87,12 +99,21 @@ export function CalmReactFlowGraph({
     useEffect(() => {
         let cancelled = false;
         vmToReactFlow(vm).then(({ nodes, edges }) => {
-            if (!cancelled) { setNodes(nodes); setEdges(edges); }
+            if (!cancelled) {
+                setNodes(nodes);
+                setEdges(edges);
+                // ReactFlow needs time to measure and render new nodes before fitView.
+                // setTimeout ensures the DOM update from setNodes/setEdges has been
+                // committed and ReactFlow has processed the node dimensions.
+                setTimeout(() => {
+                    if (!cancelled) fitView({ padding: 0.2, duration: 200 });
+                }, 50);
+            }
         }).catch((err) => {
             console.error('[CalmReactFlowGraph] layout error:', err);
         });
         return () => { cancelled = true; };
-    }, [vm, setNodes, setEdges]);
+    }, [vm, setNodes, setEdges, fitView]);
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => {

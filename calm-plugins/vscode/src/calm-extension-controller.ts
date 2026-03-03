@@ -65,6 +65,11 @@ export class CalmExtensionController {
         const previewPanel = previewPanelFactory.get()
         if (previewPanel) {
           previewPanel.sendRendererSetting()
+          // When switching to reactflow, push graph data so it renders immediately
+          const renderer = vscode.workspace.getConfiguration('calm.preview').get<string>('renderer', 'mermaid')
+          if (renderer === 'reactflow') {
+            previewPanel.handleRequestGraphData()
+          }
         }
       }
       if (e.affectsConfiguration('calm.preview.layout')) {
@@ -73,6 +78,8 @@ export class CalmExtensionController {
         if (previewPanel) {
           const vm = previewPanelFactory.getViewModel()
           vm.configurationChanged()
+          // Refresh graph data since the layout-engine option is embedded in the VM
+          previewPanel.handleRequestGraphData()
         }
       }
     }))
