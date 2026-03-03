@@ -1,9 +1,10 @@
 import { Node, Edge, MarkerType } from 'reactflow';
+import dagre from '@dagrejs/dagre';
 import type { BlockArchVM, VMContainer, VMLeafNode, VMEdge } from '../../widgets/block-architecture/types';
 import type { ReactFlowNodeData, ReactFlowEdgeData } from '../contracts';
 import { THEME } from '../theme/theme';
 import { GRAPH_LAYOUT } from './constants';
-import { getLayoutedElements, createTopLevelLayout } from './layout-utils';
+import { createTopLevelLayout } from './layout-utils';
 
 export interface ReactFlowData {
     nodes: Node[];
@@ -161,20 +162,65 @@ export function vmToReactFlow(vm: BlockArchVM, options?: ReactFlowOptions): Reac
 }
 
 /**
- * Two-pass layout: first lay out children within containers, then top-level nodes.
+ * Get the effective width/height of a node for layout purposes.
+ * Groups use their computed style dimensions; leaf nodes use constants.
+ */
+function getNodeDimensions(node: Node): { width: number; height: number } {
+    if (node.type === 'group') {
+        return {
+            width: (node.style?.width as number) || GRAPH_LAYOUT.SYSTEM_NODE_DEFAULT_WIDTH,
+            height: (node.style?.height as number) || GRAPH_LAYOUT.SYSTEM_NODE_DEFAULT_HEIGHT,
+        };
+    }
+    return { width: GRAPH_LAYOUT.NODE_WIDTH, height: GRAPH_LAYOUT.NODE_HEIGHT };
+}
+
+/**
+ * Build a bottom-up ordering of group IDs so inner groups are processed before outer ones.
+ */
+function getGroupProcessingOrder(allNodes: Node[]): string[] {
+    const groups = allNodes.filter(n => n.type === 'group');
+    const groupById = new Map(groups.map(g => [g.id, g]));
+    const order: string[] = [];
+    const visited = new Set<string>();
+
+    function visit(id: string) {
+        if (visited.has(id)) return;
+        visited.add(id);
+        // Visit child groups first (depth-first)
+        for (const g of groups) {
+            if (g.parentId === id) {
+                visit(g.id);
+            }
+        }
+        order.push(id);
+    }
+
+    // Start from root groups (no parent, or parent is not a group)
+    for (const g of groups) {
+        if (!g.parentId || !groupById.has(g.parentId)) {
+            visit(g.id);
+        }
+    }
+    return order;
+}
+
+/**
+ * Multi-pass layout: lay out groups bottom-up, then top-level nodes.
  */
 function applyLayout(
     allNodes: Node[],
     allEdges: Edge[],
     nodeToContainer: Map<string, string>
 ): ReactFlowData {
-    // Identify group (container) nodes
-    const groupIds = new Set(allNodes.filter(n => n.type === 'group').map(n => n.id));
+    const nodeById = new Map(allNodes.map(n => [n.id, n]));
+    const headerHeight = GRAPH_LAYOUT.GROUP_HEADER_HEIGHT;
+    const padding = GRAPH_LAYOUT.SYSTEM_NODE_PADDING;
 
-    // Collect children per group
+    // Collect direct children (both leaf and group) per group
     const childrenByGroup = new Map<string, Node[]>();
     for (const node of allNodes) {
-        if (node.parentId && groupIds.has(node.parentId) && node.type !== 'group') {
+        if (node.parentId && nodeById.get(node.parentId)?.type === 'group') {
             if (!childrenByGroup.has(node.parentId)) {
                 childrenByGroup.set(node.parentId, []);
             }
@@ -182,45 +228,66 @@ function applyLayout(
         }
     }
 
-    // Pass 1: Layout children within each group
-    for (const [groupId, children] of childrenByGroup) {
-        // Find edges internal to this group
+    // Process groups bottom-up so inner groups are sized before outer ones
+    const groupOrder = getGroupProcessingOrder(allNodes);
+
+    for (const groupId of groupOrder) {
+        const children = childrenByGroup.get(groupId);
+        if (!children || children.length === 0) continue;
+
+        // Find edges where both endpoints are direct children of this group
         const childIds = new Set(children.map(c => c.id));
         const internalEdges = allEdges.filter(
             e => childIds.has(e.source) && childIds.has(e.target)
         );
 
-        const { nodes: layouted } = getLayoutedElements(children, internalEdges);
+        // Run Dagre layout using each child's actual dimensions
+        const dagreGraph = new dagre.graphlib.Graph();
+        dagreGraph.setDefaultEdgeLabel(() => ({}));
+        dagreGraph.setGraph({
+            rankdir: GRAPH_LAYOUT.RANK_DIR,
+            ranksep: GRAPH_LAYOUT.RANK_SEPARATION,
+            nodesep: GRAPH_LAYOUT.NODE_SEPARATION,
+            edgesep: GRAPH_LAYOUT.EDGE_SEPARATION,
+            marginx: GRAPH_LAYOUT.MARGIN_X,
+            marginy: GRAPH_LAYOUT.MARGIN_Y,
+        });
 
-        // Apply positions back to the nodes
-        for (const ln of layouted) {
-            const original = allNodes.find(n => n.id === ln.id);
-            if (original) {
-                original.position = ln.position;
-            }
+        for (const child of children) {
+            const dims = getNodeDimensions(child);
+            dagreGraph.setNode(child.id, { width: dims.width, height: dims.height });
+        }
+        for (const edge of internalEdges) {
+            dagreGraph.setEdge(edge.source, edge.target);
         }
 
-        // Resize the group node based on children positions
-        const groupNode = allNodes.find(n => n.id === groupId);
-        if (groupNode && layouted.length > 0) {
-            const padding = GRAPH_LAYOUT.SYSTEM_NODE_PADDING;
-            let maxX = 0;
-            let maxY = 0;
-            for (const child of layouted) {
-                maxX = Math.max(maxX, child.position.x + GRAPH_LAYOUT.NODE_WIDTH);
-                maxY = Math.max(maxY, child.position.y + GRAPH_LAYOUT.NODE_HEIGHT);
-            }
-            groupNode.style = {
-                ...groupNode.style,
-                width: maxX + padding,
-                height: maxY + padding,
+        dagre.layout(dagreGraph);
+
+        // Apply positions with header offset, using each child's own dimensions
+        let maxRight = 0;
+        let maxBottom = 0;
+        for (const child of children) {
+            const pos = dagreGraph.node(child.id);
+            const dims = getNodeDimensions(child);
+            child.position = {
+                x: pos.x - dims.width / 2,
+                y: pos.y - dims.height / 2 + headerHeight,
             };
+            maxRight = Math.max(maxRight, child.position.x + dims.width);
+            maxBottom = Math.max(maxBottom, child.position.y + dims.height);
         }
+
+        // Resize the group node to fit all children
+        const groupNode = nodeById.get(groupId)!;
+        groupNode.style = {
+            ...groupNode.style,
+            width: maxRight + padding,
+            height: maxBottom + padding,
+        };
     }
 
-    // Pass 2: Layout top-level nodes (groups + ungrouped leaf nodes)
+    // Final pass: Layout top-level nodes (groups + ungrouped leaf nodes)
     const topLevelNodes = allNodes.filter(n => !n.parentId);
-    // Edges where at least one endpoint is top-level or a group
     const topLevelNodeIds = new Set(topLevelNodes.map(n => n.id));
     const topLevelEdges = allEdges.filter(e => {
         const srcTop = topLevelNodeIds.has(e.source) || topLevelNodeIds.has(nodeToContainer.get(e.source) ?? '');

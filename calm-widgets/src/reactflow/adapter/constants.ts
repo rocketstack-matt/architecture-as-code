@@ -14,6 +14,8 @@ export const GRAPH_LAYOUT = {
     SYSTEM_NODE_DEFAULT_HEIGHT: 200,
     /** Padding around nodes within system containers */
     SYSTEM_NODE_PADDING: 80,
+    /** Vertical offset for group header label */
+    GROUP_HEADER_HEIGHT: 40,
     /** Horizontal spacing between ranks (left-to-right spacing) */
     RANK_SEPARATION: 200,
     /** Vertical spacing between nodes in the same rank */

@@ -28,6 +28,20 @@ export interface CalmReactFlowGraphProps {
 }
 
 /**
+ * Get the effective width/height of a node for bounds calculation.
+ * Group nodes use their style dimensions; leaf nodes use constants.
+ */
+function getChildDimensions(node: Node): { width: number; height: number } {
+    if (node.type === 'group') {
+        return {
+            width: (node.style?.width as number) || GRAPH_LAYOUT.SYSTEM_NODE_DEFAULT_WIDTH,
+            height: (node.style?.height as number) || GRAPH_LAYOUT.SYSTEM_NODE_DEFAULT_HEIGHT,
+        };
+    }
+    return { width: GRAPH_LAYOUT.NODE_WIDTH, height: GRAPH_LAYOUT.NODE_HEIGHT };
+}
+
+/**
  * Calculate the minimum bounds for a group node based on its children
  */
 function calculateGroupBounds(
@@ -38,15 +52,14 @@ function calculateGroupBounds(
     if (children.length === 0) return null;
 
     const padding = GRAPH_LAYOUT.SYSTEM_NODE_PADDING;
-    const nodeWidth = GRAPH_LAYOUT.NODE_WIDTH;
-    const nodeHeight = GRAPH_LAYOUT.NODE_HEIGHT;
 
     let maxX = -Infinity;
     let maxY = -Infinity;
 
     children.forEach((child) => {
-        const childRight = child.position.x + nodeWidth;
-        const childBottom = child.position.y + nodeHeight;
+        const dims = getChildDimensions(child);
+        const childRight = child.position.x + dims.width;
+        const childBottom = child.position.y + dims.height;
         maxX = Math.max(maxX, childRight);
         maxY = Math.max(maxY, childBottom);
     });
@@ -206,6 +219,7 @@ export function CalmReactFlowGraph({
                 onPaneClick={handlePaneClick}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}
+                minZoom={0.1}
                 attributionPosition="bottom-left"
                 style={{ background: THEME.colors.background }}
             >
