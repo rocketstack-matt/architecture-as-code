@@ -1,0 +1,32 @@
+---
+architecture: ../../../payment-service.json
+node-id: payment-processor
+id: "{{node-id}}"
+title: "{{_architecture.nodes['{{node-id}}'].name}}"
+---
+
+# {{_architecture.nodes["{{node-id}}"].name}}
+
+## Details
+{{table _architecture.nodes["{{node-id}}"] orientation="vertical" sections="overview"}}
+
+## Interfaces
+{{table _architecture.nodes["{{node-id}}"].interfaces columns="unique-id,host,port" empty-message="No interfaces defined."}}
+
+## Related Nodes
+{{related-nodes _architecture node-id="{{node-id}}"}}
+
+## Controls
+{{#each _architecture.nodes["{{node-id}}"].controls}}
+### {{kebabToTitleCase @key}}
+
+{{this.description}}
+
+{{table this.requirements key="control-id" empty-message="No requirements defined."}}
+
+{{else}}
+_No controls defined._
+{{/each}}
+
+## Metadata
+{{table _architecture.nodes["{{node-id}}"].metadata orientation="vertical" empty-message="No metadata defined."}}

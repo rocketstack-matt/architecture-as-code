@@ -1,0 +1,45 @@
+---
+architecture: ../../payment-service.json
+id: index
+title: Welcome to CALM Documentation
+sidebar_position: 1
+slug: /
+---
+
+# Welcome to CALM Documentation
+
+This documentation is generated from the **CALM Architecture-as-Code** model.
+
+## High Level Architecture
+{{block-architecture _architecture}}
+
+## Nodes
+{{#each nodes}}
+- [{{name}}](nodes/{{unique-id}})
+{{/each}}
+
+## Relationships
+{{#each relationships}}
+- [{{kebabToTitleCase unique-id}}](relationships/{{unique-id}})
+{{/each}}
+
+## Flows
+{{#if (notEmpty flows)}}
+{{#each flows}}
+- [{{name}}](flows/{{unique-id}})
+{{/each}}
+{{else}}
+_No flows defined._
+{{/if}}
+
+## Metadata
+{{table metadata orientation="vertical" empty-message="No metadata defined."}}
+
+## ADRs
+{{#if (notEmpty adrs)}}
+{{#each adrs}}
+- [{{this}}]({{this}})
+{{/each}}
+{{else}}
+_No ADRs defined._
+{{/if}}

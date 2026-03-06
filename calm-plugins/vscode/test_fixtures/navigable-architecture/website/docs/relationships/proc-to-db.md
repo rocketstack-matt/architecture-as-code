@@ -1,0 +1,29 @@
+---
+architecture: ../../../payment-service.json
+relationship-id: proc-to-db
+id: "{{relationship-id}}"
+title: "{{kebabToTitleCase relationship-id}}"
+---
+
+# {{kebabToTitleCase relationship-id}}
+
+## Details
+{{table _architecture.relationships["{{relationship-id}}"] orientation="vertical" columns="unique-id,description,protocol"}}
+
+## Related Nodes
+{{related-nodes _architecture relationship-id="{{relationship-id}}"}}
+
+## Controls
+{{#each _architecture.relationships["{{relationship-id}}"].controls}}
+### {{kebabToTitleCase @key}}
+
+{{this.description}}
+
+{{table this.requirements key="control-id" empty-message="No requirements defined."}}
+
+{{else}}
+_No controls defined._
+{{/each}}
+
+## Metadata
+{{table _architecture.relationships["{{relationship-id}}"].metadata orientation="vertical" empty-message="No metadata defined."}}
