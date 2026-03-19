@@ -52,16 +52,34 @@ export class CalmHubDocumentLoader implements DocumentLoader {
             throw new Error(`CalmHubDocumentLoader only loads documents with protocol '${CALM_HUB_PROTO}'. (Requested: ${protocol})`);
         }
         // The URL constructor normalizes '..' segments, so url.pathname is already resolved.
-        // Reject if the original input contained traversal sequences before normalization.
-        if (documentId.includes('/..')) {
+        // Reject if the original input contained traversal sequences before normalization,
+        // including percent-encoded path separators (%2f, %5c), dot sequences (%2e), and
+        // double-encoded percent signs (%25) that could hide traversal after further decoding.
+        if (documentId.includes('/..') || /(%2e(%2e|\.)|\.%2e|%2f|%5c|%25)/i.test(documentId)) {
             throw new Error(`CalmHubDocumentLoader rejected path containing directory traversal in: ${documentId}`);
         }
-        const path = url.pathname;
+        // Reconstruct a safe path by decoding each URL path segment individually, validating
+        // for traversal sequences and path separators, then re-encoding. This prevents SSRF
+        // via path injection while avoiding double-encoding of legitimate percent-escapes.
+        const segments = url.pathname.split('/').filter(s => s.length > 0);
+        const decodedSegments = segments.map(s => {
+            let decoded: string;
+            try {
+                decoded = decodeURIComponent(s);
+            } catch {
+                throw new Error(`CalmHubDocumentLoader rejected invalid percent-encoding in path: ${documentId}`);
+            }
+            if (decoded === '..' || decoded === '.' || decoded.includes('/') || decoded.includes('\\')) {
+                throw new Error(`CalmHubDocumentLoader rejected path containing directory traversal in: ${documentId}`);
+            }
+            return decoded;
+        });
+        const safePath = '/' + decodedSegments.map(s => encodeURIComponent(s)).join('/');
 
-        this.logger.debug(`Loading CALM schema from ${this.calmHubUrl}${path}`);
+        this.logger.debug(`Loading CALM schema from ${this.calmHubUrl}${safePath}`);
 
         // TODO gracefully handle 404s and other errors
-        const response = await this.ax.get(path);
+        const response = await this.ax.get(safePath);
         const document = response.data;
         this.logger.debug('Successfully loaded document from CALMHub with id ' + documentId);
         return document;
