@@ -112,6 +112,16 @@ const architectureRules: RulesetDefinition = {
                 function: interfaceIdExists
             },
         },
+
+        'referenced-interface-defined-in-architecture': {
+            description: 'Referenced interface (singular form) must be defined',
+            severity: 'error',
+            message: '{{error}}',
+            given: '$.relationships[*].relationship-type.connects.*.interface',
+            then: {
+                function: interfaceIdExists
+            },
+        },
         
         'referenced-interfaces-defined-on-correct-node-in-architecture': {
             description: 'Connects relationships must reference interfaces that exist on the correct nodes',
