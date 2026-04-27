@@ -21,7 +21,6 @@ import org.finos.calm.mcp.results.McpResults.UpdateDecoratorResult;
 import org.finos.calm.mcp.tools.ArchitectureTools;
 import org.finos.calm.mcp.tools.ControlTools;
 import org.finos.calm.mcp.tools.DecoratorTools;
-import org.finos.calm.mcp.tools.FlowTools;
 import org.finos.calm.mcp.tools.NamespaceTools;
 import org.finos.calm.mcp.tools.SearchTools;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,9 +80,6 @@ public class NitriteMcpIntegration {
 
     @Inject
     DecoratorTools decoratorTools;
-
-    @Inject
-    FlowTools flowTools;
 
     @Inject
     NamespaceTools namespaceTools;
@@ -270,23 +266,6 @@ public class NitriteMcpIntegration {
         assertThat(result.isError(), is(false));
         DecoratorDetailResult body = structured(result, DecoratorDetailResult.class);
         assertThat(String.valueOf(body.decorator().data()), containsString("completed"));
-    }
-
-    // --- Flow Tools ---
-
-    @Test
-    @Order(16)
-    void mcp_list_flows() {
-        ToolResponse result = flowTools.listFlows("finos");
-        assertThat(result.isError(), is(false));
-    }
-
-    @Test
-    @Order(16)
-    void mcp_get_flow_not_found() {
-        ToolResponse result = flowTools.getFlow("finos", 999, "1.0.0");
-        assertThat(result.isError(), is(true));
-        assertThat(errorText(result), containsString("not found"));
     }
 
     // --- Search Tools ---
