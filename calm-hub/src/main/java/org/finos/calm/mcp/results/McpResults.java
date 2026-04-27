@@ -98,17 +98,6 @@ public final class McpResults {
                                         String message) {
     }
 
-    // --- Flow ---
-
-    public record FlowSummary(int id, String name, String description) {
-    }
-
-    public record FlowListResult(String namespace, List<FlowSummary> flows) {
-    }
-
-    public record FlowContentResult(String namespace, int id, String version, JsonNode content) {
-    }
-
     // --- Namespace / Domain ---
 
     public record NamespaceView(String name, String description) {
