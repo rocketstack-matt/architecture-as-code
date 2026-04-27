@@ -5,9 +5,11 @@ import org.finos.calm.domain.exception.FlowNotFoundException;
 import org.finos.calm.domain.exception.FlowVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.flow.NamespaceFlowSummary;
+import org.finos.calm.mcp.results.McpResults.FlowContentResult;
+import org.finos.calm.mcp.results.McpResults.FlowListResult;
 import org.finos.calm.store.FlowStore;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -18,10 +20,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.finos.calm.mcp.tools.McpResponseAssert.errorText;
+import static org.finos.calm.mcp.tools.McpResponseAssert.structured;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,10 +45,6 @@ class TestFlowToolsShould {
         flowTools.mcpEnabled = true;
     }
 
-    private static String text(ToolResponse r) {
-        return r.firstContent().asText().text();
-    }
-
     // --- listFlows ---
 
     @Test
@@ -53,20 +54,25 @@ class TestFlowToolsShould {
                         new NamespaceFlowSummary("Signup Flow", "User registration flow", 1)
                 ));
 
-        String result = text(flowTools.listFlows("workshop"));
+        ToolResponse result = flowTools.listFlows("workshop");
 
-        assertThat(result, containsString("Signup Flow"));
-        assertThat(result, containsString("ID: 1"));
+        assertThat(result.isError(), is(false));
+        FlowListResult body = structured(result, FlowListResult.class);
+        assertThat(body.namespace(), is("workshop"));
+        assertThat(body.flows(), hasSize(1));
+        assertThat(body.flows().get(0).id(), is(1));
+        assertThat(body.flows().get(0).name(), is("Signup Flow"));
     }
 
     @Test
-    void return_empty_message_when_no_flows() throws NamespaceNotFoundException {
+    void return_empty_list_when_no_flows() throws NamespaceNotFoundException {
         when(flowStore.getFlowsForNamespace("empty"))
                 .thenReturn(List.of());
 
-        String result = text(flowTools.listFlows("empty"));
+        ToolResponse result = flowTools.listFlows("empty");
 
-        assertThat(result, containsString("No flows found"));
+        assertThat(result.isError(), is(false));
+        assertThat(structured(result, FlowListResult.class).flows(), is(empty()));
     }
 
     @Test
@@ -77,7 +83,7 @@ class TestFlowToolsShould {
         ToolResponse response = flowTools.listFlows("missing");
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), startsWith("Error:"));
+        assertThat(errorText(response), containsString("Error:"));
     }
 
     @ParameterizedTest
@@ -87,7 +93,7 @@ class TestFlowToolsShould {
         ToolResponse response = flowTools.listFlows(namespace);
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), startsWith("Error:"));
+        assertThat(errorText(response), containsString("Error:"));
         verifyNoInteractions(flowStore);
     }
 
@@ -98,9 +104,14 @@ class TestFlowToolsShould {
         when(flowStore.getFlowForVersion(any()))
                 .thenReturn("{\"transitions\":[]}");
 
-        String result = text(flowTools.getFlow("workshop", 1, "1.0.0"));
+        ToolResponse result = flowTools.getFlow("workshop", 1, "1.0.0");
 
-        assertThat(result, containsString("transitions"));
+        assertThat(result.isError(), is(false));
+        FlowContentResult body = structured(result, FlowContentResult.class);
+        assertThat(body.namespace(), is("workshop"));
+        assertThat(body.id(), is(1));
+        assertThat(body.version(), is("1.0.0"));
+        assertThat(body.content().has("transitions"), is(true));
     }
 
     @Test
@@ -111,7 +122,7 @@ class TestFlowToolsShould {
         ToolResponse response = flowTools.getFlow("workshop", 1, "9.9.9");
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), containsString("Version"));
+        assertThat(errorText(response), containsString("Version"));
     }
 
     @Test
@@ -122,7 +133,7 @@ class TestFlowToolsShould {
         ToolResponse response = flowTools.getFlow("workshop", 99, "1.0.0");
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), containsString("not found"));
+        assertThat(errorText(response), containsString("not found"));
     }
 
     @Test
@@ -133,7 +144,7 @@ class TestFlowToolsShould {
         ToolResponse response = flowTools.getFlow("missing", 1, "1.0.0");
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), containsString("Namespace"));
+        assertThat(errorText(response), containsString("Namespace"));
     }
 
     @Test
@@ -141,7 +152,6 @@ class TestFlowToolsShould {
         ToolResponse response = flowTools.getFlow("bad ns", 1, "1.0.0");
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), startsWith("Error:"));
         verifyNoInteractions(flowStore);
     }
 
@@ -150,7 +160,6 @@ class TestFlowToolsShould {
         ToolResponse response = flowTools.getFlow("workshop", 1, "not-a-version");
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), startsWith("Error:"));
         verifyNoInteractions(flowStore);
     }
 
@@ -164,9 +173,9 @@ class TestFlowToolsShould {
         ToolResponse getFlow = flowTools.getFlow("workshop", 1, "1.0.0");
 
         assertThat(listFlows.isError(), is(true));
-        assertThat(text(listFlows), containsString("disabled"));
+        assertThat(errorText(listFlows), containsString("disabled"));
         assertThat(getFlow.isError(), is(true));
-        assertThat(text(getFlow), containsString("disabled"));
+        assertThat(errorText(getFlow), containsString("disabled"));
         verifyNoInteractions(flowStore);
     }
 }

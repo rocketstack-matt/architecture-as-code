@@ -190,6 +190,24 @@ The tool implementations live in
 - **NamespaceTools** — create namespaces, list namespaces, list domains.
 - **SearchTools** — global cross-resource search with capped, grouped results.
 
+#### Response format — structured content
+
+Every tool returns its successful payload as **MCP structured content**, not as
+free-form text. The schema for each response is declared via
+`@Tool(outputSchema = @OutputSchema(from = ...class))` and the payload types
+live in
+[`org.finos.calm.mcp.results.McpResults`](src/main/java/org/finos/calm/mcp/results/McpResults.java)
+(records such as `ArchitectureListResult`, `DecoratorDetailResult`,
+`SearchResultEnvelope`, etc). MCP clients should read
+`tool_result.structuredContent` and validate against `outputSchema`; the text
+`content` array is empty on success.
+
+Validation failures and store-level errors (e.g. namespace not found) still
+return `ToolResponse.error(...)` with a human-readable text message and
+`isError = true`, so the LLM can surface a clear reason. The
+`quarkus.mcp.server.tools.structured-content.compatibility-mode` property is
+set to `false` so success responses are not duplicated as text.
+
 #### Endpoint
 
 When the application is running, the MCP server is available over Streamable HTTP at:

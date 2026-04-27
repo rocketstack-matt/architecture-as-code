@@ -3,10 +3,13 @@ package org.finos.calm.mcp.tools;
 import io.quarkiverse.mcp.server.ToolResponse;
 import org.finos.calm.domain.exception.NamespaceAlreadyExistsException;
 import org.finos.calm.domain.namespaces.NamespaceInfo;
+import org.finos.calm.mcp.results.McpResults.CreateNamespaceResult;
+import org.finos.calm.mcp.results.McpResults.DomainListResult;
+import org.finos.calm.mcp.results.McpResults.NamespaceListResult;
 import org.finos.calm.store.DomainStore;
 import org.finos.calm.store.NamespaceStore;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -17,10 +20,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.finos.calm.mcp.tools.McpResponseAssert.errorText;
+import static org.finos.calm.mcp.tools.McpResponseAssert.structured;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -41,10 +48,6 @@ class TestNamespaceToolsShould {
         namespaceTools.mcpEnabled = true;
     }
 
-    private static String text(ToolResponse r) {
-        return r.firstContent().asText().text();
-    }
-
     // --- listNamespaces ---
 
     @Test
@@ -55,19 +58,23 @@ class TestNamespaceToolsShould {
                         new NamespaceInfo("workshop", "Workshop namespace")
                 ));
 
-        String result = text(namespaceTools.listNamespaces());
+        ToolResponse result = namespaceTools.listNamespaces();
 
-        assertThat(result, containsString("finos"));
-        assertThat(result, containsString("workshop"));
+        assertThat(result.isError(), is(false));
+        NamespaceListResult body = structured(result, NamespaceListResult.class);
+        assertThat(body.namespaces(), hasSize(2));
+        assertThat(body.namespaces().get(0).name(), is("finos"));
+        assertThat(body.namespaces().get(1).name(), is("workshop"));
     }
 
     @Test
-    void return_no_namespaces_message() {
+    void return_empty_namespaces_list() {
         when(namespaceStore.getNamespaces()).thenReturn(List.of());
 
-        String result = text(namespaceTools.listNamespaces());
+        ToolResponse result = namespaceTools.listNamespaces();
 
-        assertThat(result, containsString("No namespaces found"));
+        assertThat(result.isError(), is(false));
+        assertThat(structured(result, NamespaceListResult.class).namespaces(), is(empty()));
     }
 
     @Test
@@ -75,35 +82,31 @@ class TestNamespaceToolsShould {
         when(namespaceStore.getNamespaces())
                 .thenReturn(List.of(new NamespaceInfo("test", null)));
 
-        String result = text(namespaceTools.listNamespaces());
+        NamespaceListResult body = structured(namespaceTools.listNamespaces(), NamespaceListResult.class);
 
-        assertThat(result, containsString("test"));
-    }
-
-    @Test
-    void return_namespace_with_empty_description() {
-        when(namespaceStore.getNamespaces())
-                .thenReturn(List.of(new NamespaceInfo("test", "")));
-
-        String result = text(namespaceTools.listNamespaces());
-
-        assertThat(result, containsString("test"));
+        assertThat(body.namespaces(), hasSize(1));
+        assertThat(body.namespaces().get(0).name(), is("test"));
+        assertThat(body.namespaces().get(0).description(), is(org.hamcrest.CoreMatchers.nullValue()));
     }
 
     // --- createNamespace ---
 
     @Test
     void create_namespace_successfully() throws NamespaceAlreadyExistsException {
-        String result = text(namespaceTools.createNamespace("test", "A test namespace"));
+        ToolResponse result = namespaceTools.createNamespace("test", "A test namespace");
 
-        assertThat(result, containsString("created successfully"));
+        assertThat(result.isError(), is(false));
+        CreateNamespaceResult body = structured(result, CreateNamespaceResult.class);
+        assertThat(body.name(), is("test"));
+        assertThat(body.message(), containsString("created successfully"));
     }
 
     @Test
     void create_namespace_with_null_description() throws NamespaceAlreadyExistsException {
-        String result = text(namespaceTools.createNamespace("no-desc", null));
+        ToolResponse result = namespaceTools.createNamespace("no-desc", null);
 
-        assertThat(result, containsString("created successfully"));
+        assertThat(result.isError(), is(false));
+        assertThat(structured(result, CreateNamespaceResult.class).name(), is("no-desc"));
     }
 
     @Test
@@ -114,7 +117,7 @@ class TestNamespaceToolsShould {
         ToolResponse response = namespaceTools.createNamespace("existing", "desc");
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), containsString("already exists"));
+        assertThat(errorText(response), containsString("already exists"));
     }
 
     @ParameterizedTest
@@ -124,7 +127,6 @@ class TestNamespaceToolsShould {
         ToolResponse response = namespaceTools.createNamespace(name, "desc");
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), startsWith("Error:"));
         verifyNoInteractions(namespaceStore);
     }
 
@@ -134,19 +136,21 @@ class TestNamespaceToolsShould {
     void return_domains() {
         when(domainStore.getDomains()).thenReturn(List.of("api-threats", "cloud-security"));
 
-        String result = text(namespaceTools.listDomains());
+        ToolResponse result = namespaceTools.listDomains();
 
-        assertThat(result, containsString("api-threats"));
-        assertThat(result, containsString("cloud-security"));
+        assertThat(result.isError(), is(false));
+        assertThat(structured(result, DomainListResult.class).domains(),
+                contains("api-threats", "cloud-security"));
     }
 
     @Test
-    void return_no_domains_message() {
+    void return_empty_domains_list() {
         when(domainStore.getDomains()).thenReturn(List.of());
 
-        String result = text(namespaceTools.listDomains());
+        ToolResponse result = namespaceTools.listDomains();
 
-        assertThat(result, containsString("No domains found"));
+        assertThat(result.isError(), is(false));
+        assertThat(structured(result, DomainListResult.class).domains(), is(empty()));
     }
 
     // --- MCP disabled ---
@@ -160,11 +164,11 @@ class TestNamespaceToolsShould {
         ToolResponse listDomains = namespaceTools.listDomains();
 
         assertThat(listNs.isError(), is(true));
-        assertThat(text(listNs), containsString("disabled"));
+        assertThat(errorText(listNs), containsString("disabled"));
         assertThat(createNs.isError(), is(true));
-        assertThat(text(createNs), containsString("disabled"));
+        assertThat(errorText(createNs), containsString("disabled"));
         assertThat(listDomains.isError(), is(true));
-        assertThat(text(listDomains), containsString("disabled"));
+        assertThat(errorText(listDomains), containsString("disabled"));
         verifyNoInteractions(namespaceStore);
         verifyNoInteractions(domainStore);
     }

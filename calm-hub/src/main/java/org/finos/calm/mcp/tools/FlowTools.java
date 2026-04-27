@@ -1,6 +1,7 @@
 package org.finos.calm.mcp.tools;
 
 import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.Tool.OutputSchema;
 import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkiverse.mcp.server.ToolResponse;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -11,6 +12,10 @@ import org.finos.calm.domain.exception.FlowNotFoundException;
 import org.finos.calm.domain.exception.FlowVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.flow.NamespaceFlowSummary;
+import org.finos.calm.mcp.results.McpResults;
+import org.finos.calm.mcp.results.McpResults.FlowContentResult;
+import org.finos.calm.mcp.results.McpResults.FlowListResult;
+import org.finos.calm.mcp.results.McpResults.FlowSummary;
 import org.finos.calm.store.FlowStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,8 +23,11 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
- * MCP tool provider for flow resources. Exposes read operations on
- * flows within CalmHub namespaces via the Quarkiverse MCP server.
+ * MCP tool provider for flow resources. Exposes read operations on flows
+ * within CalmHub namespaces via the Quarkiverse MCP server.
+ *
+ * <p>All success responses use structured content; clients should read
+ * {@link ToolResponse#structuredContent()} rather than the text body.</p>
  */
 @ApplicationScoped
 public class FlowTools {
@@ -33,7 +41,9 @@ public class FlowTools {
     @Inject
     FlowStore flowStore;
 
-    @Tool(description = "List all flows in a CalmHub namespace.")
+    @Tool(
+            description = "List all flows in a CalmHub namespace.",
+            outputSchema = @OutputSchema(from = FlowListResult.class))
     public ToolResponse listFlows(
             @ToolArg(description = "The namespace to list flows from") String namespace) {
         String error = McpValidationHelper.checkEnabled(mcpEnabled);
@@ -43,25 +53,22 @@ public class FlowTools {
 
         try {
             List<NamespaceFlowSummary> flows = flowStore.getFlowsForNamespace(namespace);
-            if (flows.isEmpty()) {
-                return ToolResponse.success("No flows found in namespace '" + namespace + "'.");
-            }
-            StringBuilder sb = new StringBuilder("Flows in '" + namespace + "':\n");
-            for (NamespaceFlowSummary flow : flows) {
-                sb.append("- ID: ").append(flow.getId());
-                if (flow.getName() != null) {
-                    sb.append(", Name: ").append(flow.getName());
-                }
-                sb.append("\n");
-            }
-            return ToolResponse.success(sb.toString());
+            List<FlowSummary> summaries = flows.stream()
+                    .map(f -> new FlowSummary(
+                            f.getId() == null ? 0 : f.getId(),
+                            f.getName(),
+                            f.getDescription()))
+                    .toList();
+            return ToolResponse.structuredSuccess(new FlowListResult(namespace, summaries));
         } catch (NamespaceNotFoundException e) {
             logger.warn("Namespace not found [{}]", namespace, e);
             return ToolResponse.error("Error: Namespace '" + namespace + "' not found.");
         }
     }
 
-    @Tool(description = "Get the full JSON content of a specific flow version.")
+    @Tool(
+            description = "Get the full JSON content of a specific flow version.",
+            outputSchema = @OutputSchema(from = FlowContentResult.class))
     public ToolResponse getFlow(
             @ToolArg(description = "The namespace containing the flow") String namespace,
             @ToolArg(description = "The flow ID (positive integer)") int flowId,
@@ -81,7 +88,9 @@ public class FlowTools {
                     .setId(flowId)
                     .setVersion(version)
                     .build();
-            return ToolResponse.success(flowStore.getFlowForVersion(flow));
+            String json = flowStore.getFlowForVersion(flow);
+            return ToolResponse.structuredSuccess(
+                    new FlowContentResult(namespace, flowId, version, McpResults.parseJson(json)));
         } catch (NamespaceNotFoundException e) {
             logger.warn("Namespace not found [{}]", namespace, e);
             return ToolResponse.error("Error: Namespace '" + namespace + "' not found.");

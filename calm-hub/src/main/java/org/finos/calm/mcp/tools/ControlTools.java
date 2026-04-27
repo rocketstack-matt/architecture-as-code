@@ -1,6 +1,7 @@
 package org.finos.calm.mcp.tools;
 
 import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.Tool.OutputSchema;
 import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkiverse.mcp.server.ToolResponse;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -10,6 +11,11 @@ import org.finos.calm.domain.controls.ControlDetail;
 import org.finos.calm.domain.exception.ControlNotFoundException;
 import org.finos.calm.domain.exception.ControlRequirementVersionNotFoundException;
 import org.finos.calm.domain.exception.DomainNotFoundException;
+import org.finos.calm.mcp.results.McpResults;
+import org.finos.calm.mcp.results.McpResults.ControlContentResult;
+import org.finos.calm.mcp.results.McpResults.ControlListResult;
+import org.finos.calm.mcp.results.McpResults.ControlSummary;
+import org.finos.calm.mcp.results.McpResults.ControlVersionListResult;
 import org.finos.calm.store.ControlStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +25,9 @@ import java.util.List;
 /**
  * MCP tool provider for control requirement resources. Exposes read operations
  * on control requirements within CalmHub domains via the Quarkiverse MCP server.
+ *
+ * <p>All success responses use structured content; clients should read
+ * {@link ToolResponse#structuredContent()} rather than the text body.</p>
  */
 @ApplicationScoped
 public class ControlTools {
@@ -32,7 +41,9 @@ public class ControlTools {
     @Inject
     ControlStore controlStore;
 
-    @Tool(description = "List all control requirements in a domain (e.g. 'security'). Returns control IDs, names, and descriptions.")
+    @Tool(
+            description = "List all control requirements in a domain (e.g. 'security'). Returns control IDs, names, and descriptions.",
+            outputSchema = @OutputSchema(from = ControlListResult.class))
     public ToolResponse listControls(
             @ToolArg(description = "The domain to list controls for (e.g. 'security')") String domain) {
         String error = McpValidationHelper.checkEnabled(mcpEnabled);
@@ -46,28 +57,22 @@ public class ControlTools {
 
         try {
             List<ControlDetail> controls = controlStore.getControlsForDomain(domain);
-            if (controls.isEmpty()) {
-                return ToolResponse.success("No controls found in domain '" + domain + "'.");
-            }
-            StringBuilder sb = new StringBuilder().append("Controls in domain '").append(domain).append("':\n");
-            for (ControlDetail control : controls) {
-                sb.append("- ID: ").append(control.getId());
-                if (control.getName() != null) {
-                    sb.append(", Name: ").append(control.getName());
-                }
-                if (control.getDescription() != null) {
-                    sb.append(", Description: ").append(control.getDescription());
-                }
-                sb.append("\n");
-            }
-            return ToolResponse.success(sb.toString());
+            List<ControlSummary> summaries = controls.stream()
+                    .map(c -> new ControlSummary(
+                            c.getId() == null ? 0 : c.getId(),
+                            c.getName(),
+                            c.getDescription()))
+                    .toList();
+            return ToolResponse.structuredSuccess(new ControlListResult(domain, summaries));
         } catch (DomainNotFoundException e) {
             logger.warn("Domain not found [{}]", domain, e);
             return ToolResponse.error("Error: Domain '" + domain + "' not found.");
         }
     }
 
-    @Tool(description = "Get the full JSON content of a specific control requirement version.")
+    @Tool(
+            description = "Get the full JSON content of a specific control requirement version.",
+            outputSchema = @OutputSchema(from = ControlContentResult.class))
     public ToolResponse getControl(
             @ToolArg(description = "The domain containing the control (e.g. 'security')") String domain,
             @ToolArg(description = "The control ID (positive integer)") int controlId,
@@ -90,7 +95,9 @@ public class ControlTools {
         }
 
         try {
-            return ToolResponse.success(controlStore.getRequirementForVersion(domain, controlId, version));
+            String json = controlStore.getRequirementForVersion(domain, controlId, version);
+            return ToolResponse.structuredSuccess(
+                    new ControlContentResult(domain, controlId, version, McpResults.parseJson(json)));
         } catch (DomainNotFoundException e) {
             logger.warn("Domain not found [{}]", domain, e);
             return ToolResponse.error("Error: Domain '" + domain + "' not found.");
@@ -103,7 +110,9 @@ public class ControlTools {
         }
     }
 
-    @Tool(description = "List available versions for a specific control requirement.")
+    @Tool(
+            description = "List available versions for a specific control requirement.",
+            outputSchema = @OutputSchema(from = ControlVersionListResult.class))
     public ToolResponse listControlVersions(
             @ToolArg(description = "The domain containing the control (e.g. 'security')") String domain,
             @ToolArg(description = "The control ID (positive integer)") int controlId) {
@@ -122,14 +131,8 @@ public class ControlTools {
 
         try {
             List<String> versions = controlStore.getRequirementVersions(domain, controlId);
-            if (versions.isEmpty()) {
-                return ToolResponse.success("No versions found for control " + controlId + " in domain '" + domain + "'.");
-            }
-            StringBuilder sb = new StringBuilder().append("Versions for control ").append(controlId).append(":\n");
-            for (String version : versions) {
-                sb.append("- ").append(version).append("\n");
-            }
-            return ToolResponse.success(sb.toString());
+            return ToolResponse.structuredSuccess(
+                    new ControlVersionListResult(domain, controlId, versions));
         } catch (DomainNotFoundException e) {
             logger.warn("Domain not found [{}]", domain, e);
             return ToolResponse.error("Error: Domain '" + domain + "' not found.");
