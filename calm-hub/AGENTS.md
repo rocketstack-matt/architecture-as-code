@@ -125,30 +125,6 @@ public class ArchitectureStoreProducer {
 - Requires Keycloak running on https://localhost:9443
 - Self-signed certificates for local dev
 
-### MCP Tools (`org.finos.calm.mcp.tools`)
-
-CalmHub embeds a Quarkiverse MCP server. All MCP tool methods MUST follow these
-conventions:
-
-- Return `ToolResponse.structuredSuccess(<record>)` on success — never wrap the
-  payload as plain text. The `text` content array stays empty on success.
-- Declare the response shape with `@Tool(outputSchema = @OutputSchema(from = X.class))`.
-- Define `X` as a public record inside
-  [`org.finos.calm.mcp.results.McpResults`](src/main/java/org/finos/calm/mcp/results/McpResults.java).
-  Group related records together; embed raw store JSON via
-  `McpResults.parseJson(...)` so it travels as a `JsonNode`, not a string.
-- Use `ToolResponse.error("Error: ...")` for validation failures and store
-  exceptions (namespace not found, decorator not found, invalid JSON, etc.).
-  These remain text-only and set `isError = true`.
-- Validate input via `McpValidationHelper` and short-circuit before touching
-  the store.
-- The `quarkus.mcp.server.tools.structured-content.compatibility-mode=false`
-  property keeps the contract strict — do not flip it to `true`.
-
-Tests use the `McpResponseAssert` helper (in
-`src/test/java/org/finos/calm/mcp/tools/`): `structured(response, X.class)` for
-success-path assertions, `errorText(response)` for error-path assertions.
-
 ## Key Concepts
 
 ### Quarkus Dev Mode

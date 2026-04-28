@@ -1,7 +1,6 @@
 package org.finos.calm.mcp.tools;
 
 import io.quarkiverse.mcp.server.Tool;
-import io.quarkiverse.mcp.server.Tool.OutputSchema;
 import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkiverse.mcp.server.ToolResponse;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -9,25 +8,18 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.finos.calm.domain.search.GroupedSearchResults;
 import org.finos.calm.domain.search.SearchResult;
-import org.finos.calm.mcp.results.McpResults.SearchGroup;
-import org.finos.calm.mcp.results.McpResults.SearchHit;
-import org.finos.calm.mcp.results.McpResults.SearchResultEnvelope;
 import org.finos.calm.store.SearchStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * MCP tool provider for global search across CalmHub. Searches all resource
- * types (architectures, patterns, flows, standards, interfaces, controls,
- * ADRs) and returns grouped results via the Quarkiverse MCP server.
- *
- * <p>All success responses use structured content; clients should read
- * {@link ToolResponse#structuredContent()} rather than the text body.</p>
+ * types (architectures, patterns, flows, standards, interfaces, controls, ADRs)
+ * and returns grouped results via the Quarkiverse MCP server.
  */
 @ApplicationScoped
 public class SearchTools {
@@ -43,9 +35,7 @@ public class SearchTools {
     @Inject
     SearchStore searchStore;
 
-    @Tool(
-            description = "Search across all resource types in CalmHub. Performs a global search across architectures, patterns, flows, standards, interfaces, controls, and ADRs. Results are grouped by type.",
-            outputSchema = @OutputSchema(from = SearchResultEnvelope.class))
+    @Tool(description = "Search across all resource types in CalmHub. Performs a global search across architectures, patterns, flows, standards, interfaces, controls, and ADRs. Results are grouped by type.")
     public ToolResponse searchHub(
             @ToolArg(description = "The search query string (1-200 characters)") String query) {
         String error = McpValidationHelper.checkEnabled(mcpEnabled);
@@ -64,7 +54,11 @@ public class SearchTools {
         GroupedSearchResults groupedResults = searchStore.search(query);
         Map<String, List<SearchResult>> groups = toGroupMap(groupedResults);
 
-        List<SearchGroup> structuredGroups = new ArrayList<>();
+        if (groups.values().stream().allMatch(List::isEmpty)) {
+            return ToolResponse.success("No results found for '" + query + "'.");
+        }
+
+        StringBuilder sb = new StringBuilder().append("Search results for '").append(query).append("':\n");
         for (Map.Entry<String, List<SearchResult>> entry : groups.entrySet()) {
             List<SearchResult> items = entry.getValue();
             if (items.isEmpty()) {
@@ -72,16 +66,26 @@ public class SearchTools {
             }
             int total = items.size();
             int shown = Math.min(total, MAX_RESULTS_PER_GROUP);
-            List<SearchHit> hits = new ArrayList<>(shown);
+            sb.append("\n").append(entry.getKey()).append(":\n");
             for (int i = 0; i < shown; i++) {
                 SearchResult item = items.get(i);
-                hits.add(new SearchHit(item.getNamespace(), item.getId(), item.getName(), item.getDescription()));
+                sb.append("- ID: ").append(item.getId());
+                if (item.getName() != null) {
+                    sb.append(", Name: ").append(item.getName());
+                }
+                if (item.getNamespace() != null) {
+                    sb.append(", Namespace: ").append(item.getNamespace());
+                }
+                if (item.getDescription() != null) {
+                    sb.append(", Description: ").append(item.getDescription());
+                }
+                sb.append("\n");
             }
-            structuredGroups.add(new SearchGroup(entry.getKey(), total, shown, hits));
+            if (total > MAX_RESULTS_PER_GROUP) {
+                sb.append("  (showing ").append(shown).append(" of ").append(total).append(")\n");
+            }
         }
-
-        logger.debug("Search [{}] produced {} non-empty groups", query, structuredGroups.size());
-        return ToolResponse.structuredSuccess(new SearchResultEnvelope(query, structuredGroups));
+        return ToolResponse.success(sb.toString());
     }
 
     private static Map<String, List<SearchResult>> toGroupMap(GroupedSearchResults results) {

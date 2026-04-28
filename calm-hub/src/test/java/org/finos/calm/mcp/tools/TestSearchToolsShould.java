@@ -3,11 +3,9 @@ package org.finos.calm.mcp.tools;
 import io.quarkiverse.mcp.server.ToolResponse;
 import org.finos.calm.domain.search.GroupedSearchResults;
 import org.finos.calm.domain.search.SearchResult;
-import org.finos.calm.mcp.results.McpResults.SearchGroup;
-import org.finos.calm.mcp.results.McpResults.SearchResultEnvelope;
 import org.finos.calm.store.SearchStore;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -15,13 +13,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
-import static org.finos.calm.mcp.tools.McpResponseAssert.errorText;
-import static org.finos.calm.mcp.tools.McpResponseAssert.structured;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +36,11 @@ class TestSearchToolsShould {
 
     private static final List<SearchResult> EMPTY = List.of();
 
+    /** Extract the text payload from a ToolResponse for assertion purposes. */
+    private static String text(ToolResponse r) {
+        return r.firstContent().asText().text();
+    }
+
     @Test
     void return_grouped_results_for_valid_query() {
         List<SearchResult> archResults = List.of(
@@ -55,46 +55,34 @@ class TestSearchToolsShould {
 
         when(searchStore.search("trade")).thenReturn(grouped);
 
-        ToolResponse result = searchTools.searchHub("trade");
+        String result = text(searchTools.searchHub("trade"));
 
-        assertThat(result.isError(), is(false));
-        SearchResultEnvelope body = structured(result, SearchResultEnvelope.class);
-        assertThat(body.query(), is("trade"));
-        assertThat(body.groups(), hasSize(2));
-
-        SearchGroup archGroup = body.groups().get(0);
-        assertThat(archGroup.type(), is("architectures"));
-        assertThat(archGroup.total(), is(1));
-        assertThat(archGroup.shown(), is(1));
-        assertThat(archGroup.items().get(0).name(), is("Trade Platform"));
-        assertThat(archGroup.items().get(0).namespace(), is("workshop"));
-
-        SearchGroup controlGroup = body.groups().get(1);
-        assertThat(controlGroup.type(), is("controls"));
-        assertThat(controlGroup.items().get(0).name(), is("BOLA"));
+        assertThat(result, containsString("Search results for 'trade'"));
+        assertThat(result, containsString("architectures:"));
+        assertThat(result, containsString("Trade Platform"));
+        assertThat(result, containsString("Namespace: workshop"));
+        assertThat(result, containsString("controls:"));
+        assertThat(result, containsString("BOLA"));
     }
 
     @Test
-    void return_empty_groups_when_no_results() {
+    void return_no_results_message_for_all_empty() {
         GroupedSearchResults grouped = new GroupedSearchResults(
                 EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY);
 
         when(searchStore.search("nonexistent")).thenReturn(grouped);
 
-        ToolResponse result = searchTools.searchHub("nonexistent");
+        String result = text(searchTools.searchHub("nonexistent"));
 
-        assertThat(result.isError(), is(false));
-        SearchResultEnvelope body = structured(result, SearchResultEnvelope.class);
-        assertThat(body.query(), is("nonexistent"));
-        assertThat(body.groups(), is(empty()));
+        assertThat(result, containsString("No results found"));
     }
 
     @Test
     void return_error_for_null_query() {
         ToolResponse response = searchTools.searchHub(null);
 
-        assertThat(response.isError(), is(true));
-        assertThat(errorText(response), containsString("blank"));
+        assertThat(response.isError(), org.hamcrest.Matchers.is(true));
+        assertThat(text(response), containsString("blank"));
         verifyNoInteractions(searchStore);
     }
 
@@ -102,8 +90,8 @@ class TestSearchToolsShould {
     void return_error_for_blank_query() {
         ToolResponse response = searchTools.searchHub("   ");
 
-        assertThat(response.isError(), is(true));
-        assertThat(errorText(response), containsString("blank"));
+        assertThat(response.isError(), org.hamcrest.Matchers.is(true));
+        assertThat(text(response), containsString("blank"));
         verifyNoInteractions(searchStore);
     }
 
@@ -113,8 +101,8 @@ class TestSearchToolsShould {
 
         ToolResponse response = searchTools.searchHub(longQuery);
 
-        assertThat(response.isError(), is(true));
-        assertThat(errorText(response), containsString("200"));
+        assertThat(response.isError(), org.hamcrest.Matchers.is(true));
+        assertThat(text(response), containsString("200"));
         verifyNoInteractions(searchStore);
     }
 
@@ -126,14 +114,13 @@ class TestSearchToolsShould {
                 EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY);
         when(searchStore.search(maxQuery)).thenReturn(grouped);
 
-        ToolResponse response = searchTools.searchHub(maxQuery);
+        String result = text(searchTools.searchHub(maxQuery));
 
-        assertThat(response.isError(), is(false));
-        assertThat(structured(response, SearchResultEnvelope.class).groups(), is(empty()));
+        assertThat(result, containsString("No results found"));
     }
 
     @Test
-    void omit_empty_groups_in_results() {
+    void skip_empty_groups_in_results() {
         List<SearchResult> archResults = List.of(
                 new SearchResult("workshop", 1, "My Arch", "desc")
         );
@@ -143,10 +130,11 @@ class TestSearchToolsShould {
 
         when(searchStore.search("arch")).thenReturn(grouped);
 
-        SearchResultEnvelope body = structured(searchTools.searchHub("arch"), SearchResultEnvelope.class);
+        String result = text(searchTools.searchHub("arch"));
 
-        assertThat(body.groups(), hasSize(1));
-        assertThat(body.groups().get(0).type(), is("architectures"));
+        assertThat(result, containsString("architectures:"));
+        assertThat(result, not(containsString("controls:")));
+        assertThat(result, not(containsString("patterns:")));
     }
 
     // --- MCP disabled ---
@@ -156,8 +144,8 @@ class TestSearchToolsShould {
         searchTools.mcpEnabled = false;
 
         ToolResponse response = searchTools.searchHub("trade");
-        assertThat(response.isError(), is(true));
-        assertThat(errorText(response), containsString("disabled"));
+        assertThat(response.isError(), org.hamcrest.Matchers.is(true));
+        assertThat(text(response), containsString("disabled"));
         verifyNoInteractions(searchStore);
     }
 }
