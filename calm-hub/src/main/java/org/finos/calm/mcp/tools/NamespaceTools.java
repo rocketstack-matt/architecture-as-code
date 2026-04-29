@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * MCP tool provider for namespace and domain resources. Exposes listing and
@@ -36,10 +37,9 @@ public class NamespaceTools {
 
     @Tool(description = "List all namespaces available in CalmHub. Returns namespace names and descriptions.")
     public ToolResponse listNamespaces() {
-        String error = McpValidationHelper.checkEnabled(mcpEnabled);
-        if (error != null) {
-            return ToolResponse.error(error);
-        }
+        Optional<ToolResponse> err = McpValidationHelper.firstError(
+                () -> McpValidationHelper.checkEnabled(mcpEnabled));
+        if (err.isPresent()) return err.get();
         List<NamespaceInfo> namespaces = namespaceStore.getNamespaces();
         if (namespaces.isEmpty()) {
             return ToolResponse.success("No namespaces found.");
@@ -59,20 +59,11 @@ public class NamespaceTools {
     public ToolResponse createNamespace(
             @ToolArg(description = "Name for the new namespace (alphanumeric with optional hyphens and dotted segments, case-sensitive, e.g. 'my-org.team1')") String name,
             @ToolArg(description = "Optional description of the namespace", required = false) String description) {
-        String error = McpValidationHelper.checkEnabled(mcpEnabled);
-        if (error != null) {
-            return ToolResponse.error(error);
-        }
-        error = McpValidationHelper.validateNamespace(name);
-        if (error != null) {
-            return ToolResponse.error(error);
-        }
-        if (description != null) {
-            error = McpValidationHelper.validateDescriptionLength(description, "Description");
-            if (error != null) {
-                return ToolResponse.error(error);
-            }
-        }
+        Optional<ToolResponse> err = McpValidationHelper.firstError(
+                () -> McpValidationHelper.checkEnabled(mcpEnabled),
+                () -> McpValidationHelper.validateNamespace(name),
+                () -> description != null ? McpValidationHelper.validateDescriptionLength(description, "Description") : null);
+        if (err.isPresent()) return err.get();
 
         try {
             namespaceStore.createNamespace(name, description);
@@ -86,10 +77,9 @@ public class NamespaceTools {
 
     @Tool(description = "List all control domains available in CalmHub (e.g. 'security').")
     public ToolResponse listDomains() {
-        String error = McpValidationHelper.checkEnabled(mcpEnabled);
-        if (error != null) {
-            return ToolResponse.error(error);
-        }
+        Optional<ToolResponse> err = McpValidationHelper.firstError(
+                () -> McpValidationHelper.checkEnabled(mcpEnabled));
+        if (err.isPresent()) return err.get();
         List<String> domains = domainStore.getDomains();
         if (domains.isEmpty()) {
             return ToolResponse.success("No domains found.");
