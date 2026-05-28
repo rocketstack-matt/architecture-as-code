@@ -117,6 +117,23 @@
                     },
                     "default": [],
                     "markdownDescription": "Additional folders containing CALM schemas for validation. Useful for schema developers testing local schema changes. Paths are relative to the workspace root."
+                },
+                "calm.hub.url": {
+                    "type": "string",
+                    "default": "",
+                    "markdownDescription": "Base URL of the CALM Hub REST API (e.g. `https://calm-hub.example.com`). Leave empty to disable the CALM Hub view."
+                },
+                "calm.hub.auth.mode": {
+                    "type": "string",
+                    "enum": ["none", "bearer", "device-code"],
+                    "default": "none",
+                    "markdownDescription": "Authentication mode for the CALM Hub.\n\n- **none**: unauthenticated Hub.\n- **bearer**: prompt for a token via **CALM: Sign in to Hub** and store it in SecretStorage.\n- **device-code**: run an OIDC device-flow against the Hub realm (lands in a later phase)."
+                },
+                "calm.hub.namespaces.pinned": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": [],
+                    "markdownDescription": "Namespaces to pin to the top of the CALM Hub view."
                 }
             }
         },
@@ -182,10 +199,12 @@
     "dependencies": {
         "@dagrejs/dagre": "^1.1.4",
         "@finos/calm-design-tokens": "*",
+        "@finos/calm-hub-client": "*",
         "@finos/calm-models": "file:../../calm-models",
         "@finos/calm-shared": "file:../../shared",
         "@finos/calm-ui-react": "*",
         "@monaco-editor/react": "^4.7.0",
+        "axios": "^1.15.2",
         "lodash": "^4.18.1",
         "lucide-react": "^0.577.0",
         "react": "^19.1.0",
