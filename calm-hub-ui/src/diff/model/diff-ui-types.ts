@@ -1,30 +1,16 @@
-import type {
-    CalmArchitectureSchema,
-    CalmNodeSchema,
-    CalmRelationshipSchema,
-} from '@finos/calm-models/types';
-import type { DiffResult } from '@finos/calm-models/diff';
-
-export type DiffStatus = 'added' | 'removed' | 'modified' | 'renamed' | 'unchanged';
-
-export interface DiffNodeData extends CalmNodeSchema {
-    diffStatus?: DiffStatus;
-    originalId?: string;
-}
-
-export interface DiffEdgeData extends CalmRelationshipSchema {
-    diffStatus?: DiffStatus;
-    originalId?: string;
-}
-
-/** A diffable CALM document: an architecture instance or a pattern JSON Schema. */
-export type DiffSource = CalmArchitectureSchema | Record<string, unknown>;
-
-export type DiffSourceType = 'Architectures' | 'Patterns';
-
-export interface DiffGraphProps {
-    source: DiffSource;
-    sourceType: DiffSourceType;
-    diffResult: DiffResult | null;
-    isFirst: boolean;
-}
+/**
+ * Re-export of the diff UI types from @finos/calm-ui-react/diff.
+ *
+ * The canonical definitions live in calm-ui-react so the VSCode webview and
+ * Hub UI share the same type shape. This file remains for backwards
+ * compatibility with existing local imports. New code should import from
+ * `@finos/calm-ui-react/diff` directly.
+ */
+export type {
+    DiffStatus,
+    DiffNodeData,
+    DiffEdgeData,
+    DiffSource,
+    DiffSourceType,
+    DiffGraphProps,
+} from '@finos/calm-ui-react/diff'

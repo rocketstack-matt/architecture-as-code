@@ -1,0 +1,62 @@
+{
+  "name": "@finos/calm-ui-react",
+  "version": "0.1.0",
+  "description": "Shared React components for CALM — visualizer, details sidebar, ADR view, timeline + compare shell, diff overlay. Consumed by calm-hub-ui and calm-plugins/vscode.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./diff": {
+      "types": "./dist/diff/index.d.ts",
+      "import": "./dist/diff/index.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "watch": "tsup --watch",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "lint-fix": "eslint src --fix"
+  },
+  "keywords": [
+    "calm",
+    "react",
+    "visualizer",
+    "reactflow"
+  ],
+  "author": "FINOS",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@finos/calm-design-tokens": "*",
+    "@finos/calm-models": "*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "reactflow": "^11.11.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "jsdom": "^26.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "reactflow": "^11.11.4",
+    "tsup": "^8.4.0"
+  }
+}

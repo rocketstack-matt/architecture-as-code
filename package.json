@@ -8,6 +8,7 @@
     },
     "workspaces": [
         "calm-design-tokens",
+        "calm-ui-react",
         "calm-models",
         "calm-widgets",
         "calm-ai",
