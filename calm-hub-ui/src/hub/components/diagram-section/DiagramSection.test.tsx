@@ -33,32 +33,33 @@ vi.mock('../../../visualizer/components/drawer/Drawer.js', () => ({
     Drawer: ({ data }: { data: Data }) => <div data-testid="drawer">Drawer for {data.id}</div>
 }));
 
-vi.mock('./compare/CompareView.js', () => ({
-    CompareView: ({ calmType, versionA, versionB }: { calmType: string; versionA: string; versionB: string }) => (
-        <div data-testid="compare-view" data-from={versionA} data-to={versionB} data-calm-type={calmType}>
-            Compare
-        </div>
-    ),
-}));
-
-// Lightweight TimelineBar stub exposing the wiring DiagramSection passes in,
-// so we can assert navigation and compare callbacks without the full UI.
-vi.mock('./timeline/TimelineBar.js', () => ({
-    TimelineBar: ({
-        currentVersion,
-        onNavigate,
-        onCompare,
-    }: {
-        currentVersion: string;
-        onNavigate: (v: string) => void;
-        onCompare: (from: string, to: string) => void;
-    }) => (
-        <div data-testid="timeline-bar" data-current={currentVersion}>
-            <button onClick={() => onNavigate('2.0.0')}>nav-2.0.0</button>
-            <button onClick={() => onCompare('1.0.0', '2.0.0')}>compare</button>
-        </div>
-    ),
-}));
+vi.mock('@finos/calm-ui-react/shell', async (importActual) => {
+    const actual = await importActual<typeof import('@finos/calm-ui-react/shell')>();
+    return {
+        ...actual,
+        CompareView: ({ calmType, versionA, versionB }: { calmType: string; versionA: string; versionB: string }) => (
+            <div data-testid="compare-view" data-from={versionA} data-to={versionB} data-calm-type={calmType}>
+                Compare
+            </div>
+        ),
+        // Lightweight TimelineBar stub exposing the wiring DiagramSection passes in,
+        // so we can assert navigation and compare callbacks without the full UI.
+        TimelineBar: ({
+            currentVersion,
+            onNavigate,
+            onCompare,
+        }: {
+            currentVersion: string;
+            onNavigate: (v: string) => void;
+            onCompare: (from: string, to: string) => void;
+        }) => (
+            <div data-testid="timeline-bar" data-current={currentVersion}>
+                <button onClick={() => onNavigate('2.0.0')}>nav-2.0.0</button>
+                <button onClick={() => onCompare('1.0.0', '2.0.0')}>compare</button>
+            </div>
+        ),
+    };
+});
 
 vi.mock('../../../service/calm-service.js', () => ({
     CalmService: vi.fn().mockImplementation(() => ({

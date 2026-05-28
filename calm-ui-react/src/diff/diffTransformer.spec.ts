@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCALMDataWithDiff } from './diffTransformer.js';
 import { DiffResult } from '@finos/calm-models/diff';
-import testArchitectures from '../../fixtures/diff-test-architectures.json' with { type: 'json' };
+import testArchitectures from './fixtures/diff-test-architectures.json' with { type: 'json' };
 
 describe('diffTransformer', () => {
     it('should return base result when diffResult is null', () => {

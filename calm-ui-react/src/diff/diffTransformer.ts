@@ -1,7 +1,7 @@
 import type { Node, Edge } from 'reactflow';
 import type { CalmArchitectureSchema } from '@finos/calm-models/types';
 import type { DiffResult } from '@finos/calm-models/diff';
-import { parseCALMData } from '@finos/calm-ui-react/visualizer/reactflow';
+import { parseCALMData } from '../visualizer/reactflow/index.js';
 import { applyDiffStatus } from './applyDiffStatus.js';
 
 export function parseCALMDataWithDiff(

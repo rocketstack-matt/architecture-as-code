@@ -17,9 +17,9 @@ import {
     SystemGroupNode,
     DecisionGroupNode,
     THEME,
-} from '@finos/calm-ui-react/visualizer/reactflow';
-import { parseCALMDataWithDiff } from './utils/diffTransformer.js';
-import { parsePatternDataWithDiff } from './utils/patternDiffTransformer.js';
+} from '../visualizer/reactflow/index.js';
+import { parseCALMDataWithDiff } from './diffTransformer.js';
+import { parsePatternDataWithDiff } from './patternDiffTransformer.js';
 import type { DiffGraphProps } from '../model/diff-ui-types.js';
 
 const edgeTypes = { custom: FloatingEdge };
@@ -33,7 +33,7 @@ function DiffGraphInner({ source, sourceType, diffResult, isFirst }: DiffGraphPr
     const { fitView } = useReactFlow();
     const nodesInitialized = useNodesInitialized();
     const containerRef = useRef<HTMLDivElement>(null);
-    const fitFrameRef = useRef<number>();
+    const fitFrameRef = useRef<number | undefined>(undefined);
 
     // Fit on the next animation frame so ReactFlow has picked up the container's
     // final dimensions first — the compare panels reach their final (narrower) width

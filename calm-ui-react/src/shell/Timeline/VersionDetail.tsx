@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { colors } from '../../../../theme/colors.js';
+import { colors } from '@finos/calm-design-tokens';
 import type { TimelineMoment } from './TimelineBar.js';
 import type { VersionChange } from './perVersionChanges.js';
 

@@ -39,7 +39,12 @@
     "./visualizer/contracts": {
       "types": "./dist/visualizer/contracts/index.d.ts",
       "import": "./dist/visualizer/contracts/index.js"
-    }
+    },
+    "./shell": {
+      "types": "./dist/shell/index.d.ts",
+      "import": "./dist/shell/index.js"
+    },
+    "./diff/Diff.css": "./dist/diff/Diff.css"
   },
   "files": [
     "dist"

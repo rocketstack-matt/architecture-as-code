@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { IoTriangleSharp } from 'react-icons/io5';
 import type { DiffResult } from '@finos/calm-models/diff';
 import type { CalmNodeSchema, CalmRelationshipSchema } from '@finos/calm-models/types';
-import { colors } from '../../../../theme/colors.js';
+import { colors } from '@finos/calm-design-tokens';
 
 interface InlineDiffSummaryProps {
     diffResult: DiffResult | null;
@@ -11,7 +11,12 @@ interface InlineDiffSummaryProps {
 // Exit-comparison is implicit: selecting (left-clicking) any moment navigates
 // the diagram to that version, which clears the compare state upstream.
 
-type Palette = typeof colors.diffPalette.add;
+interface Palette {
+    bg: string;
+    border: string;
+    fg: string;
+    sign: string;
+}
 
 const PALETTES: Record<'add' | 'mod' | 'del', Palette> = {
     add: colors.diffPalette.add,

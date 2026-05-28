@@ -1,7 +1,7 @@
 import type { DiffResult } from '@finos/calm-models/diff';
-import { DiffGraph } from '../../../../diff/components/DiffGraph.js';
-import type { DiffSource } from '../../../../diff/model/diff-ui-types.js';
-import '../../../../diff/Diff.css';
+import { DiffGraph } from '../../diff/DiffGraph.js';
+import type { DiffSource } from '../../diff/index.js';
+import '../../diff/Diff.css';
 
 interface CompareViewProps {
     calmType: 'Architectures' | 'Patterns';

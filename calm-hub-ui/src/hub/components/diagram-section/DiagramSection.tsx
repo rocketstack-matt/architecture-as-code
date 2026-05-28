@@ -7,18 +7,20 @@ import { JsonRenderer } from '../json-renderer/JsonRenderer.js';
 import { Drawer } from '../../../visualizer/components/drawer/Drawer.js';
 import { SectionHeader } from '../section-header/SectionHeader.js';
 import { DeploymentPanel } from '@finos/calm-ui-react/visualizer/reactflow';
-import { CompareView } from './compare/CompareView.js';
+import { CompareView } from '@finos/calm-ui-react/shell';
 import { diffArchitectures, diffPatterns, type DiffResult } from '@finos/calm-models/diff';
 import type { CalmArchitectureSchema } from '@finos/calm-models/types';
-import type { DiffSource } from '../../../diff/model/diff-ui-types.js';
-import { TimelineBar, type TimelineMoment } from './timeline/TimelineBar.js';
+import type { DiffSource } from '@finos/calm-ui-react/diff';
 import {
+    TimelineBar,
+    type TimelineMoment,
     currentMomentIdFromTimeline,
     isExplicitTimeline,
     momentsFromTimeline,
     momentsFromVersions,
-} from './timeline/timelineMoments.js';
-import { computeChanges, type VersionChange } from './timeline/perVersionChanges.js';
+    computeChanges,
+    type VersionChange,
+} from '@finos/calm-ui-react/shell';
 import { fetchVersionData, fetchVersionList } from './compare/compareData.js';
 import { CalmService } from '../../../service/calm-service.js';
 import type { DeploymentDecorator, SelectedItem } from '../../../visualizer/contracts/contracts.js';

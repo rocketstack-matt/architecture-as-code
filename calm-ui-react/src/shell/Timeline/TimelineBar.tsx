@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IoChevronDownOutline, IoTimeOutline } from 'react-icons/io5';
 import type { DiffResult } from '@finos/calm-models/diff';
-import { colors } from '../../../../theme/colors.js';
+import { colors } from '@finos/calm-design-tokens';
 import { MomentCards } from './MomentCards.js';
 import { InlineDiffSummary } from './InlineDiffSummary.js';
 import { Sparkline } from './Sparkline.js';

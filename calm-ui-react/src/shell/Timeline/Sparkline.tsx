@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { IoChevronUpOutline, IoTimeOutline } from 'react-icons/io5';
-import { colors } from '../../../../theme/colors.js';
+import { colors } from '@finos/calm-design-tokens';
 import type { TimelineMoment } from './TimelineBar.js';
 
 interface SparklineProps {

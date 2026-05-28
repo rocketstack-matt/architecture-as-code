@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import testArchitectures from '../fixtures/diff-test-architectures.json' with { type: 'json' };
+import testArchitectures from './fixtures/diff-test-architectures.json' with { type: 'json' };
 import { DiffResult } from '@finos/calm-models/diff';
 import { DiffGraph } from './DiffGraph.js';
 

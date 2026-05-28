@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { DiffResult } from '@finos/calm-models/diff';
 import { CompareView } from './CompareView.js';
 
-vi.mock('../../../../diff/components/DiffGraph.js', () => ({
+vi.mock('../../diff/DiffGraph.js', () => ({
     DiffGraph: ({ isFirst, sourceType }: { isFirst: boolean; sourceType: string }) => (
         <div data-testid={isFirst ? 'diff-graph-a' : 'diff-graph-b'} data-source-type={sourceType}>
             graph

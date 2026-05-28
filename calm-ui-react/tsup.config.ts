@@ -1,4 +1,6 @@
 import { defineConfig } from 'tsup'
+import { copyFileSync, mkdirSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 
 export default defineConfig({
     entry: {
@@ -10,6 +12,7 @@ export default defineConfig({
         'visualizer/index': 'src/visualizer/index.ts',
         'visualizer/reactflow/index': 'src/visualizer/reactflow/index.ts',
         'visualizer/contracts/index': 'src/visualizer/contracts/contracts.ts',
+        'shell/index': 'src/shell/index.ts',
     },
     format: ['esm'],
     target: 'es2020',
@@ -33,5 +36,11 @@ export default defineConfig({
     ],
     esbuildOptions(options) {
         options.jsx = 'automatic'
+    },
+    async onSuccess() {
+        const src = resolve('src/diff/Diff.css')
+        const dest = resolve('dist/diff/Diff.css')
+        mkdirSync(dirname(dest), { recursive: true })
+        copyFileSync(src, dest)
     },
 })
