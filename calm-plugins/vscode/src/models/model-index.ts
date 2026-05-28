@@ -1,4 +1,5 @@
 import { CalmModel } from "./model";
+import { extractMergedControls, type MergedControl } from '@finos/calm-models/model'
 
 export class ModelIndex {
     private idToRange = new Map<string, any>()
@@ -76,4 +77,23 @@ export class ModelIndex {
         return Array.from(grouped.values())
     }
     get flows() { return (this.model.flows || []).map(f => ({ id: f.id, label: f.label || f.description || f.id })) }
+
+    /**
+     * ADR references declared at the architecture root. Each entry is a
+     * (typically relative) path/URL to an ADR document — the TreeView turns
+     * them into clickable items that open the ADR webview.
+     */
+    get adrs(): string[] {
+        return this.model.adrs ?? []
+    }
+
+    /**
+     * Flattened control map: every control attached at the architecture root,
+     * a node, or a relationship, with metadata describing where it applies.
+     * Uses the shared @finos/calm-models helper so Hub UI's ControlsPanel and
+     * the VSCode TreeView agree on merge semantics.
+     */
+    get controls(): Record<string, MergedControl> {
+        return extractMergedControls(this.model.raw ?? null)
+    }
 }

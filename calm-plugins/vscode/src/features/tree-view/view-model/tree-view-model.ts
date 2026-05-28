@@ -73,11 +73,19 @@ export class TreeViewModel {
             })
         }
 
-        // Architecture root
+        // Architecture root — Nodes / Relationships / Flows / Controls / ADRs.
+        // Controls and ADRs mirror Hub UI's TreeNavigation so users see the
+        // same surface in both products.
         this.itemsById.set('group:architecture', {
             id: 'group:architecture',
             label: 'Architecture',
-            childrenIds: ['group:nodes', 'group:relationships', 'group:flows'],
+            childrenIds: [
+                'group:nodes',
+                'group:relationships',
+                'group:flows',
+                'group:controls',
+                'group:adrs',
+            ],
             collapsibleState: this.expandedGroups.has('group:architecture') ? 'expanded' : 'collapsed'
         })
 
@@ -106,14 +114,121 @@ export class TreeViewModel {
             collapsibleState: 'collapsed'
         })
 
+        this.itemsById.set('group:controls', {
+            id: 'group:controls',
+            label: 'Controls',
+            parentId: 'group:architecture',
+            childrenIds: [],
+            collapsibleState: 'collapsed',
+            iconPath: 'shield',
+        })
+
+        this.itemsById.set('group:adrs', {
+            id: 'group:adrs',
+            label: 'ADRs',
+            parentId: 'group:architecture',
+            childrenIds: [],
+            collapsibleState: 'collapsed',
+            iconPath: 'book',
+        })
+
         // Build from ModelIndex if available
         if (state.currentModelIndex) {
             this.buildNodesGroup(state.currentModelIndex, state.searchFilter)
             this.buildRelationshipsGroup(state.currentModelIndex, state.searchFilter)
             this.buildFlowsGroup(state.currentModelIndex, state.searchFilter)
+            this.buildControlsGroup(state.currentModelIndex, state.searchFilter)
+            this.buildAdrsGroup(state.currentModelIndex, state.searchFilter)
         }
 
         this._changed.fire()
+    }
+
+    private buildControlsGroup(modelIndex: any, searchFilter: string) {
+        const merged: Record<string, { description?: string; nodeName?: string; relationshipDescription?: string; appliesTo: string; appliesToType: string }> =
+            modelIndex.controls ?? {}
+        const filterLower = (searchFilter ?? '').toLowerCase()
+        const entries = Object.entries(merged).filter(([key, control]) => {
+            if (!filterLower) return true
+            const haystack = [
+                key,
+                control.description ?? '',
+                control.nodeName ?? '',
+                control.relationshipDescription ?? '',
+                control.appliesTo ?? '',
+            ]
+                .join(' ')
+                .toLowerCase()
+            return haystack.includes(filterLower)
+        })
+
+        const childIds: string[] = []
+        for (const [key, control] of entries) {
+            const id = `control:${key}`
+            childIds.push(id)
+            const subtitle = control.appliesToType === 'node'
+                ? `node · ${control.nodeName ?? control.appliesTo}`
+                : control.appliesToType === 'relationship'
+                    ? `relationship · ${control.relationshipDescription ?? control.appliesTo}`
+                    : 'architecture-level'
+            this.itemsById.set(id, {
+                id,
+                label: control.description ?? key,
+                description: subtitle,
+                parentId: 'group:controls',
+                contextValue: 'control',
+                collapsibleState: 'none',
+                iconPath: 'shield',
+            })
+        }
+
+        const group = this.itemsById.get('group:controls')
+        if (group) {
+            group.label = `Controls (${childIds.length})`
+            group.childrenIds = childIds
+        }
+    }
+
+    private buildAdrsGroup(modelIndex: any, searchFilter: string) {
+        const adrs: string[] = Array.isArray(modelIndex.adrs) ? modelIndex.adrs : []
+        const filterLower = (searchFilter ?? '').toLowerCase()
+        const filtered = filterLower
+            ? adrs.filter(ref => ref.toLowerCase().includes(filterLower))
+            : adrs
+        const childIds: string[] = []
+        filtered.forEach((ref, index) => {
+            const id = `adr:${index}:${ref}`
+            childIds.push(id)
+            this.itemsById.set(id, {
+                id,
+                // Show just the file/identifier tail, with the full ref as tooltip-style
+                // description so long URLs don't bloat the row.
+                label: this.tailOfRef(ref),
+                description: ref,
+                parentId: 'group:adrs',
+                contextValue: 'adr',
+                collapsibleState: 'none',
+                iconPath: 'book',
+                command: {
+                    command: 'calm.openAdr',
+                    title: 'Open ADR',
+                    arguments: [ref],
+                },
+            })
+        })
+
+        const group = this.itemsById.get('group:adrs')
+        if (group) {
+            group.label = `ADRs (${childIds.length})`
+            group.childrenIds = childIds
+        }
+    }
+
+    private tailOfRef(ref: string): string {
+        const noQuery = ref.split('?')[0].split('#')[0]
+        const idx = Math.max(noQuery.lastIndexOf('/'), noQuery.lastIndexOf('\\'))
+        const tail = idx >= 0 ? noQuery.slice(idx + 1) : noQuery
+        return tail || ref
     }
 
     private buildTimelineTree(timeline: CalmTimeline, searchFilter: string) {

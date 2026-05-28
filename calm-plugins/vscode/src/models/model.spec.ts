@@ -71,7 +71,11 @@ describe('model', () => {
 
         it('should handle empty input', () => {
             const model = loadCalmModel('')
-            expect(model).toEqual({ nodes: [], relationships: [], flows: [] })
+            expect(model).toMatchObject({ nodes: [], relationships: [], flows: [] })
+            expect(model.adrs).toBeUndefined()
+            expect(model.rootControls).toBeUndefined()
+            // raw is the parsed input (may be {} or undefined) — both are acceptable.
+            expect(model.raw === undefined || typeof model.raw === 'object').toBe(true)
         })
 
         it('should parse JSON format', () => {

@@ -6,6 +6,15 @@ export type CalmModel = {
     nodes?: Array<{ id: string; type?: string; name?: string; label?: string; description?: string; raw?: any }>
     relationships?: Array<{ id: string; type?: string; source: string; target: string; label?: string; description?: string; raw?: any }>
     flows?: Array<{ id: string; source?: string; target?: string; label?: string; description?: string; raw?: any }>
+    /** ADR references at the architecture root — strings to ADR files. */
+    adrs?: string[]
+    /** Architecture-root controls (per-key). Node- and relationship-level controls
+     *  remain inside the corresponding `raw` payloads. Use `extractMergedControls`
+     *  from @finos/calm-models for the flattened view. */
+    rootControls?: Record<string, unknown>
+    /** The raw parsed architecture JSON, kept so consumers (TreeView, future
+     *  panels) can read fields not modeled in the normalized shape. */
+    raw?: any
 }
 
 
@@ -152,7 +161,22 @@ function normalizeModel(input: any): CalmModel {
         raw: f
     })).filter(f => !!f.id)
 
-    return { nodes, relationships, flows: normFlows }
+    const adrs = Array.isArray(input.adrs)
+        ? (input.adrs as unknown[]).filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
+        : []
+    const rootControls =
+        input.controls && typeof input.controls === 'object' && !Array.isArray(input.controls)
+            ? (input.controls as Record<string, unknown>)
+            : undefined
+
+    return {
+        nodes,
+        relationships,
+        flows: normFlows,
+        adrs: adrs.length ? adrs : undefined,
+        rootControls,
+        raw: input,
+    }
 }
 
 export interface GraphData {
