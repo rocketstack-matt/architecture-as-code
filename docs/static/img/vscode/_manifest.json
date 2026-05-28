@@ -1,62 +1,62 @@
 {
-  "generatedAt": "2026-05-28T14:20:17.902Z",
+  "generatedAt": "2026-05-28T14:45:29.103Z",
   "vscodeVersion": "1.121.0",
   "shots": [
     {
       "name": "01-activity-bar.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 197650,
-      "sha256": "7616845693ef41b406d5ebcb9feff0589fdbf4aa0876305f8b2fba5bed92ef08"
+      "bytes": 193456,
+      "sha256": "6b9580570178065e3126e5657dccf11bbc934d23ecb64090efa137b8321b5774"
     },
     {
       "name": "02-tree-view.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 201996,
-      "sha256": "24d95b148c7a4695f9e3a4c8917d04b29cc3e724502272027a2d51c80f50d1b2"
+      "bytes": 197435,
+      "sha256": "d08c3c98408922fcdcec277a3c47b32536d89898108906b49f7196aee6768c8b"
     },
     {
       "name": "03-tree-search.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 201322,
-      "sha256": "d3c534d061c5c3d15fcaa31ec874a0ae8b064ff611d371b186d01c1ea170283f"
+      "bytes": 205796,
+      "sha256": "d730a2ec339578451643834e3f25be28184d7855c994b9d752eba9daf022c7a2"
     },
     {
       "name": "04-preview-hero.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 206547,
-      "sha256": "06409eee55938df3e10682635e3465d4bd22c5ac86c7f453650e9ca8c05a6123"
+      "bytes": 194532,
+      "sha256": "e7e98d6331db659f9592e1e2f872f16a1a8ee03a9adb17c73a894a15c5e9c988"
     },
     {
       "name": "04b-preview-with-sidebar.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 202285,
-      "sha256": "6a6498a175773b251e6f2585706bbef740832a710601824827c263da943010e7"
+      "bytes": 127298,
+      "sha256": "50d9388f4f6bfe26759f5dbb4fa08764c218ef8b7c348679bac83a82d2686718"
     },
     {
       "name": "07-validation-problems.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 196790,
-      "sha256": "f9f3fb5a81d6ed58ab45e2452ea4184813e261b7e24d4bfd78a0cfa898fdd627"
+      "bytes": 200924,
+      "sha256": "177b418bf53d4ae5d8dfb68676ae3f7895733f5444791344ab3cd0c3a44e8556"
     },
     {
       "name": "09-timeline.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 148408,
-      "sha256": "7dc03a18ed4735443ab6562eea703934138715f3c287788b1a94526825cc82ed"
+      "bytes": 152764,
+      "sha256": "7b75453aa2790562ef5cf8e6a6d5175baa9b16d784f19d9022c8cce9242de0bf"
     },
     {
       "name": "11-hub-view-disabled.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 197650,
-      "sha256": "7616845693ef41b406d5ebcb9feff0589fdbf4aa0876305f8b2fba5bed92ef08"
+      "bytes": 193456,
+      "sha256": "6b9580570178065e3126e5657dccf11bbc934d23ecb64090efa137b8321b5774"
     }
   ],
   "skipped": [

@@ -80,9 +80,15 @@ function ArchitectureGraphInner({ jsonData, onNodeClick, onEdgeClick, viewportKe
     // final dimensions first — a synchronous fitView() can use a stale width when
     // the diagram lives in a panel that's still settling (VSCode webview, Hub UI
     // split panels). The frame is tracked so it can be cancelled on unmount.
+    // minZoom keeps the diagram readable even when the panel is much narrower
+    // than the dagre LR layout it has to fit (e.g. the VSCode preview pane on
+    // a half-screen split, where a three-tier architecture's 4:1 aspect ratio
+    // would otherwise zoom to ~0.24 and shrink every node to a sliver). The
+    // user can pan/scroll to reach overflow.
+    const FIT_VIEW_OPTIONS = { padding: 0.15, minZoom: 0.5 } as const;
     const scheduleFit = useCallback(() => {
         if (fitFrameRef.current !== undefined) cancelAnimationFrame(fitFrameRef.current);
-        fitFrameRef.current = requestAnimationFrame(() => fitView({ padding: 0.2 }));
+        fitFrameRef.current = requestAnimationFrame(() => fitView(FIT_VIEW_OPTIONS));
     }, [fitView]);
 
     useEffect(() => () => {
@@ -171,7 +177,7 @@ function ArchitectureGraphInner({ jsonData, onNodeClick, onEdgeClick, viewportKe
                 // fit has already run. Both are gated on no saved viewport.
                 fitView={!savedViewport}
                 defaultViewport={savedViewport}
-                fitViewOptions={{ padding: 0.2 }}
+                fitViewOptions={FIT_VIEW_OPTIONS}
                 minZoom={0.1}
                 attributionPosition="bottom-left"
                 style={{ background: THEME.colors.background }}
