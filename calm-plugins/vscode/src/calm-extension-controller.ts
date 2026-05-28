@@ -23,6 +23,7 @@ import { HubDataSource } from './features/hub/hub-data-source'
 import { HubTreeDataProvider } from './features/hub/hub-tree-data-provider'
 import { createOpenFromHubCommand } from './commands/open-from-hub-command'
 import { createHubAuthCommands } from './commands/hub-auth-commands'
+import { CalmDetailsViewProvider } from './features/details/details-view-provider'
 
 /**
  * Main extension controller that orchestrates all VS Code extension functionality
@@ -104,6 +105,19 @@ export class CalmExtensionController {
     )
 
     storeReactionMediator.setupReactions()
+
+    // Details sidebar view — mounts the shared Sidebar component in a native
+    // VSCode WebviewView so the preview diagram can fill its panel while the
+    // selection details still live in the activity-bar sidebar.
+    const detailsProvider = new CalmDetailsViewProvider(context, store, log)
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(
+        CalmDetailsViewProvider.viewType,
+        detailsProvider,
+        { webviewOptions: { retainContextWhenHidden: true } },
+      ),
+      detailsProvider,
+    )
 
     // Hub feature wiring — tree view, data source, auth, and commands.
     const hubConfig = new HubConfigService(context)

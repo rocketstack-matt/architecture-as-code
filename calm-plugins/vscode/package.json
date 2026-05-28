@@ -89,6 +89,12 @@
                     "visibility": "visible"
                 },
                 {
+                    "id": "calmDetails",
+                    "name": "Details",
+                    "type": "webview",
+                    "visibility": "visible"
+                },
+                {
                     "id": "calmHubSidebar",
                     "name": "CALM Hub",
                     "canSelectMany": false,

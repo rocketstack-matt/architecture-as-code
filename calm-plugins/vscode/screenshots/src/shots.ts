@@ -157,17 +157,23 @@ export const shots: Shot[] = [
     {
         name: '04b-preview-with-sidebar',
         fixture: 'three-tier',
-        description: 'React preview with the details sidebar open on a selected node.',
+        description: 'React preview + native Details WebviewView populated by a selected node.',
         implemented: true,
         async setup(window) {
             await openPreview(window)
+            // Open the CALM activity-bar container so the Details view is
+            // visible — it lives alongside Model Elements and CALM Hub.
+            await runCommand(window, 'workbench.view.extension.calm')
+            await window.waitForTimeout(800)
+            // Click a node in the preview to fire the selection — the host
+            // forwards it to the calmDetails WebviewView via the store.
             const inner = findInnerWebviewFrame(window)
             if (inner) {
                 try {
                     const firstNode = inner.locator('.react-flow__node').first()
                     if ((await firstNode.count()) > 0) {
                         await firstNode.click({ force: true })
-                        await window.waitForTimeout(1_000)
+                        await window.waitForTimeout(1_200)
                     }
                 } catch { /* best-effort */ }
             }

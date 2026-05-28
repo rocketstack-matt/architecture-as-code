@@ -25,6 +25,33 @@ export default defineConfig([
         minify: false,
         outDir: 'dist',
     },
+    // React details webview bundle — runs inside the calmDetails sidebar
+    // WebviewView and renders @finos/calm-ui-react's Sidebar against the
+    // currently-selected CALM node or relationship.
+    {
+        entry: { 'features/details/webview/main': 'src/features/details/webview/main.tsx' },
+        platform: 'browser',
+        target: 'es2020',
+        format: ['iife'],
+        globalName: 'CalmDetailsWebview',
+        sourcemap: true,
+        clean: false,
+        dts: false,
+        minify: false,
+        outDir: 'dist',
+        noExternal: [
+            'react',
+            'react-dom',
+            '@finos/calm-ui-react',
+            '@finos/calm-design-tokens',
+            '@finos/calm-models',
+            'lucide-react',
+            'react-icons',
+        ],
+        esbuildOptions(options) {
+            options.jsx = 'automatic'
+        },
+    },
     // React ADR webview bundle. Self-contained IIFE under VSCode's CSP.
     {
         entry: { 'features/adr/webview/main': 'src/features/adr/webview/main.tsx' },

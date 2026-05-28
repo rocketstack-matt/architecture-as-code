@@ -3,11 +3,10 @@ import 'reactflow/dist/style.css'
 import '@finos/calm-ui-react/diff/Diff.css'
 
 import { createRoot } from 'react-dom/client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { CalmArchitectureSchema, CalmNodeSchema, CalmRelationshipSchema } from '@finos/calm-models/types'
 import { CalmPreviewProvider } from '@finos/calm-ui-react/adapters'
 import { ReactFlowVisualizer } from '@finos/calm-ui-react/visualizer/reactflow'
-import { Sidebar } from '@finos/calm-ui-react/details'
 import { TimelineBar, TimelineDrawer, type TimelineMoment } from '@finos/calm-ui-react/shell'
 import { VsCodeDataSource, VsCodeNavigator, type VsCodeWebviewApi } from './adapters/vscode-data-source.js'
 
@@ -118,18 +117,6 @@ function App() {
         api.postMessage({ type: 'requestNavigateMoment', payload: { version } })
     }, [])
 
-    const selected = useMemo<CalmNodeSchema | CalmRelationshipSchema | null>(() => {
-        if (!state.architecture || !state.selectedId) return null
-        const node = state.architecture.nodes?.find((n) => n['unique-id'] === state.selectedId)
-        if (node) return node as CalmNodeSchema
-        const rel = state.architecture.relationships?.find((r) => r['unique-id'] === state.selectedId)
-        return rel ? (rel as CalmRelationshipSchema) : null
-    }, [state.architecture, state.selectedId])
-
-    const closeSidebar = useCallback(() => {
-        setState((prev) => ({ ...prev, selectedId: null }))
-    }, [])
-
     if (!state.architecture) {
         return (
             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--calm-text-secondary)' }}>
@@ -144,19 +131,20 @@ function App() {
     return (
         <CalmPreviewProvider dataSource={dataSource} navigator={navigator}>
             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-                    <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-                        <ReactFlowVisualizer
-                            calmData={state.architecture}
-                            onNodeClick={onNodeClick}
-                            onEdgeClick={onEdgeClick}
-                            onBackgroundClick={onBackgroundClick}
-                            viewportKey={state.docRef && state.docRef.kind === 'local' ? state.docRef.uri : undefined}
-                        />
-                    </div>
-                    {selected && (
-                        <Sidebar selectedData={selected} closeSidebar={closeSidebar} />
-                    )}
+                <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+                    {/* The Sidebar that used to live here now renders inside the
+                     *  native calmDetails sidebar view — the host pushes the
+                     *  selected node/relationship to that webview whenever the
+                     *  store's selection changes. Keeping the click handlers
+                     *  here so the diagram still drives selection through the
+                     *  host's requestReveal channel. */}
+                    <ReactFlowVisualizer
+                        calmData={state.architecture}
+                        onNodeClick={onNodeClick}
+                        onEdgeClick={onEdgeClick}
+                        onBackgroundClick={onBackgroundClick}
+                        viewportKey={state.docRef && state.docRef.kind === 'local' ? state.docRef.uri : undefined}
+                    />
                 </div>
                 {hasTimeline && (
                     <TimelineDrawer label="Timeline">
