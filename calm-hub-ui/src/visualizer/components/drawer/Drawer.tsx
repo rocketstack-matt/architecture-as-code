@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalmArchitectureSchema, CalmNodeSchema, CalmRelationshipSchema } from '@finos/calm-models/types';
 import { useDropzone } from 'react-dropzone';
-import { ReactFlowVisualizer } from '../reactflow/ReactFlowVisualizer.js';
-import { PatternVisualizer } from '../reactflow/PatternVisualizer.js';
-import { MetadataPanel } from '../reactflow/MetadataPanel.js';
-import { toSidebarNodeData, toSidebarEdgeData } from '../reactflow/utils/patternClickHandlers.js';
+import {
+    ReactFlowVisualizer,
+    PatternVisualizer,
+    MetadataPanel,
+    toSidebarNodeData,
+    toSidebarEdgeData,
+} from '@finos/calm-ui-react/visualizer/reactflow';
 import { CalmService } from '../../../service/calm-service.js';
 import type { DrawerProps, Flow, Control, Decorator } from '../../contracts/contracts.js';
 import { isSlug } from '../../../model/calm.js';

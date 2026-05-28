@@ -27,6 +27,18 @@
     "./views/JsonView": {
       "types": "./dist/views/JsonView/index.d.ts",
       "import": "./dist/views/JsonView/index.js"
+    },
+    "./visualizer": {
+      "types": "./dist/visualizer/index.d.ts",
+      "import": "./dist/visualizer/index.js"
+    },
+    "./visualizer/reactflow": {
+      "types": "./dist/visualizer/reactflow/index.d.ts",
+      "import": "./dist/visualizer/reactflow/index.js"
+    },
+    "./visualizer/contracts": {
+      "types": "./dist/visualizer/contracts/index.d.ts",
+      "import": "./dist/visualizer/contracts/index.js"
     }
   },
   "files": [
@@ -48,11 +60,13 @@
   "author": "FINOS",
   "license": "Apache-2.0",
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.4",
     "@finos/calm-design-tokens": "*",
     "@finos/calm-models": "*",
     "@monaco-editor/react": "^4.7.0",
     "lucide-react": "^0.577.0",
-    "react-icons": "^5.5.0"
+    "react-icons": "^5.5.0",
+    "zustand": "^5.0.8"
   },
   "peerDependencies": {
     "react": "^19.0.0",

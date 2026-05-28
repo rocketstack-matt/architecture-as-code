@@ -13,21 +13,21 @@ vi.mock('../../../service/calm-service.js', () => ({
     })),
 }));
 
-vi.mock('../reactflow/MetadataPanel.js', () => ({
-    MetadataPanel: ({ decorators }: { decorators: unknown[] }) => (
-        <div data-testid="metadata-panel">decorators:{decorators.length}</div>
-    ),
-}));
-
-// Mock dependencies
-vi.mock('../reactflow/ReactFlowVisualizer.js', () => ({
-    ReactFlowVisualizer: ({ calmData }: ReactFlowVisualizerProps) => (
-        <div data-testid="reactflow-visualizer">
-            <div data-testid="node-count">{calmData?.nodes?.length ?? 0}</div>
-            <div data-testid="relationship-count">{calmData?.relationships?.length ?? 0}</div>
-        </div>
-    ),
-}));
+vi.mock('@finos/calm-ui-react/visualizer/reactflow', async (importActual) => {
+    const actual = await importActual<typeof import('@finos/calm-ui-react/visualizer/reactflow')>();
+    return {
+        ...actual,
+        MetadataPanel: ({ decorators }: { decorators: unknown[] }) => (
+            <div data-testid="metadata-panel">decorators:{decorators.length}</div>
+        ),
+        ReactFlowVisualizer: ({ calmData }: ReactFlowVisualizerProps) => (
+            <div data-testid="reactflow-visualizer">
+                <div data-testid="node-count">{calmData?.nodes?.length ?? 0}</div>
+                <div data-testid="relationship-count">{calmData?.relationships?.length ?? 0}</div>
+            </div>
+        ),
+    };
+});
 vi.mock('react-dropzone', async () => {
     const actual = await vi.importActual('react-dropzone');
     return {

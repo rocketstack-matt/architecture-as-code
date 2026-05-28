@@ -7,6 +7,9 @@ export default defineConfig({
         'adapters/index': 'src/adapters/index.ts',
         'details/index': 'src/details/index.ts',
         'views/JsonView/index': 'src/views/JsonView/index.ts',
+        'visualizer/index': 'src/visualizer/index.ts',
+        'visualizer/reactflow/index': 'src/visualizer/reactflow/index.ts',
+        'visualizer/contracts/index': 'src/visualizer/contracts/contracts.ts',
     },
     format: ['esm'],
     target: 'es2020',
@@ -25,6 +28,8 @@ export default defineConfig({
         'react-icons',
         'react-icons/io5',
         '@monaco-editor/react',
+        '@dagrejs/dagre',
+        'zustand',
     ],
     esbuildOptions(options) {
         options.jsx = 'automatic'

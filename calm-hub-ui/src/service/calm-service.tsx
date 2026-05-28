@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 import type { CalmTimelineSchema } from '@finos/calm-models/types';
 import { Data, ResourceSummary, ResourceMapping } from '../model/calm.js';
 import { getAuthHeaders } from '../authService.js';
-import { Decorator } from '../visualizer/contracts/decorator-contracts.js';
+import type { Decorator } from '../visualizer/contracts/contracts.js';
 
 /**
  * Service for interacting with CALM API endpoints.

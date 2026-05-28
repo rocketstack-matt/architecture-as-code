@@ -11,11 +11,13 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { CalmArchitectureSchema } from '@finos/calm-models/types';
-import { FloatingEdge } from '../../visualizer/components/reactflow/FloatingEdge.js';
-import { CustomNode } from '../../visualizer/components/reactflow/CustomNode.js';
-import { SystemGroupNode } from '../../visualizer/components/reactflow/SystemGroupNode.js';
-import { DecisionGroupNode } from '../../visualizer/components/reactflow/DecisionGroupNode.js';
-import { THEME } from '../../visualizer/components/reactflow/theme.js';
+import {
+    FloatingEdge,
+    CustomNode,
+    SystemGroupNode,
+    DecisionGroupNode,
+    THEME,
+} from '@finos/calm-ui-react/visualizer/reactflow';
 import { parseCALMDataWithDiff } from './utils/diffTransformer.js';
 import { parsePatternDataWithDiff } from './utils/patternDiffTransformer.js';
 import type { DiffGraphProps } from '../model/diff-ui-types.js';

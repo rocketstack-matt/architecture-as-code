@@ -6,7 +6,7 @@ import { sortVersionsDescending } from '../../../model/version.js';
 import { JsonRenderer } from '../json-renderer/JsonRenderer.js';
 import { Drawer } from '../../../visualizer/components/drawer/Drawer.js';
 import { SectionHeader } from '../section-header/SectionHeader.js';
-import { DeploymentPanel } from '../../../visualizer/components/reactflow/DeploymentPanel.js';
+import { DeploymentPanel } from '@finos/calm-ui-react/visualizer/reactflow';
 import { CompareView } from './compare/CompareView.js';
 import { diffArchitectures, diffPatterns, type DiffResult } from '@finos/calm-models/diff';
 import type { CalmArchitectureSchema } from '@finos/calm-models/types';

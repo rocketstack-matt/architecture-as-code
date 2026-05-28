@@ -1,6 +1,6 @@
 import type { Node, Edge } from 'reactflow';
 import type { DiffResult } from '@finos/calm-models/diff';
-import { parsePatternData } from '../../../visualizer/components/reactflow/utils/patternTransformer.js';
+import { parsePatternData } from '@finos/calm-ui-react/visualizer/reactflow';
 import { applyDiffStatus } from './applyDiffStatus.js';
 
 export function parsePatternDataWithDiff(

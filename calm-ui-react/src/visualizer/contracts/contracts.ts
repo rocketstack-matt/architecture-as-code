@@ -1,13 +1,8 @@
 /**
- * Re-export of the visualizer contracts from @finos/calm-ui-react.
- *
- * The canonical definitions now live in
- * `@finos/calm-ui-react/visualizer/contracts`. This barrel adds the Hub-only
- * `DrawerProps` and `HubParams` types (both depend on Hub's `Data` model
- * which is not part of the shared package).
+ * Re-export all contracts for backward compatibility and convenience
  */
+export type { NodeData } from './node-contracts.js';
 export type {
-    NodeData,
     EdgeData,
     EdgeControl,
     Mitigation,
@@ -16,17 +11,25 @@ export type {
     EdgeBadgeProps,
     EdgeTooltipProps,
     FlowTransitionEdge,
+} from './edge-contracts.js';
+export type {
     RiskItem,
     MitigationItem,
     ControlItem,
+} from './node-contracts.js';
+export type {
     Flow,
     FlowTransition,
     AIGFGovernance,
     FlowsPanelProps,
+} from './flow-contracts.js';
+export type {
     Control,
     ControlRequirement,
     ControlRequirementConfig,
     ControlsPanelProps,
+} from './control-contracts.js';
+export type {
     SelectedItem,
     SidebarProps,
     ReactFlowVisualizerProps,
@@ -34,6 +37,8 @@ export type {
     MetadataPanelProps,
     MetadataPanelTabType,
     AdrsPanelProps,
+} from './visualizer-contracts.js';
+export type {
     ControlsPanelHeaderProps,
     ControlCardProps,
     ControlCardHeaderProps,
@@ -43,6 +48,8 @@ export type {
     ControlRequirementItemProps,
     ConfigSectionProps,
     AppliesToSectionProps,
+} from './controls-panel-contracts.js';
+export type {
     FlowsPanelHeaderProps,
     FlowCardProps,
     FlowCardHeaderProps,
@@ -50,12 +57,13 @@ export type {
     FlowTransitionItemProps,
     TransitionContentProps,
     AIGFGovernanceSectionProps,
+} from './flows-panel-contracts.js';
+
+export type {
     Decorator,
     DecoratorData,
     DeploymentStatus,
     DeploymentDecoratorData,
     DeploymentDecorator,
     DeploymentPanelProps,
-} from '@finos/calm-ui-react/visualizer/contracts';
-
-export type { DrawerProps, HubParams } from './drawer-contracts.js';
+} from './decorator-contracts.js';
