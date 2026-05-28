@@ -36,10 +36,6 @@
                 "title": "CALM: Open Preview"
             },
             {
-                "command": "calm.openPreviewReact",
-                "title": "CALM: Open Preview (React, experimental)"
-            },
-            {
                 "command": "calm.openAdr",
                 "title": "CALM: Open ADR..."
             },
@@ -129,6 +125,15 @@
                     ],
                     "default": "elk",
                     "markdownDescription": "Mermaid layout engine for architecture diagrams. **ELK** provides better automatic layout for complex diagrams with improved edge routing."
+                },
+                "calm.preview.engine": {
+                    "type": "string",
+                    "enum": [
+                        "react",
+                        "legacy"
+                    ],
+                    "default": "react",
+                    "markdownDescription": "Engine used by **CALM: Open Preview**.\n\n- **react** (default): ReactFlow diagram + details sidebar shared with the CALM Hub UI. Renders local architecture files.\n- **legacy**: the original Mermaid-based preview with docify, template, and model tabs. Used as the fallback for template and timeline files until the React preview covers those flows."
                 },
                 "calm.urlMapping": {
                     "type": "string",

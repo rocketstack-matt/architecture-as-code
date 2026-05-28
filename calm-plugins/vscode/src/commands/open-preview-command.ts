@@ -1,45 +1,61 @@
 import * as vscode from 'vscode'
 import { detectFileType, FileType } from '../models/file-types'
 import type { ApplicationStoreApi } from '../application-store'
+import { ReactPreviewPanel } from '../features/preview/react-preview-panel'
+import type { Logger } from '../core/ports/logger'
 
-export function createOpenPreviewCommand(store: ApplicationStoreApi) {
+/**
+ * Picks between the React preview (default) and the legacy vanilla-DOM
+ * docify/template preview based on the `calm.preview.engine` setting.
+ *
+ * The React preview shows the architecture diagram + details sidebar shared
+ * with Hub UI. The legacy preview hosts the docify, template, and model
+ * tabs that pre-date the shared component lift. Both are kept available
+ * during the transition; subsequent phases prune the legacy code path
+ * once the React preview covers its features end-to-end.
+ */
+export function createOpenPreviewCommand(
+    store: ApplicationStoreApi,
+    context: vscode.ExtensionContext,
+    log: Logger,
+) {
     return vscode.commands.registerCommand('calm.openPreview', async (elementId?: string) => {
         const editor = vscode.window.activeTextEditor
         if (!editor) return
         const doc = editor.document
         const fileInfo = detectFileType(doc.uri.fsPath)
 
-        if (fileInfo.type === FileType.ArchitectureFile && fileInfo.isValid) {
-            // Valid architecture file
-        } else if (fileInfo.type === FileType.TemplateFile && fileInfo.isValid) {
-            // Valid template file with architecture reference
-        } else if (fileInfo.type === FileType.TimelineFile && fileInfo.isValid) {
-            // Valid timeline file - TreeView will show milestones
-        } else {
+        const isArchitecture = fileInfo.type === FileType.ArchitectureFile && fileInfo.isValid
+        const isTemplate = fileInfo.type === FileType.TemplateFile && fileInfo.isValid
+        const isTimeline = fileInfo.type === FileType.TimelineFile && fileInfo.isValid
+        if (!isArchitecture && !isTemplate && !isTimeline) {
             vscode.window.showWarningMessage('This file is not a CALM architecture, timeline, or template file.')
             return
         }
 
+        const engine = vscode.workspace.getConfiguration('calm').get<string>('preview.engine', 'react')
+
+        if (engine === 'react' && isArchitecture) {
+            // React preview only supports architecture files in this phase.
+            // Template and timeline files fall through to the legacy preview
+            // until the React path grows feature parity for them.
+            ReactPreviewPanel.createOrShow(context, doc.uri, log)
+            return
+        }
+
         const state = store.getState()
-        
-        // Set document first, then force flag - order matters because each setter triggers the subscription
-        // The forceCreatePreview check uses currentDocumentUri, so it must be set first
         state.setCurrentDocument(doc.uri)
-        
-        if (fileInfo.type === FileType.TemplateFile && fileInfo.isValid) {
+
+        if (isTemplate) {
             state.setTemplateMode(true, doc.uri.fsPath, fileInfo.architecturePath)
         } else {
             state.setTemplateMode(false)
         }
 
-        // If an elementId was provided (from CodeLens), set the selection
-        // Note: Context menu passes a Uri object, not a string, so we must check the type
         if (elementId && typeof elementId === 'string') {
             state.setSelectedElement(elementId)
         }
 
-        // Set force flag last - this triggers the StoreReactionMediator to create the panel
-        // with the correct document URI already in place
         state.setForceCreatePreview(true)
     })
 }

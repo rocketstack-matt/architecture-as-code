@@ -15,6 +15,14 @@ vi.mock('vscode', () => ({
         activeTextEditor: undefined,
         showWarningMessage: vi.fn()
     },
+    workspace: {
+        // Default to the legacy engine in unit tests so the existing
+        // store-based open path is exercised without spinning up the React
+        // preview panel (which needs a real ExtensionContext + webview).
+        getConfiguration: vi.fn(() => ({
+            get: vi.fn((_key: string, fallback: unknown) => 'legacy' ?? fallback)
+        }))
+    },
     Uri: {
         file: (path: string) => ({ fsPath: path, scheme: 'file' })
     }
@@ -68,7 +76,17 @@ describe('createOpenPreviewCommand', () => {
             getInitialState: vi.fn(() => mockState)
         }
 
-        const result = createOpenPreviewCommand(mockStore)
+        const mockContext = {
+            extensionUri: { fsPath: '/ext' },
+            subscriptions: [],
+        } as unknown as vscode.ExtensionContext
+        const mockLog = {
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+            debug: vi.fn(),
+        }
+        const result = createOpenPreviewCommand(mockStore, mockContext, mockLog as any)
         commandCallback = (result as any).callback
     })
 

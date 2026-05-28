@@ -2,7 +2,6 @@ import type { ApplicationStoreApi } from '../application-store'
 import type { NavigationService } from '../core/services/navigation-service'
 import type { Logger } from '../core/ports/logger'
 import { createOpenPreviewCommand } from './open-preview-command'
-import { createOpenPreviewReactCommand } from './open-preview-react-command'
 import { createOpenAdrCommand } from './open-adr-command'
 import { createSearchTreeViewCommand } from './search-tree-view-command'
 import { createClearTreeViewSearchCommand } from './clear-tree-view-search-command'
@@ -20,8 +19,7 @@ export class CommandRegistrar {
 
     registerAll() {
         const commands = [
-            createOpenPreviewCommand(this.store),
-            createOpenPreviewReactCommand(this.context, this.log),
+            createOpenPreviewCommand(this.store, this.context, this.log),
             createOpenAdrCommand(this.context, this.log),
             createSearchTreeViewCommand(this.store),
             createClearTreeViewSearchCommand(this.store),
