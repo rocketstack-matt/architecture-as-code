@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import type { HubConfigService } from './hub-config-service'
 import type { HubDataSource } from './hub-data-source'
+import { HubCache } from './hub-cache'
 
 /**
  * One node in the calmHubSidebar tree. Keys uniquely identify the row in the
@@ -28,6 +29,7 @@ export class HubTreeDataProvider implements vscode.TreeDataProvider<HubNode>, vs
     readonly onDidChangeTreeData = this._emitter.event
 
     private disposables: vscode.Disposable[] = []
+    private cache = new HubCache(60_000)
 
     constructor(
         private config: HubConfigService,
@@ -41,6 +43,7 @@ export class HubTreeDataProvider implements vscode.TreeDataProvider<HubNode>, vs
     }
 
     refresh(): void {
+        this.cache.invalidate()
         this._emitter.fire()
     }
 
@@ -100,7 +103,7 @@ export class HubTreeDataProvider implements vscode.TreeDataProvider<HubNode>, vs
         }
         if (!element) {
             const namespaces = await this.safeFetch(
-                () => this.dataSource.listNamespaces(),
+                () => this.cache.get('namespaces', () => this.dataSource.listNamespaces()),
                 'Failed to load namespaces',
             )
             const pinned = new Set(this.config.getPinnedNamespaces())
@@ -132,6 +135,7 @@ export class HubTreeDataProvider implements vscode.TreeDataProvider<HubNode>, vs
     }
 
     private async loadGroupChildren(namespace: string, calmType: HubCalmType): Promise<HubNode[]> {
+        const cacheKey = `ns:${namespace}/${calmType}`
         const fetch = (): Promise<{ id: string; label: string; description?: string }[]> => {
             switch (calmType) {
             case 'Architectures':
@@ -148,7 +152,10 @@ export class HubTreeDataProvider implements vscode.TreeDataProvider<HubNode>, vs
                 )
             }
         }
-        const resources = await this.safeFetch(fetch, `Failed to load ${calmType} for ${namespace}`)
+        const resources = await this.safeFetch(
+            () => this.cache.get(cacheKey, fetch),
+            `Failed to load ${calmType} for ${namespace}`,
+        )
         return resources.map<HubNode>((r) => ({
             kind: 'resource',
             namespace,
@@ -160,14 +167,15 @@ export class HubTreeDataProvider implements vscode.TreeDataProvider<HubNode>, vs
     }
 
     private async loadVersions(element: Extract<HubNode, { kind: 'resource' }>): Promise<HubNode[]> {
+        const cacheKey = `versions:${element.namespace}/${element.calmType}/${element.id}`
         const versions = await this.safeFetch(
-            () => this.dataSource.loadVersionList({
+            () => this.cache.get(cacheKey, () => this.dataSource.loadVersionList({
                 kind: 'hub',
                 namespace: element.namespace,
                 calmType: element.calmType === 'Patterns' ? 'Patterns' : 'Architectures',
                 id: element.id,
                 version: '',
-            }),
+            })),
             `Failed to load versions for ${element.label}`,
         )
         return versions.map<HubNode>((version) => ({
