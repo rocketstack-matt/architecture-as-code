@@ -17,28 +17,28 @@ export interface Shot {
     description: string
     implemented: boolean
     // Optional workbench-settings overrides merged into the seeded settings.json
-    // for this shot's VSCode launch. Use for theme, layout engine, or any other
-    // setting that needs to be in place before the first paint.
+    // for this shot's VSCode launch. Use for theme or any other setting that
+    // needs to be in place before the first paint.
     settings?: Record<string, unknown>
     setup: (window: Page) => Promise<void>
     capture: (window: Page) => Promise<Buffer>
 }
 
-// Wait for a Mermaid-rendered diagram inside the preview's inner webview frame
-// to settle. The preview emits no event we can hook, so we poll for the
-// presence of node-shaped elements and then settle.
+// Wait for the React preview's ReactFlow diagram to render at least one node
+// inside its inner webview frame. The preview emits no event we can hook, so
+// we poll for `.react-flow__node` and then settle.
 //
 // NOTE: on timeout we log a warning and return rather than throwing — the
 // caller's screenshot will still run, producing whatever the preview managed
-// to render. This means a regression in the preview can silently produce a
-// degraded PNG; manual review of the PR diff remains the gate for catching it.
-async function waitForDiagramRendered(window: Page, timeoutMs = 10_000): Promise<void> {
+// to render. This means a regression can silently produce a degraded PNG;
+// manual review of the PR diff remains the gate for catching it.
+async function waitForDiagramRendered(window: Page, timeoutMs = 15_000): Promise<void> {
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
         const inner = findInnerWebviewFrame(window)
         if (inner) {
             try {
-                const count = await inner.locator('svg .node, svg g.node').count()
+                const count = await inner.locator('.react-flow__node').count()
                 if (count > 0) {
                     await window.waitForTimeout(800)
                     return
@@ -49,7 +49,6 @@ async function waitForDiagramRendered(window: Page, timeoutMs = 10_000): Promise
         }
         await window.waitForTimeout(200)
     }
-    // Don't throw — let the shot capture whatever rendered. Logs the partial.
     console.warn(`[shoot]   waitForDiagramRendered timed out after ${timeoutMs}ms`)
 }
 
@@ -83,7 +82,7 @@ export const shots: Shot[] = [
     {
         name: '02-tree-view',
         fixture: 'three-tier',
-        description: 'Model Elements tree with Nodes, Relationships, Flows expanded.',
+        description: 'Model Elements tree with Nodes, Relationships, Flows, Controls, and ADRs groups (Phase 7).',
         implemented: true,
         async setup(window) {
             await runCommand(window, 'workbench.view.extension.calm')
@@ -97,11 +96,12 @@ export const shots: Shot[] = [
             await window.waitForTimeout(300)
 
             // Walk down the tree with ArrowDown + ArrowRight to expand each
-            // visible top-level group (Nodes, Relationships, Flows). Six
-            // iterations covers the group rows plus a couple of buffer steps
-            // for any future top-level entries; on a closed leaf ArrowRight
-            // is a no-op, on an already-expanded node it just moves focus.
-            for (let i = 0; i < 6; i++) {
+            // visible top-level group (Nodes, Relationships, Flows, Controls,
+            // ADRs). 8 iterations covers the five groups plus a couple of
+            // buffer steps for any future top-level entries; on a closed leaf
+            // ArrowRight is a no-op, on an already-expanded node it just
+            // moves focus.
+            for (let i = 0; i < 8; i++) {
                 await window.keyboard.press('ArrowDown')
                 await window.keyboard.press('ArrowRight')
                 await window.waitForTimeout(120)
@@ -120,15 +120,12 @@ export const shots: Shot[] = [
         async setup(window) {
             await runCommand(window, 'workbench.view.extension.calm')
             await window.waitForTimeout(1_000)
-            // The search command opens a quick-input prompt; type a substring
-            // of a node ID and confirm so the tree shows the filtered result.
             await runCommandByTitle(window, 'Search Model Elements')
             await window.waitForSelector('.quick-input-widget', { timeout: 5_000 })
             await window.keyboard.type('api')
             await window.waitForTimeout(400)
             await window.keyboard.press('Enter')
             await window.waitForTimeout(800)
-            // Expand the root so the matched item is visible.
             const first = window.locator('[role="treeitem"]').first()
             await first.click()
             await window.keyboard.press('ArrowRight')
@@ -147,7 +144,7 @@ export const shots: Shot[] = [
     {
         name: '04-preview-hero',
         fixture: 'three-tier',
-        description: 'Live preview of the architecture next to its JSON source.',
+        description: 'Live React preview (ReactFlow + Sidebar from @finos/calm-ui-react) next to the JSON source.',
         implemented: true,
         async setup(window) {
             await openPreview(window)
@@ -157,106 +154,65 @@ export const shots: Shot[] = [
         },
     },
 
-    // Four theme variants. Each is a separate launch with `calm.docify.theme`
-    // and `workbench.colorTheme` overridden in the seeded settings. The docs
-    // page uses these as a 2x2 markdown gallery rather than a composite PNG,
-    // because each variant can be linked / inspected on its own.
-    // Theme variants. `workbench.colorTheme` in the seeded settings is
-    // honoured at launch for the standard Modern/Dark/Light themes. HC
-    // variants are NOT honoured by the same path on VSCode 1.121 when
-    // launched via --extensionDevelopmentPath (VSCode falls back to its
-    // internal default regardless of the seeded value, and the post-launch
-    // Color Theme picker can't be driven reliably either because the
-    // theme list is loaded asynchronously). The two HC entries are kept
-    // declared but `implemented: false` until that's resolvable.
     {
-        name: '05-theme-light',
+        name: '04b-preview-with-sidebar',
         fixture: 'three-tier',
-        description: 'Preview rendered with the light theme.',
+        description: 'React preview with the details sidebar open on a selected node.',
         implemented: true,
-        settings: { 'calm.docify.theme': 'light', 'workbench.colorTheme': 'Default Light Modern' },
         async setup(window) {
             await openPreview(window)
+            const inner = findInnerWebviewFrame(window)
+            if (inner) {
+                try {
+                    const firstNode = inner.locator('.react-flow__node').first()
+                    if ((await firstNode.count()) > 0) {
+                        await firstNode.click({ force: true })
+                        await window.waitForTimeout(1_000)
+                    }
+                } catch { /* best-effort */ }
+            }
         },
         async capture(window) {
             return await captureFullWindow(window)
         },
+    },
+
+    // The Phase 11 purge removed `calm.docify.theme` and `calm.preview.layout`
+    // — the React preview ships with the @finos/calm-design-tokens stylesheet
+    // baked in and uses a single brand-neutral palette. The light/dark/HC +
+    // ELK/Dagre shots that used to toggle Mermaid options no longer have a
+    // meaningful axis to vary.
+    {
+        name: '05-theme-light',
+        fixture: 'three-tier',
+        description: 'Preview rendered with the light theme (legacy — superseded by Phase 11 design-tokens).',
+        implemented: false,
+        async setup() { /* removed */ },
+        async capture(window) { return await captureFullWindow(window) },
     },
     {
         name: '05-theme-dark',
         fixture: 'three-tier',
-        description: 'Preview rendered with the dark theme.',
-        implemented: true,
-        settings: { 'calm.docify.theme': 'dark', 'workbench.colorTheme': 'Default Dark Modern' },
-        async setup(window) {
-            await openPreview(window)
-        },
-        async capture(window) {
-            return await captureFullWindow(window)
-        },
-    },
-    // HC LIGHT — NOT implemented (see block-comment above the theme entries).
-    {
-        name: '05-theme-hc-light',
-        fixture: 'three-tier',
-        description: 'Preview rendered with the high-contrast light theme.',
+        description: 'Preview rendered with the dark theme (legacy — superseded by Phase 11 design-tokens).',
         implemented: false,
-        settings: {
-            'calm.docify.theme': 'high-contrast-light',
-            'workbench.colorTheme': 'Default High Contrast Light',
-        },
-        async setup(window) {
-            await openPreview(window)
-        },
-        async capture(window) {
-            return await captureFullWindow(window)
-        },
+        async setup() { /* removed */ },
+        async capture(window) { return await captureFullWindow(window) },
     },
-    // HC DARK — NOT implemented (same reason as HC light).
-    {
-        name: '05-theme-hc-dark',
-        fixture: 'three-tier',
-        description: 'Preview rendered with the high-contrast dark theme.',
-        implemented: false,
-        settings: {
-            'calm.docify.theme': 'high-contrast-dark',
-            'workbench.colorTheme': 'Default High Contrast',
-        },
-        async setup(window) {
-            await openPreview(window)
-        },
-        async capture(window) {
-            return await captureFullWindow(window)
-        },
-    },
-
-    // Layout engines: ELK (default) and Dagre. Same fixture, different
-    // `calm.preview.layout`. The docs page shows the two side by side.
     {
         name: '06-layout-elk',
         fixture: 'three-tier',
-        description: 'Preview rendered with the ELK layout engine (default).',
-        implemented: true,
-        settings: { 'calm.preview.layout': 'elk' },
-        async setup(window) {
-            await openPreview(window)
-        },
-        async capture(window) {
-            return await captureFullWindow(window)
-        },
+        description: 'Preview rendered with the ELK layout (legacy — superseded by Phase 6 ReactFlow).',
+        implemented: false,
+        async setup() { /* removed */ },
+        async capture(window) { return await captureFullWindow(window) },
     },
     {
         name: '06-layout-dagre',
         fixture: 'three-tier',
-        description: 'Preview rendered with the Dagre layout engine.',
-        implemented: true,
-        settings: { 'calm.preview.layout': 'dagre' },
-        async setup(window) {
-            await openPreview(window)
-        },
-        async capture(window) {
-            return await captureFullWindow(window)
-        },
+        description: 'Preview rendered with the Dagre layout (legacy — superseded by Phase 6 ReactFlow).',
+        implemented: false,
+        async setup() { /* removed */ },
+        async capture(window) { return await captureFullWindow(window) },
     },
 
     {
@@ -273,17 +229,6 @@ export const shots: Shot[] = [
         },
     },
 
-    // Hover info on a node reference inside the JSON editor. The extension
-    // contributes a hover provider, but reliably triggering its tooltip from
-    // Playwright requires either a known editor pixel coordinate (mouse
-    // hover) or a working Cmd+K Cmd+I chord. Cursor positioning works but
-    // the chord doesn't fire the tooltip via Playwright's keyboard.press
-    // sequence in this VSCode build. Left as a TODO follow-up — the docs
-    // section can describe hover without a screenshot.
-    //
-    // The setup body below is retained as scaffolding for whoever picks up
-    // this TODO: cursor lands on the right token; only the show-hover trigger
-    // is unsolved. Toggle `implemented: true` once that's fixed.
     {
         name: '08-hover',
         fixture: 'three-tier',
@@ -293,25 +238,17 @@ export const shots: Shot[] = [
             const editor = window.locator('.monaco-editor').first()
             await editor.click()
             await window.waitForTimeout(300)
-            // Pin the cursor at line 1 deterministically. ArrowUp past the
-            // top is a no-op, so 100 presses guarantees we land at line 1
-            // regardless of where the click() positioned us.
             for (let i = 0; i < 100; i++) {
                 await window.keyboard.press('ArrowUp')
             }
-            // Line 14 of the fixture is `"unique-id": "web-frontend",`.
             for (let i = 0; i < 13; i++) {
                 await window.keyboard.press('ArrowDown')
             }
             await window.keyboard.press('End')
-            // Step back into the value string so the hover provider has a
-            // token to resolve.
             for (let i = 0; i < 5; i++) {
                 await window.keyboard.press('ArrowLeft')
             }
             await window.waitForTimeout(300)
-            // Use the native show-hover keybinding directly. Going through
-            // the palette would prefix with `>` and depend on fuzzy matching.
             await window.keyboard.press('ControlOrMeta+K')
             await window.keyboard.press('ControlOrMeta+I')
             await window.waitForTimeout(1_500)
@@ -321,11 +258,6 @@ export const shots: Shot[] = [
         },
     },
 
-    // Timeline navigation: the extension's tree-view-model enters "timeline
-    // mode" when the active file is detected as a calm-timeline document
-    // (see calm-plugins/vscode/src/features/tree-view/view-model/
-    // tree-view-model.ts → buildTimelineTree). The CALM sidebar then shows
-    // "📅 Architecture Timeline" with each moment as a child item.
     {
         name: '09-timeline',
         fixture: 'timeline',
@@ -337,18 +269,12 @@ export const shots: Shot[] = [
             await editor.click()
             await window.waitForTimeout(500)
 
-            // Trigger a save (Cmd+S) to force the extension's
-            // onDidSaveTextDocument handler to re-detect the file type. The
-            // initial onDidChangeActiveTextEditor on launch is sometimes
-            // missed because the extension's onStartupFinished activation
-            // races with the editor opening.
             await window.keyboard.press('ControlOrMeta+S')
             await window.waitForTimeout(2_000)
 
             await runCommand(window, 'workbench.view.extension.calm')
             await window.waitForTimeout(1_500)
 
-            // Expand the timeline group so the moment items are visible.
             const first = window.locator('[role="treeitem"]').first()
             await first.click()
             await window.waitForTimeout(200)
@@ -365,30 +291,35 @@ export const shots: Shot[] = [
         },
     },
 
-    // Docify tab: the preview panel has Docify, Template, and Model tabs.
-    // The Docify tab is the one that actually *renders* the architecture
-    // through Mermaid / widgets (see template-tab.view.ts — the Template
-    // tab just shows escaped source). openPreview() already opens the
-    // preview on the Docify tab (the default), so we just need to wait for
-    // the diagram to render.
+    // Docify tab — removed in Phase 11 along with the rest of the
+    // template/docify preview tabs. CALM: Create Documentation Website still
+    // produces docify output as static HTML, but it's no longer surfaced in
+    // the live preview.
     {
         name: '10-docify',
         fixture: 'docify-template',
         workspaceFile: 'architecture.json',
-        description: 'Docify tab rendering the architecture through CALM widgets.',
+        description: 'Docify tab rendering the architecture (legacy — removed in Phase 11).',
+        implemented: false,
+        async setup() { /* removed */ },
+        async capture(window) { return await captureFullWindow(window) },
+    },
+
+    // ===== Phase 14 addition =====
+
+    {
+        name: '11-hub-view-disabled',
+        fixture: 'three-tier',
+        description: 'CALM Hub sidebar in disabled state (calm.hub.url unset) — Phase 14.',
         implemented: true,
         async setup(window) {
-            await openPreview(window)
-            // Belt-and-braces: explicitly click the Docify tab in case a
-            // future change makes a different tab the default.
-            const inner = findInnerWebviewFrame(window)
-            if (inner) {
-                const docifyTab = inner.locator('text=Docify').first()
-                if ((await docifyTab.count()) > 0) {
-                    await docifyTab.click()
-                    await window.waitForTimeout(2_500)
-                }
-            }
+            await runCommand(window, 'workbench.view.extension.calm')
+            await window.waitForTimeout(800)
+            // Open the CALM Hub view explicitly — its default visibility is
+            // collapsed, so without a click it's hidden behind the Model
+            // Elements view.
+            await runCommand(window, 'workbench.view.calmHubSidebar')
+            await window.waitForTimeout(1_000)
         },
         async capture(window) {
             return await captureFullWindow(window)
