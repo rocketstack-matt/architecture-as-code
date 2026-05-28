@@ -1,23 +1,22 @@
 import axios, { AxiosInstance } from 'axios';
-import { getAuthHeaders } from '../../authService.js';
 import { CalmAdrMeta } from '@finos/calm-shared/src/view-model/adr.js';
-import { AdrSummary } from '../../model/calm.js';
+import { AdrSummary, AuthHeadersProvider } from '../../types.js';
+
+const NO_AUTH: AuthHeadersProvider = { getAuthHeaders: async () => ({}) };
 
 export class AdrService {
     private readonly ax: AxiosInstance;
+    private readonly authProvider: AuthHeadersProvider;
 
-    constructor(axiosInstance?: AxiosInstance) {
-        if (axiosInstance) {
-            this.ax = axiosInstance;
-        } else {
-            this.ax = axios.create();
-        }
+    constructor(axiosInstance?: AxiosInstance, authProvider?: AuthHeadersProvider) {
+        this.ax = axiosInstance ?? axios.create();
+        this.authProvider = authProvider ?? NO_AUTH;
     }
     /**
      * Fetch ADR summaries for a given namespace.
      */
     async fetchAdrSummaries(namespace: string): Promise<AdrSummary[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/adrs`, {
                 headers,
@@ -36,7 +35,7 @@ export class AdrService {
      * Fetch revisions for a given namespace and adr ID and set them using the provided setter function.
      */
     async fetchAdrRevisions(namespace: string, adrID: string): Promise<number[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/adrs/${encodeURIComponent(adrID)}/revisions`, {
                 headers,
@@ -53,7 +52,7 @@ export class AdrService {
      * Fetch a specific adr by namespace, adr ID, and revision, and set it using the provided setter function.
      */
     async fetchAdr(namespace: string, adrID: string, revision: string): Promise<CalmAdrMeta> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/adrs/${encodeURIComponent(adrID)}/revisions/${encodeURIComponent(revision)}`, {
                 headers,

@@ -1,16 +1,4 @@
-export interface SearchResult {
-    namespace: string;
-    id: number;
-    name: string;
-    description: string;
-}
-
-export interface GroupedSearchResults {
-    architectures: SearchResult[];
-    patterns: SearchResult[];
-    flows: SearchResult[];
-    standards: SearchResult[];
-    interfaces: SearchResult[];
-    controls: SearchResult[];
-    adrs: SearchResult[];
-}
+/**
+ * Re-export of the search result types from @finos/calm-hub-client.
+ */
+export type { SearchResult, GroupedSearchResults } from '@finos/calm-hub-client';

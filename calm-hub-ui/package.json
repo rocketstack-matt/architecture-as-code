@@ -20,6 +20,7 @@
     "dependencies": {
         "@dagrejs/dagre": "^1.1.4",
         "@finos/calm-design-tokens": "*",
+        "@finos/calm-hub-client": "*",
         "@finos/calm-ui-react": "*",
         "@monaco-editor/react": "^4.7.0",
         "@tailwindcss/vite": "^4.1.4",

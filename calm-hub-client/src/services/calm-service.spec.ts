@@ -341,7 +341,7 @@ describe('CalmService', () => {
         });
     });
 
-    describe('fetchDecoratorValues', () => {
+    describe('fetchDecoratorRecordValues', () => {
         it('should retrieve decorator values for a namespace', async () => {
             const decorators = [
                 {
@@ -372,7 +372,7 @@ describe('CalmService', () => {
             mock.onGet(`/calm/namespaces/${namespace}/decorators/values`).reply(200, {
                 values: decorators,
             });
-            const actual = await calmService.fetchDecoratorValues(namespace);
+            const actual = await calmService.fetchDecoratorRecordValues(namespace);
             expect(actual).toEqual(decorators);
         });
 
@@ -392,7 +392,7 @@ describe('CalmService', () => {
             mock.onGet(`/calm/namespaces/${namespace}/decorators/values?target=node-a&type=deployment`).reply(200, {
                 values: decorators,
             });
-            const actual = await calmService.fetchDecoratorValues(namespace, 'node-a', 'deployment');
+            const actual = await calmService.fetchDecoratorRecordValues(namespace, 'node-a', 'deployment');
             expect(actual).toEqual(decorators);
         });
 
@@ -400,7 +400,7 @@ describe('CalmService', () => {
             mock.onGet(`/calm/namespaces/${namespace}/decorators/values`).reply(500, {
                 message: 'Error',
             });
-            const actual = await calmService.fetchDecoratorValues(namespace);
+            const actual = await calmService.fetchDecoratorRecordValues(namespace);
             expect(actual).toEqual([]);
         });
     });

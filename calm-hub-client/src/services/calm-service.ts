@@ -1,12 +1,17 @@
 import axios, { AxiosInstance } from 'axios';
 import type { CalmTimelineSchema } from '@finos/calm-models/types';
-import { Data, ResourceSummary, ResourceMapping } from '../model/calm.js';
-import { getAuthHeaders } from '../authService.js';
-import type { Decorator } from '../visualizer/contracts/contracts.js';
+import { Data, ResourceSummary, ResourceMapping, AuthHeadersProvider } from '../types.js';
+import type { DecoratorRecord } from '../types.js';
+
+const NO_AUTH: AuthHeadersProvider = { getAuthHeaders: async () => ({}) };
 
 /**
  * Service for interacting with CALM API endpoints.
- * 
+ *
+ * The constructor accepts an optional AxiosInstance (so callers can install
+ * their own interceptors or base URLs) and an optional AuthHeadersProvider
+ * (so consumers can plug in OIDC, bearer-token, or no-auth strategies).
+ *
  * TODO: Add type safety for API responses by:
  * - Defining response interfaces (e.g., NamespacesResponse, PatternIDsResponse)
  * - Validating responses at runtime (e.g., with Zod or similar validation library)
@@ -14,17 +19,15 @@ import type { Decorator } from '../visualizer/contracts/contracts.js';
  */
 export class CalmService {
     private readonly ax: AxiosInstance;
+    private readonly authProvider: AuthHeadersProvider;
 
-    constructor(axiosInstance?: AxiosInstance) {
-        if (axiosInstance) {
-            this.ax = axiosInstance;
-        } else {
-            this.ax = axios.create();
-        }
+    constructor(axiosInstance?: AxiosInstance, authProvider?: AuthHeadersProvider) {
+        this.ax = axiosInstance ?? axios.create();
+        this.authProvider = authProvider ?? NO_AUTH;
     }
 
     public async fetchNamespaces(): Promise<string[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get('/calm/namespaces', { headers })
             .then((res) => {
@@ -41,7 +44,7 @@ export class CalmService {
     }
 
     public async fetchPatternSummaries(namespace: string): Promise<ResourceSummary[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/patterns`, { headers })
             .then((res) => {
@@ -56,7 +59,7 @@ export class CalmService {
     }
 
     public async fetchFlowSummaries(namespace: string): Promise<ResourceSummary[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/flows`, { headers })
             .then((res) => {
@@ -71,7 +74,7 @@ export class CalmService {
     }
 
     public async fetchArchitectureSummaries(namespace: string): Promise<ResourceSummary[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/architectures`, { headers })
             .then((res) => {
@@ -86,7 +89,7 @@ export class CalmService {
     }
 
     public async fetchPatternVersions(namespace: string, patternID: string): Promise<string[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${namespace}/patterns/${patternID}/versions`, { headers })
             .then((res) => res.data.values)
@@ -99,7 +102,7 @@ export class CalmService {
     }
 
     public async fetchFlowVersions(namespace: string, flowID: string): Promise<string[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${namespace}/flows/${flowID}/versions`, { headers })
             .then((res) => res.data.values)
@@ -112,7 +115,7 @@ export class CalmService {
     }
 
     public async fetchArchitectureVersions(namespace: string, architectureID: string): Promise<string[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${namespace}/architectures/${architectureID}/versions`, {
                 headers,
@@ -127,7 +130,7 @@ export class CalmService {
     }
 
     public async fetchPattern(namespace: string, patternID: string, version: string): Promise<Data> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${namespace}/patterns/${patternID}/versions/${version}`, {
                 headers,
@@ -135,7 +138,7 @@ export class CalmService {
             .then((res) => ({
                 id: patternID,
                 version: version,
-                calmType: 'Patterns',
+                calmType: 'Patterns' as const,
                 name: namespace,
                 data: res.data,
             }))
@@ -148,7 +151,7 @@ export class CalmService {
     }
 
     public async fetchFlow(namespace: string, flowID: string, version: string): Promise<Data> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${namespace}/flows/${flowID}/versions/${version}`, {
                 headers,
@@ -156,7 +159,7 @@ export class CalmService {
             .then((res) => ({
                 id: flowID,
                 version: version,
-                calmType: 'Flows',
+                calmType: 'Flows' as const,
                 name: namespace,
                 data: res.data,
             }))
@@ -173,7 +176,7 @@ export class CalmService {
         architectureID: string,
         version: string
     ): Promise<Data> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(
                 `/calm/namespaces/${namespace}/architectures/${architectureID}/versions/${version}`,
@@ -182,7 +185,7 @@ export class CalmService {
             .then((res) => ({
                 id: architectureID,
                 version: version,
-                calmType: 'Architectures',
+                calmType: 'Architectures' as const,
                 name: namespace,
                 data: res.data,
             }))
@@ -195,7 +198,7 @@ export class CalmService {
     }
 
     public async fetchStandardSummaries(namespace: string): Promise<ResourceSummary[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/standards`, { headers })
             .then((res) => {
@@ -210,7 +213,7 @@ export class CalmService {
     }
 
     public async fetchStandardVersions(namespace: string, standardID: string): Promise<string[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/standards/${standardID}/versions`, { headers })
             .then((res) => res.data.values)
@@ -223,7 +226,7 @@ export class CalmService {
     }
 
     public async fetchStandard(namespace: string, standardID: string, version: string): Promise<Data> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(
                 `/calm/namespaces/${encodeURIComponent(namespace)}/standards/${standardID}/versions/${version}`,
@@ -232,7 +235,7 @@ export class CalmService {
             .then((res) => ({
                 id: standardID,
                 version: version,
-                calmType: 'Standards',
+                calmType: 'Standards' as const,
                 name: namespace,
                 data: res.data,
             }))
@@ -257,7 +260,7 @@ export class CalmService {
         namespace: string,
         architectureID: string
     ): Promise<CalmTimelineSchema> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(
                 `/calm/namespaces/${encodeURIComponent(namespace)}/architectures/${encodeURIComponent(architectureID)}/timeline`,
@@ -275,12 +278,12 @@ export class CalmService {
     /**
      * Fetch decorator values for a given namespace with optional target and type filters.
     */
-    public async fetchDecoratorValues(
+    public async fetchDecoratorRecordValues(
         namespace: string,
         target?: string,
         type?: string
-    ): Promise<Decorator[]> {
-        const headers = await getAuthHeaders();
+    ): Promise<DecoratorRecord[]> {
+        const headers = await this.authProvider.getAuthHeaders();
         const params = new URLSearchParams();
         if (target) params.set('target', target);
         if (type) params.set('type', type);
@@ -299,7 +302,7 @@ export class CalmService {
     // --- Front Controller API (custom ID / slug-based access) ---
 
     public async fetchMappings(namespace: string, type?: string): Promise<ResourceMapping[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         const query = type ? `?type=${encodeURIComponent(type)}` : '';
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/mappings${query}`, { headers })
@@ -314,7 +317,7 @@ export class CalmService {
     }
 
     public async fetchVersionsByCustomId(namespace: string, customId: string): Promise<string[]> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/${encodeURIComponent(customId)}/versions`, { headers })
             .then((res) => res.data.values)
@@ -326,7 +329,7 @@ export class CalmService {
     }
 
     public async fetchResourceByCustomId(namespace: string, customId: string, version: string, calmType: string): Promise<Data> {
-        const headers = await getAuthHeaders();
+        const headers = await this.authProvider.getAuthHeaders();
         return this.ax
             .get(`/calm/namespaces/${encodeURIComponent(namespace)}/${encodeURIComponent(customId)}/versions/${encodeURIComponent(version)}`, { headers })
             .then((res) => ({

@@ -1,0 +1,37 @@
+{
+  "name": "@finos/calm-hub-client",
+  "version": "0.1.0",
+  "description": "Pure TypeScript REST client for the CALM Hub backend. Used by both calm-hub-ui and the VSCode extension to fetch namespaces, architectures, patterns, flows, timelines, ADRs, decorators, and search results without depending on React or the DOM.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "watch": "tsup --watch",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "lint-fix": "eslint src --fix"
+  },
+  "keywords": ["calm", "hub", "rest", "client", "axios"],
+  "author": "FINOS",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@finos/calm-models": "*",
+    "@finos/calm-shared": "*",
+    "axios": "^1.15.2"
+  },
+  "devDependencies": {
+    "axios-mock-adapter": "^2.1.0",
+    "tsup": "^8.4.0"
+  }
+}

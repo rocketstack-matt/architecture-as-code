@@ -1,11 +1,9 @@
 /**
- * Represents an interface summary returned from the API.
+ * `InterfaceDetail` re-exported from @finos/calm-hub-client. `InterfaceData`
+ * stays here — it's the Hub UI page-state shape for the interface detail
+ * route.
  */
-export interface InterfaceDetail {
-    id: number;
-    name: string;
-    description: string;
-}
+export type { InterfaceDetail } from '@finos/calm-hub-client';
 
 /**
  * Represents the data loaded when a user selects an interface in the tree.
