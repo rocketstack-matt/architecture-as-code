@@ -36,6 +36,10 @@
                 "title": "CALM: Open Preview"
             },
             {
+                "command": "calm.openPreviewReact",
+                "title": "CALM: Open Preview (React, experimental)"
+            },
+            {
                 "command": "calm.searchTreeView",
                 "title": "Search Model Elements",
                 "icon": "$(search)"
@@ -199,14 +203,23 @@
         "tsup": "^8.4.0"
     },
     "dependencies": {
+        "@dagrejs/dagre": "^1.1.4",
+        "@finos/calm-design-tokens": "*",
         "@finos/calm-models": "file:../../calm-models",
         "@finos/calm-shared": "file:../../shared",
+        "@finos/calm-ui-react": "*",
         "@mermaid-js/layout-elk": "^0.2.0",
+        "@monaco-editor/react": "^4.7.0",
         "elkjs": "^0.11.0",
         "jsdom": "^26.1.0",
         "lodash": "^4.18.1",
+        "lucide-react": "^0.577.0",
         "markdown-it": "^14.1.1",
         "mermaid": "^11.15.0",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "react-icons": "^5.5.0",
+        "reactflow": "^11.11.4",
         "svg-pan-zoom": "^3.6.2",
         "yaml": "^2.8.3",
         "zustand": "^5.0.8"

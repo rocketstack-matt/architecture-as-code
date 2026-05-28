@@ -90,7 +90,7 @@ export class CalmExtensionController {
     const watchService = new WatchService(configService, refreshService)
     watchService.registerAll(context)
 
-    new CommandRegistrar(context, store, navigationService).registerAll()
+    new CommandRegistrar(context, store, navigationService, log).registerAll()
 
     // Initialize validation service (await to ensure schemas are loaded before validating documents)
     const validationService = new ValidationService(log, configService)

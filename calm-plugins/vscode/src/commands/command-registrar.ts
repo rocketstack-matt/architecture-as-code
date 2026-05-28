@@ -1,6 +1,8 @@
 import type { ApplicationStoreApi } from '../application-store'
 import type { NavigationService } from '../core/services/navigation-service'
+import type { Logger } from '../core/ports/logger'
 import { createOpenPreviewCommand } from './open-preview-command'
+import { createOpenPreviewReactCommand } from './open-preview-react-command'
 import { createSearchTreeViewCommand } from './search-tree-view-command'
 import { createClearTreeViewSearchCommand } from './clear-tree-view-search-command'
 import { createCreateWebsiteCommand } from './create-website/create-website-command'
@@ -11,12 +13,14 @@ export class CommandRegistrar {
     constructor(
         private context: vscode.ExtensionContext,
         private store: ApplicationStoreApi,
-        private navigation: NavigationService
+        private navigation: NavigationService,
+        private log: Logger,
     ) {}
 
     registerAll() {
         const commands = [
             createOpenPreviewCommand(this.store),
+            createOpenPreviewReactCommand(this.context, this.log),
             createSearchTreeViewCommand(this.store),
             createClearTreeViewSearchCommand(this.store),
             createCreateWebsiteCommand(this.context),
