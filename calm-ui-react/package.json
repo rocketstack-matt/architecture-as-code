@@ -28,6 +28,10 @@
       "types": "./dist/views/JsonView/index.d.ts",
       "import": "./dist/views/JsonView/index.js"
     },
+    "./views/AdrView": {
+      "types": "./dist/views/AdrView/index.d.ts",
+      "import": "./dist/views/AdrView/index.js"
+    },
     "./visualizer": {
       "types": "./dist/visualizer/index.d.ts",
       "import": "./dist/visualizer/index.js"

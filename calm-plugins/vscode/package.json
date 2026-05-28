@@ -40,6 +40,10 @@
                 "title": "CALM: Open Preview (React, experimental)"
             },
             {
+                "command": "calm.openAdr",
+                "title": "CALM: Open ADR..."
+            },
+            {
                 "command": "calm.searchTreeView",
                 "title": "Search Model Elements",
                 "icon": "$(search)"

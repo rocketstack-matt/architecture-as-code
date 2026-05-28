@@ -9,6 +9,7 @@ export default defineConfig({
         'adapters/index': 'src/adapters/index.ts',
         'details/index': 'src/details/index.ts',
         'views/JsonView/index': 'src/views/JsonView/index.ts',
+        'views/AdrView/index': 'src/views/AdrView/index.ts',
         'visualizer/index': 'src/visualizer/index.ts',
         'visualizer/reactflow/index': 'src/visualizer/reactflow/index.ts',
         'visualizer/contracts/index': 'src/visualizer/contracts/contracts.ts',

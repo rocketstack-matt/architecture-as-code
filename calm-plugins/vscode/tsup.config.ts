@@ -42,6 +42,32 @@ export default defineConfig([
         minify: false,
         outDir: 'dist'
     },
+    // React ADR webview bundle. Same packaging strategy as the preview React
+    // bundle — self-contained IIFE that ships under VSCode's CSP.
+    {
+        entry: { 'features/adr/webview/main': 'src/features/adr/webview/main.tsx' },
+        platform: 'browser',
+        target: 'es2020',
+        format: ['iife'],
+        globalName: 'CalmAdrWebview',
+        sourcemap: true,
+        clean: false,
+        dts: false,
+        minify: false,
+        outDir: 'dist',
+        noExternal: [
+            'react',
+            'react-dom',
+            '@finos/calm-ui-react',
+            '@finos/calm-design-tokens',
+            '@finos/calm-models',
+            'lucide-react',
+            'react-icons',
+        ],
+        esbuildOptions(options) {
+            options.jsx = 'automatic'
+        },
+    },
     // React webview bundle for the new preview entry. Self-contained: React,
     // ReactFlow, and the @finos/calm-ui-react component tree are all baked into
     // the IIFE so the webview can load offline under VSCode's CSP.
