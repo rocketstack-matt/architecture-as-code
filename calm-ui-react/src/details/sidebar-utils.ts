@@ -3,10 +3,12 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 
+import type { RiskItem, MitigationItem } from './types.js';
+
 export interface AigfData {
     'risk-level'?: string;
-    risks?: (string | import('../../contracts/contracts.js').RiskItem)[];
-    mitigations?: (string | import('../../contracts/contracts.js').MitigationItem)[];
+    risks?: (string | RiskItem)[];
+    mitigations?: (string | MitigationItem)[];
 }
 
 export function formatFieldName(field: string): string {

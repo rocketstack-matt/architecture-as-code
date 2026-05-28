@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { AlertTriangle, AlertCircle, Shield, ArrowRight, type LucideIcon } from 'lucide-react';
-import { getRiskLevelColor } from '../../../theme/helpers.js';
-import type { RiskItem, MitigationItem, ControlItem } from '../../contracts/contracts.js';
+import { getRiskLevelColor } from '@finos/calm-design-tokens';
+import type { RiskItem, MitigationItem, ControlItem } from './types.js';
 import { formatFieldName } from './sidebar-utils.js';
 
 export { formatFieldName, getNodeIcon, extractAigf, getExtraProperties } from './sidebar-utils.js';

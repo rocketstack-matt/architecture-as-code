@@ -1,35 +1,10 @@
-import { Editor } from '@monaco-editor/react';
-
-interface JsonRendererProps {
-    json?: object;
-    showLineNumbers?: boolean;
-}
-
-function NoData() {
-    return <div className="text-center w-full h-full">Please select a document to load.</div>;
-}
-
-function JsonDisplay({ data, showLineNumbers = true }: { data: object; showLineNumbers?: boolean }) {
-    return (
-        <Editor
-            height="100%"
-            defaultLanguage="json"
-            value={JSON.stringify(data, null, 2)}
-            data-cy={"json-renderer"}
-            options={{
-                readOnly: true,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                overviewRulerLanes: 0,
-                wordWrap: 'on',
-                lineNumbers: showLineNumbers ? 'on' : 'off',
-            }}
-        />
-    );
-}
-
-export function JsonRenderer({ json, showLineNumbers = true }: JsonRendererProps) {
-    const content = json ? <JsonDisplay data={json} showLineNumbers={showLineNumbers} /> : <NoData />;
-
-    return <div className="h-full" data-cy={"json-renderer-wrapper"}>{content}</div>;
-}
+/**
+ * Re-export of JsonRenderer from @finos/calm-ui-react.
+ *
+ * The component now lives in calm-ui-react/views/JsonView so the VSCode
+ * extension webview and Hub UI share a single implementation. This file
+ * remains for backwards compatibility with existing local imports. New code
+ * should import from `@finos/calm-ui-react/views/JsonView` (or the package
+ * root) directly.
+ */
+export { JsonRenderer } from '@finos/calm-ui-react/views/JsonView';

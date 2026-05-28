@@ -1,13 +1,16 @@
 import { CalmNodeSchema } from '@finos/calm-models/types';
 import { ZoomIn } from 'lucide-react';
-import { extractNodeType } from '../reactflow/utils/calmHelpers.js';
-import { getNodeTypeColor } from '../../../theme/helpers.js';
-import type { ControlItem } from '../../contracts/contracts.js';
+import { getNodeTypeColor } from '@finos/calm-design-tokens';
+import type { ControlItem } from './types.js';
 import {
     Badge, RiskLevelBadge,
     PropertiesSection, ControlsSection, RisksSection, MitigationsSection, InterfacesSection,
     getNodeIcon, extractAigf, getExtraProperties,
 } from './detail-components.js';
+
+function extractNodeType(node: CalmNodeSchema | null | undefined): string | undefined {
+    return node?.['node-type'];
+}
 
 const KNOWN_FIELDS = new Set([
     'unique-id', 'name', 'node-type', 'description', 'details',

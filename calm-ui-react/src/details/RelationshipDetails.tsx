@@ -1,13 +1,18 @@
-import { CalmRelationshipSchema } from '@finos/calm-models/types';
+import { CalmRelationshipSchema, CalmRelationshipTypeSchema } from '@finos/calm-models/types';
 import { ArrowRight, GitFork, Container, Layers } from 'lucide-react';
-import { extractRelationshipType } from '../reactflow/utils/calmHelpers.js';
-import type { ControlItem } from '../../contracts/contracts.js';
+import type { ControlItem } from './types.js';
 import {
     Badge, RiskLevelBadge, Section,
     PropertiesSection, ControlsSection, RisksSection, MitigationsSection,
     ConnectionDiagram, NodeList,
     extractAigf, getExtraProperties,
 } from './detail-components.js';
+
+function extractRelationshipType(
+    relationship: CalmRelationshipSchema | null | undefined
+): CalmRelationshipTypeSchema | undefined {
+    return relationship?.['relationship-type'];
+}
 
 const KNOWN_FIELDS = new Set([
     'unique-id', 'description', 'relationship-type', 'protocol', 'controls', 'metadata',

@@ -3,6 +3,14 @@
     themes: light --default;
 }
 
+/*
+ * Scan the compiled output of the shared React component package so Tailwind
+ * v4 discovers utility class names baked into its JS bundle. Without this,
+ * classes used only by @finos/calm-ui-react components (Sidebar, etc.) are
+ * tree-shaken out of the final CSS.
+ */
+@source "../../calm-ui-react/dist/**/*.js";
+
 /* Fonts for the timeline / diff UI, exposed via --font-* so Tailwind v4
  * generates `font-inter` and `font-mono-jb` utility classes without overriding
  * the global default sans. */
