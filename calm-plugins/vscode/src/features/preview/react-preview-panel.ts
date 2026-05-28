@@ -1,7 +1,19 @@
 import * as vscode from 'vscode'
+import * as fs from 'fs'
+import * as path from 'path'
 import { ModelService } from '../../core/services/model-service'
 import { HtmlBuilder } from '../../cli/html-builder'
+import { detectCalmTimeline } from '../../models/model'
 import type { Logger } from '../../core/ports/logger'
+
+interface TimelineMomentLite {
+    key: string
+    version: string
+    label: string
+    description?: string
+    /** Optional ISO date — TimelineBar renders a date stamp when supplied. */
+    date?: string
+}
 
 /**
  * Wire shape for the request/response message protocol used by the React
@@ -152,6 +164,15 @@ export class ReactPreviewPanel {
                 // Bound by the panel factory when it constructs this panel.
                 this.revealHandlers.forEach(h => h(String((msg.payload as { id?: string } | undefined)?.id ?? '')))
                 return
+            case 'requestNavigateMoment': {
+                // Phase 9 places the navigator-only — diff-overlay between
+                // moments lands once the data source can fetch moment-specific
+                // architectures via Hub REST. For now the host logs the
+                // intent so it shows up in the CALM output channel.
+                const version = String((msg.payload as { version?: string } | undefined)?.version ?? '')
+                this.log.info?.(`[react-preview] Timeline moment requested: ${version}`)
+                return
+            }
             default:
                 this.log.warn?.(`[react-preview] Unknown message type: ${msg.type}`)
             }
@@ -166,13 +187,46 @@ export class ReactPreviewPanel {
     private async pushArchitecture(uri: vscode.Uri) {
         try {
             const fullModelData = await this.modelService.readModelAsync(uri.fsPath)
+            // If a sibling timeline document exists in the same directory, project
+            // its moments onto the drawer. The architecture itself is shown as-is
+            // (Phase 9 ships the navigator UI; diff-overlay across moments lands
+            // in the follow-up Hub-integration phase along with the
+            // diff transformer wiring on the webview side).
+            const timeline = await this.findSiblingTimeline(uri)
+            const { moments, currentMomentKey } = projectTimelineMoments(timeline)
             this.push('architectureData', {
                 docRef: { kind: 'local', uri: uri.fsPath },
                 architecture: fullModelData,
+                moments,
+                currentMomentKey,
             })
         } catch (err) {
             this.log.error?.(`[react-preview] Failed to read architecture: ${String(err)}`)
         }
+    }
+
+    private async findSiblingTimeline(uri: vscode.Uri): Promise<unknown | null> {
+        try {
+            const dir = path.dirname(uri.fsPath)
+            const entries = await fs.promises.readdir(dir)
+            for (const name of entries) {
+                if (!/\.(json|ya?ml)$/i.test(name)) continue
+                const full = path.join(dir, name)
+                if (full === uri.fsPath) continue
+                let content: string
+                try {
+                    content = await fs.promises.readFile(full, 'utf8')
+                } catch { continue }
+                if (detectCalmTimeline(content)) {
+                    try {
+                        return name.endsWith('.json')
+                            ? JSON.parse(content)
+                            : (await import('yaml')).parse(content)
+                    } catch { /* fall through */ }
+                }
+            }
+        } catch { /* directory unreadable — proceed without timeline */ }
+        return null
     }
 
     private async respondWithArchitecture(requestId: string | undefined, docRef: DocRef | undefined) {
@@ -205,4 +259,45 @@ export class ReactPreviewPanel {
     onRevealInEditor(handler: (id: string) => void) {
         this.revealHandlers.push(handler)
     }
+}
+
+/**
+ * Convert a parsed CALM timeline JSON into the shape TimelineBar expects.
+ * Defensive: skips moments without a usable key/version and falls back to
+ * sensible defaults when optional fields are missing.
+ */
+function projectTimelineMoments(timeline: unknown): {
+    moments: TimelineMomentLite[]
+    currentMomentKey: string | null
+} {
+    if (!timeline || typeof timeline !== 'object') {
+        return { moments: [], currentMomentKey: null }
+    }
+    const tl = timeline as { moments?: unknown[]; 'current-moment'?: string }
+    const raw = Array.isArray(tl.moments) ? tl.moments : []
+    const moments: TimelineMomentLite[] = []
+    for (const entry of raw) {
+        if (!entry || typeof entry !== 'object') continue
+        const m = entry as {
+            'unique-id'?: string
+            name?: string
+            description?: string
+            'valid-from'?: string
+            details?: { 'detailed-architecture'?: { reference?: string; version?: string } }
+        }
+        const key = m['unique-id']
+        if (!key) continue
+        const version =
+            m.details?.['detailed-architecture']?.version ??
+            m.details?.['detailed-architecture']?.reference ??
+            key
+        moments.push({
+            key,
+            version: String(version),
+            label: m.name ?? key,
+            description: m.description,
+            date: m['valid-from'],
+        })
+    }
+    return { moments, currentMomentKey: tl['current-moment'] ?? null }
 }
