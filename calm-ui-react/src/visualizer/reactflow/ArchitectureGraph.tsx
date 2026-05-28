@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
     Node,
     Background,
     Controls,
     MiniMap,
     Panel,
-    useNodesState,
+    ReactFlowProvider,
     useEdgesState,
+    useNodesInitialized,
+    useNodesState,
+    useReactFlow,
     type Viewport,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -26,7 +29,7 @@ const edgeTypes = { custom: FloatingEdge };
 const nodeTypes = { custom: CustomNode, group: SystemGroupNode };
 const GROUP_NODE_TYPES = ['group'];
 
-export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewportKey }: ArchitectureGraphProps) {
+function ArchitectureGraphInner({ jsonData, onNodeClick, onEdgeClick, viewportKey }: ArchitectureGraphProps) {
     // Restore the saved viewport for this diagram (so a refresh keeps the zoom/pan);
     // a different diagram has no saved viewport for its key, so it fits to view.
     const savedViewport = useMemo<Viewport | undefined>(
@@ -38,6 +41,11 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
+
+    const { fitView } = useReactFlow();
+    const nodesInitialized = useNodesInitialized();
+    const containerRef = useRef<HTMLDivElement>(null);
+    const fitFrameRef = useRef<number | undefined>(undefined);
 
     // Ref holds the structural node data from parsing.
     // Filter effect reads from this instead of reactive state to avoid
@@ -67,6 +75,47 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
         setEdges(parsedEdges);
         setAvailableNodeTypes(getUniqueNodeTypes(parsedNodes));
     }, [jsonData, setNodes, setEdges, onNodeClick]);
+
+    // Fit on the next animation frame so ReactFlow has picked up the container's
+    // final dimensions first — a synchronous fitView() can use a stale width when
+    // the diagram lives in a panel that's still settling (VSCode webview, Hub UI
+    // split panels). The frame is tracked so it can be cancelled on unmount.
+    const scheduleFit = useCallback(() => {
+        if (fitFrameRef.current !== undefined) cancelAnimationFrame(fitFrameRef.current);
+        fitFrameRef.current = requestAnimationFrame(() => fitView({ padding: 0.2 }));
+    }, [fitView]);
+
+    useEffect(() => () => {
+        if (fitFrameRef.current !== undefined) cancelAnimationFrame(fitFrameRef.current);
+    }, []);
+
+    // Fit once nodes have been measured by ReactFlow. The built-in `fitView`
+    // prop only runs once at mount time, before the data effect above has
+    // populated the state — by the time nodes appear, the fit has already
+    // happened against an empty graph, so in a narrow panel (e.g. VSCode
+    // webview split view) the diagram is pinned to the container's top-left
+    // at its raw dagre coordinates. Re-firing fitView once nodes are
+    // initialised restores the expected behaviour without changing what the
+    // user sees on a refresh that has a saved viewport.
+    useEffect(() => {
+        if (!nodesInitialized) return;
+        if (savedViewport) return;
+        scheduleFit();
+    }, [nodesInitialized, savedViewport, scheduleFit]);
+
+    // Re-fit on container size changes — when the preview panel reaches its
+    // final width after the webview's first layout pass, ReactFlow doesn't
+    // refit on its own.
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        if (savedViewport) return;
+        const observer = new ResizeObserver(() => {
+            if (nodesInitialized) scheduleFit();
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [savedViewport, nodesInitialized, scheduleFit]);
 
     // Search & filter
     const isSearchActive = searchTerm !== '' || typeFilter !== '';
@@ -98,7 +147,7 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
     }
 
     return (
-        <div style={{ height: '100%', width: '100%' }}>
+        <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
             <ReactFlow
                 // Remount when the diagram (resource) changes so a new architecture fits
                 // afresh; switching versions/moments keeps the same key and preserves the view.
@@ -116,6 +165,10 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
                 onMove={(_, viewport) => {
                     if (viewportKey) saveViewportForKey(viewportKey, viewport);
                 }}
+                // Keep the built-in fitView for the initial mount path — the
+                // programmatic re-fit below covers the case where the data
+                // effect hasn't populated nodes by the time ReactFlow's own
+                // fit has already run. Both are gated on no saved viewport.
                 fitView={!savedViewport}
                 defaultViewport={savedViewport}
                 fitViewOptions={{ padding: 0.2 }}
@@ -150,5 +203,17 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
                 </Panel>
             </ReactFlow>
         </div>
+    );
+}
+
+export function ArchitectureGraph(props: ArchitectureGraphProps) {
+    // Wrap with ReactFlowProvider so the inner component can use the
+    // useReactFlow / useNodesInitialized hooks. The ReactFlow component below
+    // creates its own internal provider, but the hooks must be called from a
+    // component that's already a descendant of the provider.
+    return (
+        <ReactFlowProvider>
+            <ArchitectureGraphInner {...props} />
+        </ReactFlowProvider>
     );
 }

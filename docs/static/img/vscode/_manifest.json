@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-05-28T13:40:01.348Z",
+  "generatedAt": "2026-05-28T14:02:30.260Z",
   "vscodeVersion": "1.121.0",
   "shots": [
     {
       "name": "01-activity-bar.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 190260,
-      "sha256": "abb042776ead106c681c9a61c8892baec0f79bd85cf126f48b4d8ce712e977b9"
+      "bytes": 191097,
+      "sha256": "1eab4d838dd9c9aa4ce68e393d09d5735649dae8ef0419b6588b7477a178345b"
     },
     {
       "name": "02-tree-view.png",
@@ -20,22 +20,22 @@
       "name": "03-tree-search.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 194638,
-      "sha256": "c59ea24936dd58b6b633e44ec7694e0a07870c2c0437b193d1637dcb24c124df"
+      "bytes": 198898,
+      "sha256": "1679dc7c0d7a1a2a86f2fbd811c72e416b453623275554d112b087ab890a6685"
     },
     {
       "name": "04-preview-hero.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 195009,
-      "sha256": "62b85047bc571ae208fe23f945bbf64f99de01b1431a7e22af09e9ed66641128"
+      "bytes": 206531,
+      "sha256": "d04593ee1ff871141c5539ee625c818393fc3a9fcf94ece558aeeb84611286ba"
     },
     {
       "name": "04b-preview-with-sidebar.png",
       "width": 1600,
       "height": 1000,
-      "bytes": 195009,
-      "sha256": "62b85047bc571ae208fe23f945bbf64f99de01b1431a7e22af09e9ed66641128"
+      "bytes": 196465,
+      "sha256": "a505c7c240cd671c31129ece7609897f303c64b9e7bac44ee01bc863483e61ea"
     },
     {
       "name": "07-validation-problems.png",
