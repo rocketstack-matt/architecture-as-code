@@ -1,0 +1,38 @@
+{
+  "name": "@finos/calm-design-tokens",
+  "version": "0.1.0",
+  "description": "Shared CALM design tokens — colours, typography, spacing — exposed as both CSS custom properties and typed TS exports. Consumed by calm-hub-ui, calm-ui-react, calm-widgets, and calm-plugins/vscode.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./tokens.css": "./dist/tokens.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "watch": "tsup --watch",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "lint-fix": "eslint src --fix"
+  },
+  "keywords": [
+    "calm",
+    "design-tokens",
+    "theme"
+  ],
+  "author": "FINOS",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "tsup": "^8.4.0"
+  }
+}

@@ -7,6 +7,7 @@
         "node": "^22.14.0 || >=24.10.0"
     },
     "workspaces": [
+        "calm-design-tokens",
         "calm-models",
         "calm-widgets",
         "calm-ai",
