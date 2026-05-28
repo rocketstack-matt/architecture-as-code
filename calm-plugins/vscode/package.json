@@ -105,36 +105,6 @@
                     ],
                     "markdownDescription": "Glob patterns for template files that may reference CALM architecture files."
                 },
-                "calm.docify.theme": {
-                    "type": "string",
-                    "enum": [
-                        "light",
-                        "dark",
-                        "high-contrast-light",
-                        "high-contrast-dark",
-                        "auto"
-                    ],
-                    "default": "auto",
-                    "description": "Default theme for CALM diagrams."
-                },
-                "calm.preview.layout": {
-                    "type": "string",
-                    "enum": [
-                        "dagre",
-                        "elk"
-                    ],
-                    "default": "elk",
-                    "markdownDescription": "Mermaid layout engine for architecture diagrams. **ELK** provides better automatic layout for complex diagrams with improved edge routing."
-                },
-                "calm.preview.engine": {
-                    "type": "string",
-                    "enum": [
-                        "react",
-                        "legacy"
-                    ],
-                    "default": "react",
-                    "markdownDescription": "Engine used by **CALM: Open Preview**.\n\n- **react** (default): ReactFlow diagram + details sidebar shared with the CALM Hub UI. Renders local architecture files.\n- **legacy**: the original Mermaid-based preview with docify, template, and model tabs. Used as the fallback for template and timeline files until the React preview covers those flows."
-                },
                 "calm.urlMapping": {
                     "type": "string",
                     "description": "Path to a JSON file mapping URLs to local file paths for detailed-architecture navigation.",
@@ -198,9 +168,7 @@
         "vscode:prepublish": "npm run build"
     },
     "devDependencies": {
-        "@types/markdown-it": "^14.1.2",
         "@types/mocha": "^10.0.6",
-        "@types/svg-pan-zoom": "^3.3.0",
         "@types/vscode": "^1.88.0",
         "@vscode/dts": "^0.4.1",
         "@vscode/test-electron": "^2.3.9",
@@ -217,19 +185,13 @@
         "@finos/calm-models": "file:../../calm-models",
         "@finos/calm-shared": "file:../../shared",
         "@finos/calm-ui-react": "*",
-        "@mermaid-js/layout-elk": "^0.2.0",
         "@monaco-editor/react": "^4.7.0",
-        "elkjs": "^0.11.0",
-        "jsdom": "^26.1.0",
         "lodash": "^4.18.1",
         "lucide-react": "^0.577.0",
-        "markdown-it": "^14.1.1",
-        "mermaid": "^11.15.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",
         "react-icons": "^5.5.0",
         "reactflow": "^11.11.4",
-        "svg-pan-zoom": "^3.6.2",
         "yaml": "^2.8.3",
         "zustand": "^5.0.8"
     }

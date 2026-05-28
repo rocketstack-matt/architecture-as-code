@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import type { ApplicationStoreApi } from '../../application-store'
-import type { PreviewViewModelInterface } from '../../features/preview/preview.view-model'
+import type { PreviewPanelPort } from '../../features/preview/preview-panel-factory'
 import { NavigationService } from '../services/navigation-service'
 
 export interface TreeRevealer {
@@ -19,7 +19,7 @@ export interface TreeRevealer {
 export class SelectionService {
     constructor(
         private store: ApplicationStoreApi,
-        private getPreview: () => PreviewViewModelInterface | undefined,
+        private getPreview: () => PreviewPanelPort | undefined,
         private tree: TreeRevealer,
         private revealInEditor: (doc: vscode.TextDocument, id: string) => Promise<void>,
         private navigation?: NavigationService

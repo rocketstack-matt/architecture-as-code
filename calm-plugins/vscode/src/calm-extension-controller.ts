@@ -53,19 +53,11 @@ export class CalmExtensionController {
     const editorFactory = new EditorFactory(store)
     const navigationService = new NavigationService(log, configService)
 
-    // Listen for configuration changes to reset navigation service and refresh preview
+    // Listen for configuration changes to reset navigation service
     this.disposables.push(vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('calm.urlMapping')) {
         log.info?.('[extension] Configuration changed: calm.urlMapping - resetting navigation service')
         navigationService.reset()
-      }
-      if (e.affectsConfiguration('calm.docify.theme') || e.affectsConfiguration('workbench.colorTheme')) {
-        log.info?.('[extension] Configuration changed: calm.docify.theme - refreshing docify view')
-        const previewPanel = previewPanelFactory.get()
-        if (previewPanel) {
-          const vm = previewPanelFactory.getViewModel()
-          vm.configurationChanged();
-        }
       }
     }))
 
@@ -76,7 +68,7 @@ export class CalmExtensionController {
     }
     const selectionService = new SelectionService(
       store,
-      () => previewPanelFactory.getViewModel(),
+      () => previewPanelFactory.get(),
       treeManager,
       async (doc: vscode.TextDocument, id: string) => await editorFactory.revealById(doc, id),
       navigationService
@@ -103,7 +95,6 @@ export class CalmExtensionController {
       selectionService,
       log,
       context,
-      configService
     )
 
     storeReactionMediator.setupReactions()

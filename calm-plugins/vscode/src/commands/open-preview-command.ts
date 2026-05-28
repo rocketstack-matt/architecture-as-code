@@ -5,14 +5,13 @@ import { ReactPreviewPanel } from '../features/preview/react-preview-panel'
 import type { Logger } from '../core/ports/logger'
 
 /**
- * Picks between the React preview (default) and the legacy vanilla-DOM
- * docify/template preview based on the `calm.preview.engine` setting.
+ * `calm.openPreview` — opens the ReactFlow preview shared with Hub UI.
  *
- * The React preview shows the architecture diagram + details sidebar shared
- * with Hub UI. The legacy preview hosts the docify, template, and model
- * tabs that pre-date the shared component lift. Both are kept available
- * during the transition; subsequent phases prune the legacy code path
- * once the React preview covers its features end-to-end.
+ * The command updates the application store with the new document URI,
+ * template mode (when applicable), and any incoming elementId. For
+ * architecture files it also drives the React preview directly so the
+ * panel appears even when the StoreReactionMediator's `forceCreatePreview`
+ * pathway has been short-circuited (e.g. by tests).
  */
 export function createOpenPreviewCommand(
     store: ApplicationStoreApi,
@@ -33,16 +32,6 @@ export function createOpenPreviewCommand(
             return
         }
 
-        const engine = vscode.workspace.getConfiguration('calm').get<string>('preview.engine', 'react')
-
-        if (engine === 'react' && isArchitecture) {
-            // React preview only supports architecture files in this phase.
-            // Template and timeline files fall through to the legacy preview
-            // until the React path grows feature parity for them.
-            ReactPreviewPanel.createOrShow(context, doc.uri, log)
-            return
-        }
-
         const state = store.getState()
         state.setCurrentDocument(doc.uri)
 
@@ -57,5 +46,11 @@ export function createOpenPreviewCommand(
         }
 
         state.setForceCreatePreview(true)
+
+        // Architecture files also get the React preview opened directly so the
+        // panel appears even outside the store-reaction-mediator's normal flow.
+        if (isArchitecture) {
+            ReactPreviewPanel.createOrShow(context, doc.uri, log)
+        }
     })
 }

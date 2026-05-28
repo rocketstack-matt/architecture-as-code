@@ -15,17 +15,17 @@ vi.mock('vscode', () => ({
         activeTextEditor: undefined,
         showWarningMessage: vi.fn()
     },
-    workspace: {
-        // Default to the legacy engine in unit tests so the existing
-        // store-based open path is exercised without spinning up the React
-        // preview panel (which needs a real ExtensionContext + webview).
-        getConfiguration: vi.fn(() => ({
-            get: vi.fn((_key: string, fallback: unknown) => 'legacy' ?? fallback)
-        }))
-    },
     Uri: {
         file: (path: string) => ({ fsPath: path, scheme: 'file' })
     }
+}))
+
+// Mock ReactPreviewPanel so the command spec stays a pure unit test (no
+// webview spin-up, no DOM, no React).
+vi.mock('../features/preview/react-preview-panel', () => ({
+    ReactPreviewPanel: {
+        createOrShow: vi.fn(),
+    },
 }))
 
 // Mock file-types module

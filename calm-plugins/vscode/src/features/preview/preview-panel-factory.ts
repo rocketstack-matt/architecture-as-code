@@ -1,70 +1,49 @@
 import * as vscode from 'vscode'
-import { CalmPreviewPanel } from './preview-panel'
-import { PreviewViewModel, PreviewViewModelInterface } from './preview.view-model'
-import { Logger } from '../../core/ports/logger'
+import { ReactPreviewPanel } from './react-preview-panel'
+import type { Logger } from '../../core/ports/logger'
 
-// Legacy interface for compatibility - should be replaced with PreviewViewModelInterface
-export interface PreviewLike {
-    setData(data: any): void
-    postSelect(id: string): void
-    getCurrentUri(): vscode.Uri | undefined
+/**
+ * Minimal contract the rest of the orchestration (RefreshService,
+ * SelectionService, StoreReactionMediator) cares about. The legacy
+ * PreviewViewModelInterface plus PreviewLike are collapsed into this single
+ * shape — there is now exactly one preview panel implementation, so the
+ * ports/adapters split that hid the legacy CalmPreviewPanel is gone.
+ */
+export interface PreviewPanelPort {
     reveal(uri: vscode.Uri): void
-    onDidDispose(handler: () => void): void
+    revealFile(filePath: string): void
+    getCurrentUri(): vscode.Uri | undefined
+    getCurrentUriPath(): string | undefined
+    setData(payload?: unknown): void
+    postSelect(id: string | null): void
     onRevealInEditor(handler: (id: string) => void): void
     onDidSelect(handler: (id: string) => void): void
+    onDidDispose(handler: () => void): void
     setGetCurrentTreeSelection(fn: () => string | undefined): void
+    configurationChanged(): void
+    isReady(): boolean
+    onReady(handler: (ready: boolean) => void): { dispose: () => void }
 }
 
 /**
- * PreviewPanelFactory - Factory for preview panel components
- * Creates ViewModel and Panel, following the same pattern as TreeViewFactory
- * Works with CalmPreviewPanel singleton but manages ViewModel lifecycle
+ * Thin facade over the ReactPreviewPanel singleton — its only job is to
+ * paper over the difference between "the panel hasn't been opened yet" and
+ * "the panel is the currently-open singleton" for callers that don't want
+ * to depend on ReactPreviewPanel directly.
  */
 export class PreviewPanelFactory implements vscode.Disposable {
     private disposables: vscode.Disposable[] = []
 
-    // MVVM Components
-    private readonly vm: PreviewViewModel
-
-    constructor() {
-        // Create ViewModel (framework-agnostic)
-        this.vm = new PreviewViewModel()
-        this.disposables.push(this.vm)
+    /** Returns the current panel or undefined if no preview is open. */
+    get(): PreviewPanelPort | undefined {
+        return ReactPreviewPanel.currentPanel
     }
 
-    /**
-     * Get the PreviewViewModel directly (preferred for new code)
-     */
-    getViewModel(): PreviewViewModelInterface {
-        return this.vm
-    }
-
-    /**
-     * Get the panel (legacy compatibility)
-     */
-    get(): PreviewLike | undefined {
-        return CalmPreviewPanel.currentPanel
-    }
-
-    /**
-     * Create or show the preview panel
-     * Uses our managed ViewModel to ensure proper selection synchronization
-     */
-    createOrShow(ctx: vscode.ExtensionContext, uri: vscode.Uri, configService: any, log: Logger): CalmPreviewPanel {
-        // Use the new method that accepts our external ViewModel
-        const panel = CalmPreviewPanel.createOrShowWithViewModel(ctx, uri, configService, log, this.vm)
-        return panel
-    }
-
-    /**
-     * Clear on dispose (legacy compatibility)
-     */
-    clearOnDispose() {
-        // Panel cleanup is handled by CalmPreviewPanel singleton
+    createOrShow(ctx: vscode.ExtensionContext, uri: vscode.Uri, log: Logger): PreviewPanelPort {
+        return ReactPreviewPanel.createOrShow(ctx, uri, log)
     }
 
     dispose() {
-        this.vm.dispose()
         this.disposables.forEach(d => d.dispose())
     }
 }

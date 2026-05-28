@@ -50,6 +50,7 @@ export class ReactPreviewPanel {
 
     private readonly panel: vscode.WebviewPanel
     private disposables: vscode.Disposable[] = []
+    private readyHandlers: Array<(ready: boolean) => void> = []
     private modelService: ModelService
     private htmlBuilder: HtmlBuilder
     private currentUri: vscode.Uri | undefined
@@ -124,12 +125,63 @@ export class ReactPreviewPanel {
     }
 
     /**
+     * Framework-agnostic mirror of `getCurrentUri` for SelectionService.
+     */
+    getCurrentUriPath(): string | undefined {
+        return this.currentUri?.fsPath
+    }
+
+    /**
+     * Same as `reveal` but takes a string path. Used by SelectionService when
+     * it only has a workspace document path on hand.
+     */
+    revealFile(filePath: string): void {
+        this.reveal(vscode.Uri.file(filePath))
+    }
+
+    /**
+     * Triggered by RefreshService after a successful file read. The legacy
+     * preview took a pre-built GraphData; the React preview reads the raw
+     * architecture from the current URI and pushes it itself, so this is a
+     * thin "re-push from disk" call. Any selectedId in the legacy payload
+     * is forwarded to the webview via postSelect.
+     */
+    setData(payload?: { selectedId?: string } | unknown): void {
+        const selectedId = (payload as { selectedId?: string } | undefined)?.selectedId
+        if (this.currentUri) void this.pushArchitecture(this.currentUri)
+        if (selectedId) this.postSelect(selectedId)
+    }
+
+    /**
      * Externally-triggered selection (tree click, editor cursor move).
      * Pushed to the webview unsolicited.
      */
     postSelect(id: string | null) {
         this.push('select', { id })
     }
+
+    /**
+     * Subscribe to selection events posted from the webview (node / edge
+     * clicks). Aliased here to the existing `onRevealInEditor` so callers
+     * with the legacy `onDidSelect` contract still work.
+     */
+    onDidSelect(handler: (id: string) => void): void {
+        this.onRevealInEditor(handler)
+    }
+
+    /**
+     * Legacy hook — the docify path used this to read the current tree
+     * selection during rendering. The React preview gets the selection from
+     * the webview's own state, so this is a no-op.
+     */
+    setGetCurrentTreeSelection(_fn: () => string | undefined): void { /* noop */ }
+
+    /**
+     * Legacy hook — the docify path observed `calm.docify.theme` changes.
+     * The React preview's design-tokens stylesheet is theme-agnostic at the
+     * moment, so this is a no-op.
+     */
+    configurationChanged(): void { /* noop */ }
 
     dispose() {
         ReactPreviewPanel.currentPanel = undefined
@@ -146,6 +198,7 @@ export class ReactPreviewPanel {
             switch (msg.type) {
             case 'ready':
                 this.webviewReady = true
+                this.readyHandlers.forEach(h => { try { h(true) } catch { /* noop */ } })
                 if (this.currentUri) await this.pushArchitecture(this.currentUri)
                 return
             case 'log':
@@ -258,6 +311,30 @@ export class ReactPreviewPanel {
     private revealHandlers: Array<(id: string) => void> = []
     onRevealInEditor(handler: (id: string) => void) {
         this.revealHandlers.push(handler)
+    }
+
+    /** Tracks whether the webview has signalled `ready` (JS executed + listeners attached). */
+    isReady(): boolean {
+        return this.webviewReady
+    }
+
+    /**
+     * Subscribe to webview readiness transitions. Handler fires immediately
+     * with the current state. Returns an unsubscribe.
+     */
+    onReady(handler: (ready: boolean) => void): { dispose: () => void } {
+        this.readyHandlers.push(handler)
+        try { handler(this.webviewReady) } catch { /* noop */ }
+        return {
+            dispose: () => {
+                const i = this.readyHandlers.indexOf(handler)
+                if (i >= 0) this.readyHandlers.splice(i, 1)
+            },
+        }
+    }
+
+    onDidDispose(handler: () => void): void {
+        this.panel.onDidDispose(handler, null, this.disposables)
     }
 }
 

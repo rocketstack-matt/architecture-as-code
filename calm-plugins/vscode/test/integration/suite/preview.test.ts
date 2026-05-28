@@ -6,11 +6,10 @@ import * as vscode from 'vscode'
 // to avoid coupling the test compile to the extension's source graph.
 interface CalmTestApi {
     waitForPreviewReady(timeoutMs?: number): Promise<boolean>
-    waitForPreviewRendered(timeoutMs?: number): Promise<boolean>
 }
 
 const EXTENSION_ID = 'FINOS.calm-vscode-plugin'
-const PREVIEW_VIEW_TYPE = 'calmPreview'
+const PREVIEW_VIEW_TYPE = 'calmReactPreview'
 const FIXTURE_REL = '../../../test_fixtures/architecture/test.architecture.1.2.json'
 
 function findCalmPreviewTab(): vscode.Tab | undefined {
@@ -34,7 +33,7 @@ async function waitForCalmPreviewTab(timeoutMs: number): Promise<vscode.Tab | un
     return undefined
 }
 
-suite('CALM Preview — open and render (issue #2361 regression guard)', () => {
+suite('CALM Preview — open and ready (React preview regression guard)', () => {
     let testApi: CalmTestApi
 
     suiteSetup(async function () {
@@ -51,7 +50,7 @@ suite('CALM Preview — open and render (issue #2361 regression guard)', () => {
         )
     })
 
-    test('open preview command creates a webview tab that reports ready and rendered', async function () {
+    test('open preview command creates a React webview tab that reports ready', async function () {
         this.timeout(30_000)
 
         const fixturePath = path.resolve(__dirname, FIXTURE_REL)
@@ -61,20 +60,13 @@ suite('CALM Preview — open and render (issue #2361 regression guard)', () => {
         await vscode.commands.executeCommand('calm.openPreview')
 
         const tab = await waitForCalmPreviewTab(5_000)
-        assert.ok(tab, 'Expected a tab with viewType=calmPreview after calm.openPreview')
+        assert.ok(tab, `Expected a tab with viewType=${PREVIEW_VIEW_TYPE} after calm.openPreview`)
 
         const ready = await testApi.waitForPreviewReady(15_000)
         assert.strictEqual(
             ready,
             true,
             'Preview webview never posted `ready` within 15s — JS did not execute'
-        )
-
-        const rendered = await testApi.waitForPreviewRendered(15_000)
-        assert.strictEqual(
-            rendered,
-            true,
-            'Preview webview never posted `rendered` within 15s — compositor appears stalled (issue #2361 regression)'
         )
     })
 })

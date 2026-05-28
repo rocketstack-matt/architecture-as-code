@@ -4,7 +4,6 @@ import type { ApplicationStoreApi } from '../../application-store'
 import type { PreviewPanelFactory } from '../../features/preview/preview-panel-factory'
 import type { RefreshService } from './refresh-service'
 import type { SelectionService } from './selection-service'
-import {Config} from "../ports/config";
 
 /**
  * StoreReactionMediator - Handles reactive coordination between store changes and various services
@@ -20,7 +19,6 @@ export class StoreReactionMediator {
     private selectionService: SelectionService,
     private log: Logger,
     private context: vscode.ExtensionContext,
-    private configService: Config
   ) {}
 
   /**
@@ -79,7 +77,7 @@ export class StoreReactionMediator {
     if (shouldForceCreate) {
       // Create the panel
       this.log.info('[extension] 🏗️  Calling previewPanelFactory.createOrShow()...')
-      panel = this.previewPanelFactory.createOrShow(this.context, uri, this.configService, this.log)
+      panel = this.previewPanelFactory.createOrShow(this.context, uri, this.log)
       this.log.info('[extension] ✅ Panel created/shown')
     } else {
       // Only refresh if preview panel is already open - don't auto-create

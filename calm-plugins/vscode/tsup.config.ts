@@ -20,30 +20,12 @@ export default defineConfig([
             '@finos/calm-shared',
             '@finos/calm-models',
             '@finos/calm-design-tokens',
-            'markdown-it',
-            'mermaid',
-            'jsdom',
-            'zustand'
+            'zustand',
         ],
         minify: false,
         outDir: 'dist',
     },
-    // Legacy vanilla-DOM webview (still wired to the existing preview panel; will be
-    // removed once the React preview is the only entrypoint — see Phase 10).
-    {
-        entry: { 'webview/main': 'src/features/preview/webview/main.ts' },
-        platform: 'browser',
-        target: 'es2020',
-        format: ['iife'],
-        globalName: 'CalmWebview',
-        sourcemap: true,
-        clean: false,
-        dts: false,
-        minify: false,
-        outDir: 'dist'
-    },
-    // React ADR webview bundle. Same packaging strategy as the preview React
-    // bundle — self-contained IIFE that ships under VSCode's CSP.
+    // React ADR webview bundle. Self-contained IIFE under VSCode's CSP.
     {
         entry: { 'features/adr/webview/main': 'src/features/adr/webview/main.tsx' },
         platform: 'browser',
@@ -68,9 +50,9 @@ export default defineConfig([
             options.jsx = 'automatic'
         },
     },
-    // React webview bundle for the new preview entry. Self-contained: React,
-    // ReactFlow, and the @finos/calm-ui-react component tree are all baked into
-    // the IIFE so the webview can load offline under VSCode's CSP.
+    // React preview webview bundle. Self-contained IIFE under VSCode's CSP:
+    // React, ReactFlow, and the @finos/calm-ui-react component tree are
+    // baked in so the bundle loads offline.
     {
         entry: { 'webview/react/main': 'src/features/preview/webview/react/main.tsx' },
         platform: 'browser',

@@ -11,25 +11,19 @@ function getNonce() {
 }
 
 export interface HtmlEntry {
-    template: 'preview.html' | 'preview-react.html'
+    template: 'preview-react.html' | 'adr.html'
     scriptPath: string[]
-    styleFile?: string
 }
 
-const DEFAULT_ENTRY: HtmlEntry = {
-    template: 'preview.html',
-    scriptPath: ['dist', 'webview', 'main.global.js'],
-    styleFile: 'preview.css',
-}
-
+/**
+ * Builds the CSP-compliant HTML shell served to a webview panel. The legacy
+ * vanilla-DOM preview is gone, so the only callers are the React preview
+ * (`preview-react.html`) and the ADR webview (`adr.html`).
+ */
 export class HtmlBuilder {
     constructor(private context: vscode.ExtensionContext) {}
 
-    /**
-     * Build the HTML body for a webview panel. Defaults to the legacy vanilla
-     * DOM preview; the React preview panel passes its own entry.
-     */
-    getHtml(panel: vscode.WebviewPanel, entry: HtmlEntry = DEFAULT_ENTRY) {
+    getHtml(panel: vscode.WebviewPanel, entry: HtmlEntry) {
         let version = 'unknown'
         try {
             const pkgUri = vscode.Uri.joinPath(this.context.extensionUri, 'package.json')
@@ -41,14 +35,10 @@ export class HtmlBuilder {
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.context.extensionUri, ...entry.scriptPath),
         )
-        const styleUri = entry.styleFile
-            ? webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', entry.styleFile))
-            : ''
         const htmlPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', entry.template)
         let html = fs.readFileSync(htmlPath.fsPath, 'utf8')
         html = html
             .replace(/{{cspSource}}/g, webview.cspSource)
-            .replace(/{{styleUri}}/g, String(styleUri))
             .replace(/{{scriptUri}}/g, String(scriptUri))
             .replace(/{{nonce}}/g, nonce)
             .replace(/{{version}}/g, version)

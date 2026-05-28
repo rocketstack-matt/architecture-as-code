@@ -23,9 +23,9 @@ import * as vscode from 'vscode'
 const VIEW_TYPE = 'calmPaintProbe'
 
 function makeBuggyWebviewHtml(): string {
-    // Mirrors what panel.view-model.ts does in the real webview: after 2 rAF
-    // ticks, post {type: 'rendered'}. Also post {type: 'ready'} immediately so
-    // we can distinguish "JS never ran" from "paint stalled".
+    // Mirrors the historical paint probe (retired alongside the legacy webview):
+    // after 2 rAF ticks, post {type: 'rendered'}. Also post {type: 'ready'}
+    // immediately so we can distinguish "JS never ran" from "paint stalled".
     return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
