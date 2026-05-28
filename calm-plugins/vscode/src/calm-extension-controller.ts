@@ -17,6 +17,12 @@ import { createApplicationStore, type ApplicationStoreApi } from './application-
 import { setWidgetLogger } from '@finos/calm-shared'
 import { ValidationService } from './features/validation/validation-service'
 import { createTestApi, CalmExtensionTestApi } from './test-api'
+import { HubConfigService } from './features/hub/hub-config-service'
+import { HubAuthService } from './features/hub/hub-auth-service'
+import { HubDataSource } from './features/hub/hub-data-source'
+import { HubTreeDataProvider } from './features/hub/hub-tree-data-provider'
+import { createOpenFromHubCommand } from './commands/open-from-hub-command'
+import { createHubAuthCommands } from './commands/hub-auth-commands'
 
 /**
  * Main extension controller that orchestrates all VS Code extension functionality
@@ -98,6 +104,24 @@ export class CalmExtensionController {
     )
 
     storeReactionMediator.setupReactions()
+
+    // Hub feature wiring — tree view, data source, auth, and commands.
+    const hubConfig = new HubConfigService(context)
+    const hubAuth = new HubAuthService(hubConfig)
+    const hubDataSource = new HubDataSource(hubConfig, hubAuth)
+    const hubTreeProvider = new HubTreeDataProvider(hubConfig, hubDataSource)
+    const hubTreeView = vscode.window.createTreeView('calmHubSidebar', {
+      treeDataProvider: hubTreeProvider,
+      showCollapseAll: true,
+    })
+    // Initialise the signed-in context key based on whether a token is stored.
+    void hubConfig.readToken().then((t) => hubConfig.setSignedInContext(!!t))
+    context.subscriptions.push(
+      hubTreeView,
+      hubTreeProvider,
+      createOpenFromHubCommand(context, hubDataSource, log),
+      ...createHubAuthCommands(hubConfig, hubTreeProvider, log),
+    )
 
     this.disposables.push(
       previewPanelFactory,

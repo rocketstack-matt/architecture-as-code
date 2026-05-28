@@ -40,6 +40,23 @@
                 "title": "CALM: Open ADR..."
             },
             {
+                "command": "calm.openFromHub",
+                "title": "CALM: Open from Hub..."
+            },
+            {
+                "command": "calm.signInToHub",
+                "title": "CALM: Sign in to Hub"
+            },
+            {
+                "command": "calm.signOutOfHub",
+                "title": "CALM: Sign out of Hub"
+            },
+            {
+                "command": "calm.refreshHub",
+                "title": "CALM: Refresh Hub",
+                "icon": "$(refresh)"
+            },
+            {
                 "command": "calm.searchTreeView",
                 "title": "Search Model Elements",
                 "icon": "$(search)"
@@ -70,6 +87,12 @@
                     "name": "Model Elements",
                     "canSelectMany": false,
                     "visibility": "visible"
+                },
+                {
+                    "id": "calmHubSidebar",
+                    "name": "CALM Hub",
+                    "canSelectMany": false,
+                    "visibility": "collapsed"
                 }
             ]
         },
@@ -156,6 +179,21 @@
                     "command": "calm.clearTreeViewSearch",
                     "when": "view == calmSidebar",
                     "group": "navigation"
+                },
+                {
+                    "command": "calm.refreshHub",
+                    "when": "view == calmHubSidebar",
+                    "group": "navigation"
+                },
+                {
+                    "command": "calm.signInToHub",
+                    "when": "view == calmHubSidebar && !calm.hub.signedIn",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "calm.signOutOfHub",
+                    "when": "view == calmHubSidebar && calm.hub.signedIn",
+                    "group": "navigation@2"
                 }
             ],
             "editor/context": [

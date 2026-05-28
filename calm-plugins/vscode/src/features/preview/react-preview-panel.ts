@@ -6,6 +6,19 @@ import { HtmlBuilder } from '../../cli/html-builder'
 import { detectCalmTimeline } from '../../models/model'
 import type { Logger } from '../../core/ports/logger'
 
+/**
+ * Reference to either a local workspace document or a Hub-hosted resource.
+ * Mirrors the calm-ui-react DocRef so adapter calls round-trip cleanly.
+ */
+export type PreviewDocRef =
+    | { kind: 'local'; uri: vscode.Uri }
+    | { kind: 'hub'; namespace: string; calmType: 'Architectures' | 'Patterns' | 'Flows' | 'Standards' | 'ADRs'; id: string; version: string }
+
+/** Minimal slice of HubDataSource needed by the preview panel. */
+export interface PreviewHubLoader {
+    loadArchitecture(ref: { kind: 'hub'; namespace: string; calmType: 'Architectures' | 'Patterns'; id: string; version: string }): Promise<unknown>
+}
+
 interface TimelineMomentLite {
     key: string
     version: string
@@ -53,7 +66,8 @@ export class ReactPreviewPanel {
     private readyHandlers: Array<(ready: boolean) => void> = []
     private modelService: ModelService
     private htmlBuilder: HtmlBuilder
-    private currentUri: vscode.Uri | undefined
+    private currentRef: PreviewDocRef | undefined
+    private hubLoader: PreviewHubLoader | undefined
     private webviewReady = false
 
     static createOrShow(
@@ -111,7 +125,7 @@ export class ReactPreviewPanel {
     }
 
     reveal(uri: vscode.Uri, options: { revealPanel?: boolean } = {}) {
-        this.currentUri = uri
+        this.currentRef = { kind: 'local', uri }
         if (options.revealPanel !== false) {
             this.panel.reveal(vscode.ViewColumn.Beside)
         }
@@ -120,15 +134,33 @@ export class ReactPreviewPanel {
         }
     }
 
+    /**
+     * Hub-resource entry point. Loads the architecture via the supplied
+     * HubDataSource and pushes it to the webview just like a local file.
+     */
+    revealHub(
+        ref: Extract<PreviewDocRef, { kind: 'hub' }>,
+        loader: PreviewHubLoader,
+        options: { revealPanel?: boolean } = {},
+    ) {
+        this.currentRef = ref
+        this.hubLoader = loader
+        if (options.revealPanel !== false) {
+            this.panel.reveal(vscode.ViewColumn.Beside)
+        }
+        this.panel.title = `CALM Preview — ${ref.namespace}/${ref.id} v${ref.version}`
+        if (this.webviewReady) void this.pushHubArchitecture(ref)
+    }
+
     getCurrentUri(): vscode.Uri | undefined {
-        return this.currentUri
+        return this.currentRef?.kind === 'local' ? this.currentRef.uri : undefined
     }
 
     /**
      * Framework-agnostic mirror of `getCurrentUri` for SelectionService.
      */
     getCurrentUriPath(): string | undefined {
-        return this.currentUri?.fsPath
+        return this.currentRef?.kind === 'local' ? this.currentRef.uri.fsPath : undefined
     }
 
     /**
@@ -148,7 +180,11 @@ export class ReactPreviewPanel {
      */
     setData(payload?: { selectedId?: string } | unknown): void {
         const selectedId = (payload as { selectedId?: string } | undefined)?.selectedId
-        if (this.currentUri) void this.pushArchitecture(this.currentUri)
+        if (this.currentRef?.kind === 'local') {
+            void this.pushArchitecture(this.currentRef.uri)
+        } else if (this.currentRef?.kind === 'hub' && this.hubLoader) {
+            void this.pushHubArchitecture(this.currentRef)
+        }
         if (selectedId) this.postSelect(selectedId)
     }
 
@@ -199,7 +235,11 @@ export class ReactPreviewPanel {
             case 'ready':
                 this.webviewReady = true
                 this.readyHandlers.forEach(h => { try { h(true) } catch { /* noop */ } })
-                if (this.currentUri) await this.pushArchitecture(this.currentUri)
+                if (this.currentRef?.kind === 'local') {
+                    await this.pushArchitecture(this.currentRef.uri)
+                } else if (this.currentRef?.kind === 'hub' && this.hubLoader) {
+                    await this.pushHubArchitecture(this.currentRef)
+                }
                 return
             case 'log':
                 this.log.info?.(`[react-preview][webview] ${String((msg.payload as { message?: string } | undefined)?.message ?? '')}`)
@@ -255,6 +295,29 @@ export class ReactPreviewPanel {
             })
         } catch (err) {
             this.log.error?.(`[react-preview] Failed to read architecture: ${String(err)}`)
+        }
+    }
+
+    private async pushHubArchitecture(ref: Extract<PreviewDocRef, { kind: 'hub' }>) {
+        if (!this.hubLoader) return
+        try {
+            const calmType = ref.calmType === 'Patterns' ? 'Patterns' : 'Architectures'
+            const architecture = await this.hubLoader.loadArchitecture({
+                kind: 'hub',
+                namespace: ref.namespace,
+                calmType,
+                id: ref.id,
+                version: ref.version,
+            })
+            this.push('architectureData', {
+                docRef: { kind: 'hub', namespace: ref.namespace, calmType: ref.calmType, id: ref.id, version: ref.version },
+                architecture,
+                moments: [],
+                currentMomentKey: null,
+            })
+        } catch (err) {
+            this.log.error?.(`[react-preview] Failed to load Hub architecture: ${String(err)}`)
+            void vscode.window.showErrorMessage(`Failed to load ${ref.namespace}/${ref.id} v${ref.version}: ${String(err)}`)
         }
     }
 
