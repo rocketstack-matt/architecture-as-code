@@ -1,13 +1,14 @@
 import { colors } from '../../../theme/colors.js';
+import { type TypeInUI } from '../tree-navigation/navigation-loaders.js';
+import { NamespaceCounts } from '../../../model/counts.js';
 
-/** The six resource types shown on the namespace browse page, in tab order. */
-export type NamespaceResourceType =
-    | 'Architectures'
-    | 'Patterns'
-    | 'Flows'
-    | 'Standards'
-    | 'ADRs'
-    | 'Interfaces';
+/**
+ * The resource types shown on the namespace browse page: every UI type except
+ * `Controls` (a control-domain concept, not a namespace browse type). Derived from
+ * `TypeInUI` so a new browsable type can't silently miss a tab — adding one to
+ * `TypeInUI` makes this union (and the `Record`s keyed on it) require it.
+ */
+export type NamespaceResourceType = Exclude<TypeInUI, 'Controls'>;
 
 type ResourceTypeKey = keyof typeof colors.resourceTypes;
 
@@ -41,6 +42,20 @@ const RESOURCE_TYPE_META: Record<NamespaceResourceType, ResourceTypeMeta> = {
     Standards: { label: 'Standard', pluralLabel: 'standards', colorKey: 'standard' },
     ADRs: { label: 'ADR', pluralLabel: 'ADRs', colorKey: 'adr' },
     Interfaces: { label: 'Interface', pluralLabel: 'interfaces', colorKey: 'interface' },
+};
+
+/**
+ * Maps each browse type to its field on the namespace counts payload. A `Record`
+ * (not a hand switch) so a new `NamespaceResourceType` fails to compile until its
+ * count field is wired — shared by the desktop tabs and the mobile drill-down.
+ */
+export const COUNT_FIELD: Record<NamespaceResourceType, keyof NamespaceCounts> = {
+    Architectures: 'architectures',
+    Patterns: 'patterns',
+    Flows: 'flows',
+    Standards: 'standards',
+    ADRs: 'adrs',
+    Interfaces: 'interfaces',
 };
 
 /** Stable DOM id for a type tab button — referenced by the panel's `aria-labelledby`. */

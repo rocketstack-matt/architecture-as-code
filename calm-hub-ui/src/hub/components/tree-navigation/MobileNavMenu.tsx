@@ -12,6 +12,7 @@ import { NamespaceCounts, DomainControlCount } from '../../../model/counts.js';
 import { colors } from '../../../theme/colors.js';
 import { redesignTokens } from '../../../theme/redesign-tokens.js';
 import { CountBadge } from '../explore-rail/CountBadge.js';
+import { COUNT_FIELD, type NamespaceResourceType } from '../namespace-page/resource-type-meta.js';
 import {
     type TypeInUI,
     mapTypeInUIToTypeInUrl,
@@ -94,27 +95,14 @@ export function MobileNavMenu({ namespaceCounts, domainCounts, onClose }: Mobile
         [domainCounts]
     );
     // Per-type count for a namespace's resource-type drill-down level, mirroring
-    // the desktop namespace page's segmented type tabs.
+    // the desktop namespace page's segmented type tabs. Uses the shared COUNT_FIELD
+    // map so a new browse type is wired in one place (Controls has no count field).
     const typeCount = useCallback(
         (namespace: string, type: TypeInUI): number | undefined => {
             const c = namespaceCounts.find((nc) => nc.namespace === namespace);
             if (!c) return undefined;
-            switch (type) {
-                case 'Architectures':
-                    return c.architectures;
-                case 'Patterns':
-                    return c.patterns;
-                case 'Flows':
-                    return c.flows;
-                case 'Standards':
-                    return c.standards;
-                case 'ADRs':
-                    return c.adrs;
-                case 'Interfaces':
-                    return c.interfaces;
-                default:
-                    return undefined;
-            }
+            const field = COUNT_FIELD[type as NamespaceResourceType];
+            return field ? (c[field] as number) : undefined;
         },
         [namespaceCounts]
     );

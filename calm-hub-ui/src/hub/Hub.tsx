@@ -33,6 +33,9 @@ export default function Hub() {
     const [selectedItem, setSelectedItem] = useState<SelectedItem>(null);
     const [namespaceCounts, setNamespaceCounts] = useState<NamespaceCounts[]>([]);
     const [namespaceCountsLoaded, setNamespaceCountsLoaded] = useState(false);
+    // Distinct from "loaded": a failed counts fetch means counts are unknown, not
+    // zero, so consumers must render them as unknown rather than a misleading 0.
+    const [namespaceCountsFailed, setNamespaceCountsFailed] = useState(false);
     const [domainCounts, setDomainCounts] = useState<DomainControlCount[]>([]);
     const isMobile = useIsMobile();
 
@@ -56,10 +59,16 @@ export default function Hub() {
         countsService
             .fetchNamespaceCounts()
             .then(setNamespaceCounts)
-            .catch(() => setNamespaceCounts([]))
+            // On failure counts are unknown, not zero: flag it so the tabs render
+            // resting (no badge) rather than a misleading dimmed 0 while the
+            // independent item grid still fills below.
+            .catch(() => {
+                setNamespaceCounts([]);
+                setNamespaceCountsFailed(true);
+            })
             // Mark loaded on success or failure so consumers can tell "counts
-            // unknown (loading)" from "known zero" — an absent namespace after the
-            // fetch settles is genuinely zero, not still loading.
+            // unknown (loading)" from "known zero" — an absent namespace after a
+            // successful fetch is genuinely zero, not still loading.
             .finally(() => setNamespaceCountsLoaded(true));
         countsService.fetchDomainCounts().then(setDomainCounts).catch(() => setDomainCounts([]));
     }, [countsService]);
@@ -147,12 +156,13 @@ export default function Hub() {
 
     // The active namespace's full per-type counts, passed straight to NamespacePage
     // so its type tabs show counts without a second fetch. `undefined` while the
-    // counts fetch is in flight — distinct from a known all-zero record — so the
-    // page can render tabs resting (not dimmed) and defer the first-non-empty
-    // default until counts resolve. Once loaded, a namespace absent from the list
-    // is a genuine all-zero (e.g. an unknown namespace), not still loading.
+    // counts fetch is in flight OR if it failed — distinct from a known all-zero
+    // record — so the page renders tabs resting (not dimmed 0) rather than
+    // contradicting the item grid, and defers the first-non-empty default until
+    // counts resolve. Once loaded successfully, a namespace absent from the list is
+    // a genuine all-zero (e.g. an unknown namespace), not still loading.
     const activeNamespaceCounts = useMemo<NamespaceCounts | undefined>(() => {
-        if (!namespaceCountsLoaded) return undefined;
+        if (!namespaceCountsLoaded || namespaceCountsFailed) return undefined;
         return (
             namespaceCounts.find((c) => c.namespace === activeNamespace) ?? {
                 namespace: activeNamespace ?? '',
@@ -165,7 +175,7 @@ export default function Hub() {
                 total: 0,
             }
         );
-    }, [namespaceCounts, namespaceCountsLoaded, activeNamespace]);
+    }, [namespaceCounts, namespaceCountsLoaded, namespaceCountsFailed, activeNamespace]);
     const domainControlCount = useMemo(
         () => domainCounts.find((c) => c.domain === activeDomain)?.controlCount ?? 0,
         [domainCounts, activeDomain]

@@ -1,22 +1,21 @@
 import { useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { CalmService } from '../../../service/calm-service.js';
 import { AdrService } from '../../../service/adr-service/adr-service.js';
 import { NamespaceCounts } from '../../../model/counts.js';
 import { resolveResourceDetailPath } from '../tree-navigation/navigation-loaders.js';
 import { NamespacePageHeader } from './NamespacePageHeader.js';
-import { SegmentedTypeTabs, type TypeTab } from './SegmentedTypeTabs.js';
+import { SegmentedTypeTabs } from './SegmentedTypeTabs.js';
 import { ItemCard } from './ItemCard.js';
 import { EmptyState } from './EmptyState.js';
 import { useNamespaceItems } from './useNamespaceItems.js';
+import { useActiveType } from './useActiveType.js';
 import {
-    NAMESPACE_RESOURCE_TYPES,
     type NamespaceResourceType,
     getResourceTypeMeta,
     tabId,
     TYPE_PANEL_ID,
 } from './resource-type-meta.js';
-import { mapTypeInUIToTypeInUrl } from '../tree-navigation/navigation-loaders.js';
 
 interface NamespacePageProps {
     namespace: string;
@@ -27,65 +26,6 @@ interface NamespacePageProps {
      * default type isn't committed to a non-Architectures value prematurely.
      */
     counts?: NamespaceCounts;
-}
-
-/** Maps each browse type to its field on the counts payload. */
-const COUNT_FIELD: Record<NamespaceResourceType, keyof NamespaceCounts> = {
-    Architectures: 'architectures',
-    Patterns: 'patterns',
-    Flows: 'flows',
-    Standards: 'standards',
-    ADRs: 'adrs',
-    Interfaces: 'interfaces',
-};
-
-/** Resolves the `?type=` param to a valid browse type, defaulting deterministically. */
-function useActiveType(counts: NamespaceCounts | undefined): {
-    active: NamespaceResourceType;
-    select: (type: NamespaceResourceType) => void;
-    tabs: TypeTab[];
-} {
-    const [searchParams, setSearchParams] = useSearchParams();
-
-    // While counts are loading (`undefined`) each tab's count is `undefined` too, so
-    // SegmentedTypeTabs renders them resting rather than dimming true-zero tabs.
-    const tabs = useMemo<TypeTab[]>(
-        () =>
-            NAMESPACE_RESOURCE_TYPES.map((type) => ({
-                type,
-                count: counts ? (counts[COUNT_FIELD[type]] as number) : undefined,
-            })),
-        [counts]
-    );
-
-    // Default: first type with items, else Architectures. Only applied once counts
-    // have loaded — while loading we hold Architectures without committing a
-    // non-Architectures default, so the active underline never jumps mid-load. The
-    // counts are server data available synchronously once resolved, so the active
-    // tab is stable before the items fetch resolves — no flash and no URL churn.
-    const defaultType = useMemo<NamespaceResourceType>(
-        () => tabs.find((t) => (t.count ?? 0) > 0)?.type ?? 'Architectures',
-        [tabs]
-    );
-
-    const paramValue = searchParams.get('type');
-    const active = useMemo<NamespaceResourceType>(() => {
-        const match = NAMESPACE_RESOURCE_TYPES.find((t) => mapTypeInUIToTypeInUrl(t) === paramValue);
-        return match ?? defaultType;
-    }, [paramValue, defaultType]);
-
-    // Replace (not push) so paging through tabs doesn't pollute browser history —
-    // Back returns to the previous page, not the previously viewed type.
-    const select = useCallback(
-        (type: NamespaceResourceType) => {
-            const next = new URLSearchParams(searchParams);
-            next.set('type', mapTypeInUIToTypeInUrl(type));
-            setSearchParams(next, { replace: true });
-        },
-        [searchParams, setSearchParams]
-    );
-
-    return { active, select, tabs };
 }
 
 /**
@@ -123,7 +63,10 @@ export function NamespacePage({ namespace, counts }: NamespacePageProps) {
         [namespace, calmService, adrService, navigate]
     );
 
-    const activeItems = groups.find((g) => g.type === active)?.items ?? [];
+    const activeItems = useMemo(
+        () => groups.find((g) => g.type === active)?.items ?? [],
+        [groups, active]
+    );
 
     return (
         <div className="h-full overflow-auto bg-base-100" style={{ padding: '32px 40px' }}>
