@@ -18,7 +18,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.finos.calm.domain.Architecture;
-import org.finos.calm.domain.architecture.NamespaceArchitectureSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.finos.calm.domain.exception.ArchitectureNotFoundException;
 import org.finos.calm.domain.exception.ArchitectureVersionExistsException;
 import org.finos.calm.domain.exception.ArchitectureVersionNotFoundException;
@@ -130,7 +130,7 @@ public class TestMongoArchitectureStoreShould {
         when(documentMock.getList("architectures", Document.class))
                 .thenReturn(Arrays.asList(doc1, doc2));
 
-        List<NamespaceArchitectureSummary> architectures = mongoArchitectureStore.getArchitecturesForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> architectures = mongoArchitectureStore.getArchitecturesForNamespace(NAMESPACE);
 
         assertThat(architectures.size(), is(2));
         assertThat(architectures.get(0).getName(), is("Arch One"));
@@ -159,7 +159,7 @@ public class TestMongoArchitectureStoreShould {
         when(documentMock.getList("architectures", Document.class))
                 .thenReturn(List.of(legacyDoc));
 
-        List<NamespaceArchitectureSummary> architectures = mongoArchitectureStore.getArchitecturesForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> architectures = mongoArchitectureStore.getArchitecturesForNamespace(NAMESPACE);
 
         assertThat(architectures.size(), is(1));
         assertThat(architectures.get(0).getName(), is("Architecture 42"));

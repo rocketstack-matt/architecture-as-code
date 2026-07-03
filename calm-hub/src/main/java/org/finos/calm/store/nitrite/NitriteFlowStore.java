@@ -15,9 +15,10 @@ import org.finos.calm.domain.exception.FlowVersionExistsException;
 import org.finos.calm.domain.exception.FlowVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.flow.CreateFlowRequest;
-import org.finos.calm.domain.flow.NamespaceFlowSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.finos.calm.store.FlowStore;
 import org.finos.calm.store.util.TypeSafeNitriteDocument;
+import org.finos.calm.store.util.VersionKeySelector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +63,7 @@ public class NitriteFlowStore implements FlowStore {
     }
 
     @Override
-    public List<NamespaceFlowSummary> getFlowsForNamespace(String namespace) throws NamespaceNotFoundException {
+    public List<NamespaceResourceSummary> getFlowsForNamespace(String namespace) throws NamespaceNotFoundException {
         if (!namespaceStore.namespaceExists(namespace)) {
             LOG.warn("Namespace '{}' not found when retrieving flows", namespace);
             throw new NamespaceNotFoundException();
@@ -81,7 +82,7 @@ public class NitriteFlowStore implements FlowStore {
             return List.of();
         }
 
-        List<NamespaceFlowSummary> flowSummaries = new ArrayList<>();
+        List<NamespaceResourceSummary> flowSummaries = new ArrayList<>();
         for (Document flow : flows) {
             Integer flowId = flow.get(FLOW_ID_FIELD, Integer.class);
             String name = flow.get(NAME_FIELD, String.class);
@@ -89,9 +90,9 @@ public class NitriteFlowStore implements FlowStore {
             if (name == null) name = "Flow " + flowId;
             if (description == null) description = "";
             // Count versions from the already-in-memory sub-document (O(1), no extra query).
-            Document versions = flow.get(VERSIONS_FIELD, Document.class);
-            int versionCount = versions == null ? 0 : versions.getFields().size();
-            flowSummaries.add(new NamespaceFlowSummary(name, description, flowId, versionCount));
+            Object rawVersions = flow.get(VERSIONS_FIELD);
+            int versionCount = VersionKeySelector.versionCount(rawVersions instanceof Document d ? d.getFields() : null);
+            flowSummaries.add(new NamespaceResourceSummary(name, description, flowId, versionCount));
         }
 
         return flowSummaries;

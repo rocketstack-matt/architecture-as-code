@@ -23,7 +23,7 @@ import org.finos.calm.domain.exception.FlowVersionExistsException;
 import org.finos.calm.domain.exception.FlowVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.flow.CreateFlowRequest;
-import org.finos.calm.domain.flow.NamespaceFlowSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -118,7 +118,7 @@ public class TestMongoFlowStoreShould {
         when(documentMock.getList("flows", Document.class))
                 .thenReturn(Arrays.asList(doc1, doc2));
 
-        List<NamespaceFlowSummary> flows = mongoFlowStore.getFlowsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> flows = mongoFlowStore.getFlowsForNamespace(NAMESPACE);
 
         assertThat(flows.size(), is(2));
         assertThat(flows.get(0).getName(), is("Flow One"));
@@ -147,7 +147,7 @@ public class TestMongoFlowStoreShould {
         when(documentMock.getList("flows", Document.class))
                 .thenReturn(List.of(legacyDoc));
 
-        List<NamespaceFlowSummary> flows = mongoFlowStore.getFlowsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> flows = mongoFlowStore.getFlowsForNamespace(NAMESPACE);
 
         assertThat(flows.size(), is(1));
         assertThat(flows.get(0).getName(), is("Flow 77"));

@@ -23,7 +23,7 @@ import org.finos.calm.domain.exception.StandardNotFoundException;
 import org.finos.calm.domain.exception.StandardVersionExistsException;
 import org.finos.calm.domain.exception.StandardVersionNotFoundException;
 import org.finos.calm.domain.standards.CreateStandardRequest;
-import org.finos.calm.domain.standards.NamespaceStandardSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -124,7 +124,7 @@ public class TestMongoStandardStoreShould {
         when(documentMock.getList("standards", Document.class))
                 .thenReturn(List.of(doc, docNoVersions));
 
-        List<NamespaceStandardSummary> standards = mongoStandardStore.getStandardsForNamespace("finos");
+        List<NamespaceResourceSummary> standards = mongoStandardStore.getStandardsForNamespace("finos");
 
         assertThat(standards.size(), is(2));
         assertThat(standards.getFirst().getName(), is("Test Standard"));

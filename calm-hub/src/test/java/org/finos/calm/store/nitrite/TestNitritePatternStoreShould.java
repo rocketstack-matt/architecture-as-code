@@ -12,7 +12,7 @@ import org.finos.calm.domain.exception.PatternNotFoundException;
 import org.finos.calm.domain.exception.PatternVersionExistsException;
 import org.finos.calm.domain.exception.PatternVersionNotFoundException;
 import org.finos.calm.domain.pattern.CreatePatternRequest;
-import org.finos.calm.domain.pattern.NamespacePatternSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -81,7 +81,7 @@ public class TestNitritePatternStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(mockCursor);
 
         // Act
-        List<NamespacePatternSummary> result = patternStore.getPatternsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = patternStore.getPatternsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, is(notNullValue()));
@@ -108,7 +108,7 @@ public class TestNitritePatternStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespacePatternSummary> result = patternStore.getPatternsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = patternStore.getPatternsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, is(notNullValue()));
@@ -138,7 +138,7 @@ public class TestNitritePatternStoreShould {
         when(cursor.firstOrNull()).thenReturn(namespaceDoc);
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
-        List<NamespacePatternSummary> result = patternStore.getPatternsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = patternStore.getPatternsForNamespace(NAMESPACE);
 
         assertThat(result.size(), is(1));
         assertThat(result.get(0).getId(), is(99));

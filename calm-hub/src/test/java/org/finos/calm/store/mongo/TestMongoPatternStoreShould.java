@@ -23,7 +23,7 @@ import org.finos.calm.domain.exception.PatternNotFoundException;
 import org.finos.calm.domain.exception.PatternVersionExistsException;
 import org.finos.calm.domain.exception.PatternVersionNotFoundException;
 import org.finos.calm.domain.pattern.CreatePatternRequest;
-import org.finos.calm.domain.pattern.NamespacePatternSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -120,7 +120,7 @@ public class TestMongoPatternStoreShould {
         when(documentMock.getList("patterns", Document.class))
                 .thenReturn(Arrays.asList(doc1, doc2));
 
-        List<NamespacePatternSummary> patterns = mongoPatternStore.getPatternsForNamespace("finos");
+        List<NamespaceResourceSummary> patterns = mongoPatternStore.getPatternsForNamespace("finos");
 
         assertThat(patterns.size(), is(2));
         assertThat(patterns.get(0).getName(), is("Pattern One"));
@@ -149,7 +149,7 @@ public class TestMongoPatternStoreShould {
         when(documentMock.getList("patterns", Document.class))
                 .thenReturn(List.of(legacyDoc));
 
-        List<NamespacePatternSummary> patterns = mongoPatternStore.getPatternsForNamespace("finos");
+        List<NamespaceResourceSummary> patterns = mongoPatternStore.getPatternsForNamespace("finos");
 
         assertThat(patterns.size(), is(1));
         assertThat(patterns.get(0).getName(), is("Pattern 99"));

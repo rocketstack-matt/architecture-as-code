@@ -7,7 +7,7 @@ import org.dizitart.no2.collection.NitriteCollection;
 import org.dizitart.no2.filters.Filter;
 import org.bson.json.JsonParseException;
 import org.finos.calm.domain.Architecture;
-import org.finos.calm.domain.architecture.NamespaceArchitectureSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.finos.calm.domain.exception.ArchitectureNotFoundException;
 import org.finos.calm.domain.exception.ArchitectureVersionExistsException;
 import org.finos.calm.domain.exception.ArchitectureVersionNotFoundException;
@@ -84,7 +84,7 @@ public class TestNitriteArchitectureStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceArchitectureSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result.isEmpty(), is(true));
@@ -105,7 +105,7 @@ public class TestNitriteArchitectureStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceArchitectureSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result.isEmpty(), is(true));
@@ -125,7 +125,7 @@ public class TestNitriteArchitectureStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceArchitectureSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result.isEmpty(), is(true));
@@ -158,7 +158,7 @@ public class TestNitriteArchitectureStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceArchitectureSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result.size(), is(2));
@@ -189,7 +189,7 @@ public class TestNitriteArchitectureStoreShould {
         when(cursor.firstOrNull()).thenReturn(namespaceDoc);
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
-        List<NamespaceArchitectureSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = architectureStore.getArchitecturesForNamespace(NAMESPACE);
 
         assertThat(result.size(), is(1));
         assertThat(result.get(0).getId(), is(42));

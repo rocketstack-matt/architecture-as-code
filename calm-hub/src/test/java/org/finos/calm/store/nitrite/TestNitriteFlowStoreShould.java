@@ -11,7 +11,7 @@ import org.finos.calm.domain.exception.FlowVersionExistsException;
 import org.finos.calm.domain.exception.FlowVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.flow.CreateFlowRequest;
-import org.finos.calm.domain.flow.NamespaceFlowSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,7 +76,7 @@ public class TestNitriteFlowStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceFlowSummary> result = flowStore.getFlowsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = flowStore.getFlowsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, is(empty()));
@@ -96,7 +96,7 @@ public class TestNitriteFlowStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceFlowSummary> result = flowStore.getFlowsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = flowStore.getFlowsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, is(empty()));
@@ -123,7 +123,7 @@ public class TestNitriteFlowStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceFlowSummary> result = flowStore.getFlowsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = flowStore.getFlowsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, hasSize(2));
@@ -153,7 +153,7 @@ public class TestNitriteFlowStoreShould {
         when(cursor.firstOrNull()).thenReturn(namespaceDoc);
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
-        List<NamespaceFlowSummary> result = flowStore.getFlowsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = flowStore.getFlowsForNamespace(NAMESPACE);
 
         assertThat(result, hasSize(1));
         assertThat(result.get(0).getId(), is(77));

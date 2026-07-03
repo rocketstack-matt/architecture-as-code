@@ -11,7 +11,7 @@ import org.finos.calm.domain.exception.StandardNotFoundException;
 import org.finos.calm.domain.exception.StandardVersionExistsException;
 import org.finos.calm.domain.exception.StandardVersionNotFoundException;
 import org.finos.calm.domain.standards.CreateStandardRequest;
-import org.finos.calm.domain.standards.NamespaceStandardSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,7 +75,7 @@ public class TestNitriteStandardStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(mockCursor);
 
         // Act
-        List<NamespaceStandardSummary> result = standardStore.getStandardsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = standardStore.getStandardsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, is(notNullValue()));
@@ -97,7 +97,7 @@ public class TestNitriteStandardStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceStandardSummary> result = standardStore.getStandardsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = standardStore.getStandardsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, is(notNullValue()));
@@ -119,7 +119,7 @@ public class TestNitriteStandardStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceStandardSummary> result = standardStore.getStandardsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = standardStore.getStandardsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, is(notNullValue()));
@@ -152,7 +152,7 @@ public class TestNitriteStandardStoreShould {
         when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
 
         // Act
-        List<NamespaceStandardSummary> result = standardStore.getStandardsForNamespace(NAMESPACE);
+        List<NamespaceResourceSummary> result = standardStore.getStandardsForNamespace(NAMESPACE);
 
         // Assert
         assertThat(result, is(notNullValue()));

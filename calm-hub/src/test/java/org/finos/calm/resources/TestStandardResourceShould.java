@@ -11,7 +11,7 @@ import org.finos.calm.domain.exception.StandardNotFoundException;
 import org.finos.calm.domain.exception.StandardVersionExistsException;
 import org.finos.calm.domain.exception.StandardVersionNotFoundException;
 import org.finos.calm.domain.standards.CreateStandardRequest;
-import org.finos.calm.domain.standards.NamespaceStandardSummary;
+import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.finos.calm.store.StandardStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,13 +42,13 @@ public class TestStandardResourceShould {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private NamespaceStandardSummary nistStandardSummary;
-    private NamespaceStandardSummary finosStandardSummary;
+    private NamespaceResourceSummary nistStandardSummary;
+    private NamespaceResourceSummary finosStandardSummary;
 
     @BeforeEach
     void beforeEach() {
-        nistStandardSummary = new NamespaceStandardSummary("nist", "NIST Standard", 1, 3);
-        finosStandardSummary = new NamespaceStandardSummary("finos", "FINOS Standard", 2, 1);
+        nistStandardSummary = new NamespaceResourceSummary("nist", "NIST Standard", 1, 3);
+        finosStandardSummary = new NamespaceResourceSummary("finos", "FINOS Standard", 2, 1);
     }
 
     @Test
@@ -76,7 +76,7 @@ public class TestStandardResourceShould {
 
     @Test
     void return_list_of_standards_response_when_valid_namespace_provided_on_get_standards() throws NamespaceNotFoundException, JsonProcessingException {
-        List<NamespaceStandardSummary> expectedStandardSummary = List.of(this.nistStandardSummary, this.finosStandardSummary);
+        List<NamespaceResourceSummary> expectedStandardSummary = List.of(this.nistStandardSummary, this.finosStandardSummary);
 
         when(mockStandardStore.getStandardsForNamespace("valid")).thenReturn(expectedStandardSummary);
 
