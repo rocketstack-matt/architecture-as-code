@@ -17,6 +17,8 @@ import { CustomNode } from './CustomNode.js';
 import { SystemGroupNode } from './SystemGroupNode.js';
 import { DecisionGroupNode } from './DecisionGroupNode.js';
 import { RenderReadySignal } from './RenderReadySignal.js';
+import { CHROMELESS_FIT_VIEW_OPTIONS, useChromelessRender } from './chromeless.js';
+import { ChromelessEmptyState } from './ChromelessEmptyState.js';
 import { SearchBar } from './SearchBar.js';
 import { THEME } from './theme.js';
 import { EmptyGraphState } from './EmptyGraphState.js';
@@ -43,17 +45,6 @@ const nodeTypes = {
 };
 const GROUP_NODE_TYPES = ['group', 'decisionGroup'];
 
-/**
- * Chromeless (thumbnail render) fit: the screenshot must show the whole graph in a
- * fixed wide-and-short viewport (a minimap-style strip), so the zoom floor drops
- * below ReactFlow's default — a partially cropped thumbnail is worse than a small
- * one. Margins don't matter to framing because the screenshot is clipped to the
- * graph's content server-side. maxZoom sits below the interactive fit so tiny
- * graphs don't render as oversized strips that overflow the clip's card-aspect
- * expansion.
- */
-const CHROMELESS_FIT_VIEW_OPTIONS = { padding: 0.1, minZoom: 0.05, maxZoom: 0.8 } as const;
-
 interface PatternGraphProps {
     patternData: Record<string, unknown>;
     onNodeClick?: (nodeData: Record<string, unknown>) => void;
@@ -74,11 +65,7 @@ export function PatternGraph({ patternData, onNodeClick, onEdgeClick, viewportKe
         [viewportKey]
     );
 
-    // Chromeless render mode: true once nodes are measured and the first paint has
-    // settled (RenderReadySignal), surfaced as data-render-ready on the wrapper so
-    // calm-server's headless browser knows the graph is safe to screenshot.
-    const [renderReady, setRenderReady] = useState(false);
-    const markRenderReady = useCallback(() => setRenderReady(true), []);
+    const { renderReady, markRenderReady } = useChromelessRender();
 
     // Distinguishes "not parsed yet" (initial empty node state) from a genuinely
     // empty document, so chromeless mode never signals ready before the parse ran.
@@ -197,15 +184,10 @@ export function PatternGraph({ patternData, onNodeClick, onEdgeClick, viewportKe
     }, []);
 
     if (nodes.length === 0) {
-        const emptyState = <EmptyGraphState message="No pattern data to display. Load a CALM pattern to visualize." />;
-        // A chromeless render of a genuinely empty document must still signal ready,
-        // otherwise calm-server waits out its full render timeout for nothing.
-        return chromeless && parsed ? (
-            <div style={{ height: '100%', width: '100%' }} data-render-ready="true">
-                {emptyState}
-            </div>
-        ) : (
-            emptyState
+        return (
+            <ChromelessEmptyState signalReady={chromeless && parsed}>
+                <EmptyGraphState message="No pattern data to display. Load a CALM pattern to visualize." />
+            </ChromelessEmptyState>
         );
     }
 

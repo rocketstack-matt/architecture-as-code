@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -62,6 +63,17 @@ public class ThumbnailService {
     private final long failureCacheTtlMs;
     private final HttpClient httpClient;
 
+    /**
+     * Bounds concurrent renders ({@code calm.render.max-concurrent-renders}): each render
+     * costs calm-server a full headless-browser launch, so an unbounded burst (a browse
+     * page of misses) could fork dozens of Chrome processes. Only render OWNERS acquire a
+     * permit — joiners just wait on the shared future. Acquisition is non-blocking: when
+     * saturated the attempt resolves empty WITHOUT entering the failure cache, so the next
+     * view retries rather than being 404-pinned for the TTL.
+     */
+    private final Semaphore renderPermits;
+    private final int maxConcurrentRenders;
+
     /** In-flight renders keyed by {@code namespace/type/id/version} (single-flight). */
     private final ConcurrentHashMap<String, CompletableFuture<Optional<byte[]>>> inFlight = new ConcurrentHashMap<>();
 
@@ -78,20 +90,24 @@ public class ThumbnailService {
             @ConfigProperty(name = "calm.render.service-url") Optional<String> renderServiceUrl,
             @ConfigProperty(name = "calm.hub.base-url", defaultValue = "http://localhost:8080") String uiBaseUrl,
             @ConfigProperty(name = "calm.render.timeout-ms", defaultValue = "20000") long timeoutMs,
-            @ConfigProperty(name = "calm.render.failure-cache-ttl-ms", defaultValue = "60000") long failureCacheTtlMs) {
-        this(renderServiceUrl.orElse(""), uiBaseUrl, timeoutMs, failureCacheTtlMs, HttpClient.newBuilder()
+            @ConfigProperty(name = "calm.render.failure-cache-ttl-ms", defaultValue = "60000") long failureCacheTtlMs,
+            @ConfigProperty(name = "calm.render.max-concurrent-renders", defaultValue = "2") int maxConcurrentRenders) {
+        this(renderServiceUrl.orElse(""), uiBaseUrl, timeoutMs, failureCacheTtlMs, maxConcurrentRenders, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build());
     }
 
     /** Visible-for-testing constructor allowing an injected {@link HttpClient}. */
-    ThumbnailService(String renderServiceUrl, String uiBaseUrl, long timeoutMs, long failureCacheTtlMs, HttpClient httpClient) {
+    ThumbnailService(String renderServiceUrl, String uiBaseUrl, long timeoutMs, long failureCacheTtlMs,
+                     int maxConcurrentRenders, HttpClient httpClient) {
         // Trailing slashes are stripped so a configured base URL of "http://host:3000/"
         // doesn't produce a double-slash render path (mirrors calm-server's uiBaseUrl handling).
         this.renderServiceUrl = renderServiceUrl == null ? "" : renderServiceUrl.trim().replaceAll("/+$", "");
         this.uiBaseUrl = uiBaseUrl;
         this.timeoutMs = timeoutMs;
         this.failureCacheTtlMs = failureCacheTtlMs;
+        this.maxConcurrentRenders = maxConcurrentRenders;
+        this.renderPermits = new Semaphore(maxConcurrentRenders);
         this.httpClient = httpClient;
     }
 
@@ -146,6 +162,15 @@ public class ThumbnailService {
      * collapse onto a single render. On success {@code storeCallback} is invoked with the bytes
      * before they are returned.
      *
+     * <p><b>Stale-render race:</b> a GET-miss that joins an already in-flight render can be
+     * returned a render of content that a concurrent same-version update just replaced, and
+     * that client then pins the stale image for up to the response's Cache-Control max-age
+     * (5 minutes). The write path converges the STORE: {@link #triggerRender}'s non-owner
+     * chase re-renders the new content once the in-flight render completes, so staleness is
+     * bounded to that one client's cache window. The read path deliberately does NOT chase:
+     * concurrent GETs for the same missing thumbnail are the common case this single-flight
+     * exists for, and chasing per joiner would fire N renders for one page of cards.</p>
+     *
      * @param key           single-flight key, {@code namespace/type/id/version}
      * @param documentType  {@link #DOCUMENT_TYPE_ARCHITECTURE} or {@link #DOCUMENT_TYPE_PATTERN}
      * @param documentJson  the raw CALM JSON document as a string
@@ -192,6 +217,15 @@ public class ThumbnailService {
             return new CompletableFuture<>();
         });
         if (owner.get()) {
+            if (!renderPermits.tryAcquire()) {
+                // Saturated: resolve this attempt empty WITHOUT touching the failure
+                // cache — saturation is transient, and the next view should retry
+                // rather than be 404-pinned for the failure TTL.
+                logger.debug("Thumbnail render for [{}] skipped: {} renders already in flight", key, maxConcurrentRenders);
+                inFlight.remove(key);
+                future.complete(Optional.empty());
+                return new RenderAttempt(future, true);
+            }
             sendRenderRequest(documentType, documentJson)
                     .thenApply(png -> {
                         boolean stored = png.isPresent() && safeStore(key, png.get(), storeCallback);
@@ -210,8 +244,12 @@ public class ThumbnailService {
                         return Optional.<byte[]>empty();
                     })
                     .whenComplete((result, t) -> {
-                        // Remove before completing so a caller observing completion
-                        // and re-requesting always triggers a fresh render.
+                        // The async "finally": the permit is released however the
+                        // pipeline ended (sendRenderRequest never throws synchronously —
+                        // it converts failures into a failed future — so this stage
+                        // always runs). Remove before completing so a caller observing
+                        // completion and re-requesting always triggers a fresh render.
+                        renderPermits.release();
                         inFlight.remove(key);
                         future.complete(result == null ? Optional.empty() : result);
                     });

@@ -3,6 +3,7 @@ import { CalmService } from '../../../service/calm-service.js';
 import { InterfaceService } from '../../../service/interface-service.js';
 import { AdrService } from '../../../service/adr-service/adr-service.js';
 import { ResourceSummary } from '../../../model/calm.js';
+import { latestThumbnailUrl } from '../../../service/thumbnail-url.js';
 import { type TypeInUI } from '../tree-navigation/navigation-loaders.js';
 
 export interface NamespaceItem {
@@ -46,7 +47,7 @@ const summaryToThumbnailItem = (
     typePath: 'architectures' | 'patterns'
 ): NamespaceItem => ({
     ...summaryToItem(s),
-    thumbnailUrl: `/api/calm/namespaces/${encodeURIComponent(namespace)}/${typePath}/${encodeURIComponent(String(s.id))}/thumbnail`,
+    thumbnailUrl: latestThumbnailUrl(namespace, typePath, s.id),
 });
 
 /**

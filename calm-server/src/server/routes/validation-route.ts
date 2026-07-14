@@ -2,6 +2,7 @@ import { SchemaDirectory, validate, ValidationOutcome, initLogger } from '@finos
 import type { Logger } from '@finos/calm-shared';
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
+import { ErrorResponse } from './error-response';
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -201,13 +202,6 @@ export class ValidationRouter {
             return res.status(500).type('json').send(new ErrorResponse('Failed to validate architecture against pattern'));
         }
     };
-}
-
-class ErrorResponse {
-    error: string;
-    constructor(error: string) {
-        this.error = error;
-    }
 }
 
 interface ValidationRequest {

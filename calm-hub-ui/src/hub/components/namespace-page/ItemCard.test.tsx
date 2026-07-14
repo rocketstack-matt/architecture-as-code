@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import { ItemCard } from './ItemCard.js';
 
@@ -196,5 +197,73 @@ describe('ItemCard', () => {
     it('renders no thumbnail image when thumbnailUrl is unset', () => {
         render(<ItemCard name="TraderX" type="Architectures" onActivate={() => {}} />);
         expect(screen.queryByTestId('item-card-thumbnail')).not.toBeInTheDocument();
+    });
+
+    it('defaults the header to 96px for icon/stripe-only cards (no thumbnailUrl)', () => {
+        const { container } = render(<ItemCard name="No Thumb" type="Flows" onActivate={() => {}} />);
+        expect(container.querySelector('article > div')).toHaveStyle({ height: '96px' });
+    });
+
+    it('defaults the header to 160px when a thumbnailUrl is set', () => {
+        const { container } = render(
+            <ItemCard
+                name="With Thumb"
+                type="Architectures"
+                thumbnailUrl="/api/calm/namespaces/finos/architectures/1/thumbnail"
+                onActivate={() => {}}
+            />
+        );
+        expect(container.querySelector('article > div')).toHaveStyle({ height: '160px' });
+    });
+
+    it('lets an explicit thumbnailHeight win over both defaults', () => {
+        const { container, rerender } = render(
+            <ItemCard name="Explicit" type="Flows" thumbnailHeight={72} onActivate={() => {}} />
+        );
+        expect(container.querySelector('article > div')).toHaveStyle({ height: '72px' });
+
+        rerender(
+            <ItemCard
+                name="Explicit"
+                type="Architectures"
+                thumbnailHeight={72}
+                thumbnailUrl="/api/calm/namespaces/finos/architectures/1/thumbnail"
+                onActivate={() => {}}
+            />
+        );
+        expect(container.querySelector('article > div')).toHaveStyle({ height: '72px' });
+    });
+
+    it('describes the activation button with the description and meta chip', () => {
+        // The search-results shape: description + namespace meta chip both present.
+        render(
+            <ItemCard
+                name="Test Architecture"
+                description="A test architecture"
+                type="Architectures"
+                meta="finos"
+                onActivate={() => {}}
+            />
+        );
+        expect(screen.getByTestId('item-card')).toHaveAccessibleDescription('A test architecture finos');
+    });
+
+    it('describes the activation element with just the chip when there is no description', () => {
+        render(<ItemCard name="Chip Only" type="Architectures" customId="chip-only" onActivate={() => {}} />);
+        expect(screen.getByTestId('item-card')).toHaveAccessibleDescription('chip-only');
+    });
+
+    it('carries no accessible description when neither description nor chip exists', () => {
+        render(<ItemCard name="Bare" type="Architectures" onActivate={() => {}} />);
+        expect(screen.getByTestId('item-card')).not.toHaveAttribute('aria-describedby');
+    });
+
+    it('describes the Link form of the card too', () => {
+        render(
+            <MemoryRouter>
+                <ItemCard name="Linked" description="Goes somewhere" type="Architectures" href="/namespace/finos" />
+            </MemoryRouter>
+        );
+        expect(screen.getByTestId('item-card')).toHaveAccessibleDescription('Goes somewhere');
     });
 });

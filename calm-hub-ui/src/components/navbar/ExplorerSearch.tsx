@@ -6,7 +6,7 @@ import { AdrService } from '../../service/adr-service/adr-service.js';
 import { SearchResult } from '../../model/search.js';
 import { FlatResult, TYPE_LABELS, useSearchNavigation } from '../../hooks/useSearchNavigation.js';
 import { useCatalogueSearch } from '../../hooks/useCatalogueSearch.js';
-import { getSearchGroupIcon } from '../../theme/resource-type-meta.js';
+import { SearchGroupIcon } from '../search-group-icon.js';
 
 interface ExplorerSearchProps {
     searchService?: SearchService;
@@ -85,15 +85,6 @@ export function ExplorerSearch({
         [active, flatResults, selectedIndex, moveSelection, navigateToResult, handleClear]
     );
 
-    // Registry type glyph for a group header; the visual types (architectures /
-    // patterns) have none and their headers stay label-only. Inherits the
-    // header's muted text colour via currentColor.
-    const renderGroupIcon = (type: string) => {
-        const GroupIcon = getSearchGroupIcon(type);
-        if (!GroupIcon) return null;
-        return <GroupIcon size={12} className="shrink-0" data-testid={`search-group-icon-${type}`} />;
-    };
-
     const renderGroupedResults = () => {
         if (error) {
             return <div className="p-3 text-sm text-error">Search failed, please try again</div>;
@@ -112,7 +103,7 @@ export function ExplorerSearch({
         return groups.map(([type, items]) => (
             <div key={type}>
                 <div className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-base-content/50 uppercase tracking-wide bg-base-200">
-                    {renderGroupIcon(type)}
+                    <SearchGroupIcon type={type} />
                     {TYPE_LABELS[type] ?? type}
                 </div>
                 {(items as SearchResult[]).map((item) => {

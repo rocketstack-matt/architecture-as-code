@@ -17,6 +17,7 @@ import org.finos.calm.domain.exception.ArchitectureVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.ArchitectureStore;
 import org.finos.calm.store.PageRequest;
+import org.finos.calm.store.util.NitriteDocumentMutationResult;
 import org.finos.calm.store.util.TypeSafeNitriteDocument;
 import org.finos.calm.store.util.VersionKeySelector;
 import org.slf4j.Logger;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 
 import static org.dizitart.no2.filters.FluentFilter.where;
 import io.quarkus.arc.lookup.LookupIfProperty;
@@ -286,42 +288,63 @@ public class NitriteArchitectureStore implements ArchitectureStore {
 
         lock.lock();
         try {
-            Filter filter = where(NAMESPACE_FIELD).eq(architecture.getNamespace());
-            Document namespaceDoc = architectureCollection.find(filter).firstOrNull();
-            if (namespaceDoc == null) {
-                throw new NamespaceNotFoundException();
+            NitriteDocumentMutationResult result = mutateArchitectureDocument(
+                    architecture.getNamespace(), architecture.getId(), architectureDoc -> {
+                        // Thumbnails live in a sibling nested document keyed by dashed
+                        // version, so the version's JSON string value is untouched.
+                        Document thumbnails = architectureDoc.get(THUMBNAILS_FIELD, Document.class);
+                        if (thumbnails == null) {
+                            thumbnails = Document.createDocument();
+                        }
+                        thumbnails.put(architecture.getMongoVersion(), Base64.getEncoder().encodeToString(png));
+                        architectureDoc.put(THUMBNAILS_FIELD, thumbnails);
+                        return true;
+                    });
+            switch (result) {
+                case NAMESPACE_DOCUMENT_MISSING -> throw new NamespaceNotFoundException();
+                case RESOURCE_MISSING, ABORTED -> throw new ArchitectureNotFoundException();
+                case UPDATED -> LOG.debug("Stored thumbnail for version '{}' of architecture {} in namespace '{}'",
+                        architecture.getDotVersion(), architecture.getId(), architecture.getNamespace());
             }
-
-            List<Document> architectures = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class).getList(ARCHITECTURES_FIELD);
-            if (architectures == null) {
-                throw new ArchitectureNotFoundException();
-            }
-            architectures = new ArrayList<>(architectures); // Make a mutable copy
-
-            for (int i = 0; i < architectures.size(); i++) {
-                Document architectureDoc = architectures.get(i);
-                if (architectureDoc.get(ARCHITECTURE_ID_FIELD, Integer.class) == architecture.getId()) {
-                    // Thumbnails live in a sibling nested document keyed by dashed
-                    // version, so the version's JSON string value is untouched.
-                    Document thumbnails = architectureDoc.get(THUMBNAILS_FIELD, Document.class);
-                    if (thumbnails == null) {
-                        thumbnails = Document.createDocument();
-                    }
-                    thumbnails.put(architecture.getMongoVersion(), Base64.getEncoder().encodeToString(png));
-                    architectureDoc.put(THUMBNAILS_FIELD, thumbnails);
-                    architectures.set(i, architectureDoc);
-                    namespaceDoc.put(ARCHITECTURES_FIELD, architectures);
-                    architectureCollection.update(filter, namespaceDoc);
-                    LOG.debug("Stored thumbnail for version '{}' of architecture {} in namespace '{}'",
-                            architecture.getDotVersion(), architecture.getId(), architecture.getNamespace());
-                    return;
-                }
-            }
-
-            throw new ArchitectureNotFoundException();
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * Shared find→mutate→splice→persist sequence for a single architecture document
+     * inside its namespace document, used by the version-write and thumbnail-write
+     * paths. {@code mutation} returns false to abort without persisting. Callers must
+     * hold {@code lock} — this helper does not lock, so the caller's lock scope covers
+     * the whole read-modify-write.
+     */
+    private NitriteDocumentMutationResult mutateArchitectureDocument(
+            String namespace, int architectureId, Function<Document, Boolean> mutation) {
+        Filter filter = where(NAMESPACE_FIELD).eq(namespace);
+        Document namespaceDoc = architectureCollection.find(filter).firstOrNull();
+        if (namespaceDoc == null) {
+            return NitriteDocumentMutationResult.NAMESPACE_DOCUMENT_MISSING;
+        }
+
+        List<Document> architectures = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class).getList(ARCHITECTURES_FIELD);
+        if (architectures == null) {
+            return NitriteDocumentMutationResult.RESOURCE_MISSING;
+        }
+        architectures = new ArrayList<>(architectures); // Make a mutable copy
+
+        for (int i = 0; i < architectures.size(); i++) {
+            Document architectureDoc = architectures.get(i);
+            if (architectureDoc.get(ARCHITECTURE_ID_FIELD, Integer.class) == architectureId) {
+                if (!mutation.apply(architectureDoc)) {
+                    return NitriteDocumentMutationResult.ABORTED;
+                }
+                architectures.set(i, architectureDoc);
+                namespaceDoc.put(ARCHITECTURES_FIELD, architectures);
+                architectureCollection.update(filter, namespaceDoc);
+                return NitriteDocumentMutationResult.UPDATED;
+            }
+        }
+        return NitriteDocumentMutationResult.RESOURCE_MISSING;
     }
 
     @Override
@@ -370,49 +393,26 @@ public class NitriteArchitectureStore implements ArchitectureStore {
             // First verify the architecture exists
             retrieveArchitectureVersions(architecture);
 
-            // Store the architecture JSON as a string directly
-            // No need to parse it to a Document
-
-            // Find the namespace document
-            Filter filter = where(NAMESPACE_FIELD).eq(architecture.getNamespace());
-            Document namespaceDoc = architectureCollection.find(filter).firstOrNull();
-
-            if (namespaceDoc != null) {
-                // Find the architecture document
-                List<Document> architectures = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class).getList(ARCHITECTURES_FIELD);
-                if (architectures != null) {
-                    // Create a mutable copy of the list
-                    architectures = new ArrayList<>(architectures);
-                    boolean found = false;
-                    for (int i = 0; i < architectures.size(); i++) {
-                        Document architectureDoc = architectures.get(i);
-                        if (architectureDoc.get(ARCHITECTURE_ID_FIELD, Integer.class) == architecture.getId()) {
-                            // Found the architecture, update its version
-                            Document versions = architectureDoc.get(VERSIONS_FIELD, Document.class);
-                            if (versions == null) {
-                                throw new ArchitectureNotFoundException();
-                            }
-                            versions.put(architecture.getMongoVersion(), architecture.getArchitectureJson());
-                            architectureDoc.put(NAME_FIELD, architecture.getName());
-                            architectureDoc.put(DESCRIPTION_FIELD, architecture.getDescription());
-                            architectureDoc.put(VERSIONS_FIELD, versions);
-                            architectures.set(i, architectureDoc);
-                            found = true;
-                            break;
+            // Store the architecture JSON as a string directly (no need to parse it
+            // to a Document); shared find/splice/persist sequence lives in the helper.
+            NitriteDocumentMutationResult result = mutateArchitectureDocument(
+                    architecture.getNamespace(), architecture.getId(), architectureDoc -> {
+                        Document versions = architectureDoc.get(VERSIONS_FIELD, Document.class);
+                        if (versions == null) {
+                            return false;
                         }
-                    }
+                        versions.put(architecture.getMongoVersion(), architecture.getArchitectureJson());
+                        architectureDoc.put(NAME_FIELD, architecture.getName());
+                        architectureDoc.put(DESCRIPTION_FIELD, architecture.getDescription());
+                        architectureDoc.put(VERSIONS_FIELD, versions);
+                        return true;
+                    });
 
-                    if (found) {
-                        // Update the namespace document with the modified architectures list
-                        namespaceDoc.put(ARCHITECTURES_FIELD, architectures);
-                        architectureCollection.update(filter, namespaceDoc);
-                        LOG.info("Updated version '{}' for architecture {} in namespace '{}'",
-                                architecture.getDotVersion(), architecture.getId(), architecture.getNamespace());
-                        return;
-                    }
-                }
+            if (result == NitriteDocumentMutationResult.UPDATED) {
+                LOG.info("Updated version '{}' for architecture {} in namespace '{}'",
+                        architecture.getDotVersion(), architecture.getId(), architecture.getNamespace());
+                return;
             }
-
             LOG.error("Failed to write architecture to Nitrite [{}]", architecture);
             throw new ArchitectureNotFoundException();
         } catch (NamespaceNotFoundException e) {

@@ -129,6 +129,8 @@ describe('SearchResultsPage', () => {
         // ...while the unknown group and its items are dropped entirely.
         expect(screen.queryByText('Mystery Widget')).not.toBeInTheDocument();
         expect(screen.queryByText(/widgets/i)).not.toBeInTheDocument();
+        // The headline count covers only the rendered (known) groups.
+        expect(screen.getByText('2 results')).toBeInTheDocument();
     });
 
     it('shows an empty state when nothing matches', async () => {

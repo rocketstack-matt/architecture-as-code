@@ -1,9 +1,16 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { colors } from '../../../theme/colors.js';
 import { redesignTokens } from '../../../theme/redesign-tokens.js';
 import { TypeBadge } from './TypeBadge.js';
 import { type CardResourceType, getResourceTypeColors, getResourceTypeIcon } from '../../../theme/resource-type-meta.js';
+
+/**
+ * Shared responsive card grid for the browse surfaces (namespace, domain, search
+ * results). `min(280px,100%)` keeps a single column from overflowing containers
+ * narrower than the 280px card minimum.
+ */
+export const CARD_GRID_CLASS = 'grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))]';
 
 interface ItemCardProps {
     name: string;
@@ -23,7 +30,13 @@ interface ItemCardProps {
      * When unset the footer falls back to the "N versions" scent or {@link customId}.
      */
     meta?: string;
-    /** Thumbnail header height in px. The tall default gives rendered diagram thumbnails enough vertical space that the cover-fit crop stays modest. */
+    /**
+     * Thumbnail header height in px. An explicit value always wins; otherwise the
+     * default is 160 when {@link thumbnailUrl} is set (rendered diagram thumbnails
+     * need the vertical space so the cover-fit crop stays modest) and 96 when not
+     * (icon/stripe-only headers shouldn't burn it). Every browse surface shows one
+     * type at a time, so the per-type default can't misalign a row.
+     */
     thumbnailHeight?: number;
     /**
      * URL of a rendered diagram thumbnail (architectures/patterns). When set, an
@@ -74,7 +87,7 @@ export function ItemCard({
     customId,
     versionCount,
     meta,
-    thumbnailHeight = 160,
+    thumbnailHeight,
     thumbnailUrl,
     thumbnailIcon,
     active,
@@ -87,6 +100,10 @@ export function ItemCard({
     // changed thumbnailUrl naturally retries without an effect to reset state.
     const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | undefined>(undefined);
     const showThumbnailImage = thumbnailUrl !== undefined && thumbnailUrl !== failedThumbnailUrl;
+
+    // Explicit prop wins; otherwise diagram-thumbnail cards get the tall header and
+    // icon/stripe-only cards the short one (see the thumbnailHeight prop JSDoc).
+    const headerHeight = thumbnailHeight ?? (thumbnailUrl !== undefined ? 160 : 96);
 
     const { accent, accentText, tint } = getResourceTypeColors(type);
     // Registry-derived type glyph for the thumbnail; an explicit thumbnailIcon
@@ -129,6 +146,16 @@ export function ItemCard({
               ? `${versionCount} ${versionCount === 1 ? 'version' : 'versions'}`
               : customId;
 
+    // The activation element's accessible name is just the item name; the description
+    // paragraph and footer chip become its accessible description via aria-describedby
+    // so screen readers announce them with the control.
+    const descriptionId = useId();
+    const chipId = useId();
+    const describedByIds = [description ? descriptionId : undefined, chip !== undefined ? chipId : undefined]
+        .filter(Boolean)
+        .join(' ');
+    const describedBy = describedByIds === '' ? undefined : describedByIds;
+
     return (
         <article
             className="group relative rounded-[12px] overflow-hidden bg-base-100 hover:-translate-y-0.5 hover:shadow-md"
@@ -142,7 +169,7 @@ export function ItemCard({
         >
             <div
                 className={!showThumbnailImage && headerIcon ? 'flex items-center justify-center' : undefined}
-                style={{ height: thumbnailHeight, background: stripes }}
+                style={{ height: headerHeight, background: stripes }}
             >
                 {showThumbnailImage ? (
                     // Rendered diagram thumbnail on top of the stripe background; on
@@ -166,7 +193,13 @@ export function ItemCard({
             </div>
             <div className="p-[14px]">
                 {href ? (
-                    <Link to={href} data-testid={testId} className={activationClass} style={{ color: colors.redesign.ink }}>
+                    <Link
+                        to={href}
+                        data-testid={testId}
+                        aria-describedby={describedBy}
+                        className={activationClass}
+                        style={{ color: colors.redesign.ink }}
+                    >
                         {name}
                     </Link>
                 ) : (
@@ -176,6 +209,7 @@ export function ItemCard({
                         // Only forwarded when `active` is defined, so plain browse cards
                         // (which don't pass it) carry no aria-pressed and aren't toggles.
                         aria-pressed={active}
+                        aria-describedby={describedBy}
                         onClick={onActivate}
                         className={activationClass}
                         style={{ color: colors.redesign.ink }}
@@ -185,6 +219,7 @@ export function ItemCard({
                 )}
                 {description && (
                     <p
+                        id={descriptionId}
                         className="text-[12px] leading-[1.45] mt-[5px] mb-[11px] line-clamp-2"
                         style={{ color: colors.redesign.mutedAlt }}
                     >
@@ -197,6 +232,7 @@ export function ItemCard({
                     <TypeBadge type={type} />
                     {chip !== undefined && (
                         <span
+                            id={chipId}
                             className="font-mono-jb text-[10.5px] ml-auto truncate"
                             style={{ color: colors.redesign.mutedAlt }}
                         >

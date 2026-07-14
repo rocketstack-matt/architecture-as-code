@@ -119,6 +119,9 @@ browser. Disabled by default; enabled by configuring the render service URL.
 - `calm.render.timeout-ms` — per-render timeout (default 20000)
 - `calm.render.failure-cache-ttl-ms` — how long a failed render/store is remembered per
   version; GET misses within the window 404 immediately instead of re-rendering (default 60000)
+- `calm.render.max-concurrent-renders` — bound on simultaneous renders (default 2); each
+  render launches a headless browser on the render service. Saturated attempts resolve as
+  a miss (no failure-cache entry) and retry on a later view
 
 **Endpoints** (on `ArchitectureResource`/`PatternResource`, `@PermissionsAllowed(READ)`,
 respond `image/png` or 404):

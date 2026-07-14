@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
     Node,
     Background,
@@ -18,6 +18,8 @@ import { FloatingEdge } from './FloatingEdge.js';
 import { CustomNode } from './CustomNode.js';
 import { SystemGroupNode } from './SystemGroupNode.js';
 import { RenderReadySignal } from './RenderReadySignal.js';
+import { CHROMELESS_FIT_VIEW_OPTIONS, useChromelessRender } from './chromeless.js';
+import { ChromelessEmptyState } from './ChromelessEmptyState.js';
 import { SearchBar } from './SearchBar.js';
 import { THEME } from './theme.js';
 import { colors } from '../../../theme/colors.js';
@@ -57,17 +59,6 @@ const FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.6, maxZoom: 1.2 } as const;
  */
 const MOBILE_FIT_VIEW_OPTIONS = { padding: 0.1, minZoom: 0.1, maxZoom: FIT_VIEW_OPTIONS.maxZoom } as const;
 
-/**
- * Chromeless (thumbnail render) fit: the screenshot must show the whole graph in a
- * fixed wide-and-short viewport (a minimap-style strip), so the zoom floor drops well
- * below the interactive modes' legibility floors — a partially cropped thumbnail is
- * worse than a small one. Padding matches the mobile fit; margins don't matter
- * to framing because the screenshot is clipped to the graph's content server-side.
- * maxZoom sits below the interactive fits so tiny graphs (e.g. two nodes) don't
- * render as oversized strips that overflow the clip's card-aspect expansion.
- */
-const CHROMELESS_FIT_VIEW_OPTIONS = { padding: 0.1, minZoom: 0.05, maxZoom: 0.8 } as const;
-
 /** Persist the minimap show/hide choice so it survives a refresh. */
 const MINIMAP_HIDDEN_KEY = 'calmHub.diagramMinimapHidden';
 
@@ -82,11 +73,7 @@ function readMinimapHidden(): boolean {
 export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewportKey, chromeless = false }: ArchitectureGraphProps) {
     const isMobile = useIsMobile();
 
-    // Chromeless render mode: true once nodes are measured and the first paint has
-    // settled (RenderReadySignal), surfaced as data-render-ready on the wrapper so
-    // calm-server's headless browser knows the graph is safe to screenshot.
-    const [renderReady, setRenderReady] = useState(false);
-    const markRenderReady = useCallback(() => setRenderReady(true), []);
+    const { renderReady, markRenderReady } = useChromelessRender();
 
     // The viewport store key is namespaced by device. Mobile fits to a far lower zoom
     // floor (0.1 vs desktop's 0.6), so a viewport saved while mobile must not be
@@ -203,15 +190,10 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
     }, [isMobile]);
 
     if (nodes.length === 0) {
-        const emptyState = <EmptyGraphState message="No architecture data to display. Load a CALM architecture to visualize." />;
-        // A chromeless render of a genuinely empty document must still signal ready,
-        // otherwise calm-server waits out its full render timeout for nothing.
-        return chromeless && parsed ? (
-            <div style={{ height: '100%', width: '100%' }} data-render-ready="true">
-                {emptyState}
-            </div>
-        ) : (
-            emptyState
+        return (
+            <ChromelessEmptyState signalReady={chromeless && parsed}>
+                <EmptyGraphState message="No architecture data to display. Load a CALM architecture to visualize." />
+            </ChromelessEmptyState>
         );
     }
 

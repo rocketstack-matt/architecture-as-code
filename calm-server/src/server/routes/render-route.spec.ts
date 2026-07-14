@@ -55,6 +55,15 @@ const VALID_BODY = {
     documentJson: JSON.stringify({ nodes: [], relationships: [] }),
 };
 
+/**
+ * The navigation and readiness waits share one deadline, so each mocked step
+ * receives the REMAINING budget — near timeoutMs but not an exact value.
+ */
+function timeoutOf(mock: Mock): number {
+    const lastCall = mock.mock.calls.at(-1) as unknown[];
+    return (lastCall[1] as { timeout: number }).timeout;
+}
+
 describe('RenderRouter', () => {
     let app: Application;
 
@@ -123,8 +132,14 @@ describe('RenderRouter', () => {
             documentType: 'architecture',
             document: { nodes: [], relationships: [] },
         });
-        expect(fake.page.goto).toHaveBeenCalledWith('http://localhost:8080/#/render', { timeout: 20000 });
-        expect(fake.page.waitForSelector).toHaveBeenCalledWith('[data-render-ready="true"]', { timeout: 20000 });
+        expect(fake.page.goto).toHaveBeenCalledWith('http://localhost:8080/#/render', { timeout: expect.any(Number) });
+        expect(fake.page.waitForSelector).toHaveBeenCalledWith('[data-render-ready="true"]', { timeout: expect.any(Number) });
+        // Both steps draw on ONE shared 20000ms budget (mocks resolve instantly, so
+        // each remaining budget is at most the full default and always positive).
+        for (const stepTimeout of [timeoutOf(fake.page.goto), timeoutOf(fake.page.waitForSelector)]) {
+            expect(stepTimeout).toBeGreaterThan(0);
+            expect(stepTimeout).toBeLessThanOrEqual(20000);
+        }
         // The screenshot is clipped to the diagram's content bounds from the page.
         expect(fake.page.screenshot).toHaveBeenCalledWith({
             type: 'png',
@@ -166,7 +181,10 @@ describe('RenderRouter', () => {
             .post('/calm/render/thumbnail')
             .send({ ...VALID_BODY, timeoutMs: 120000 });
 
-        expect(fake.page.waitForSelector).toHaveBeenCalledWith('[data-render-ready="true"]', { timeout: 60000 });
+        expect(fake.page.waitForSelector).toHaveBeenCalledWith('[data-render-ready="true"]', { timeout: expect.any(Number) });
+        const stepTimeout = timeoutOf(fake.page.waitForSelector);
+        expect(stepTimeout).toBeGreaterThan(50000); // capped budget, minus instant-mock elapsed time
+        expect(stepTimeout).toBeLessThanOrEqual(60000);
     });
 
     test('should honour a custom timeout below the cap', async () => {
@@ -177,7 +195,10 @@ describe('RenderRouter', () => {
             .post('/calm/render/thumbnail')
             .send({ ...VALID_BODY, timeoutMs: 5000 });
 
-        expect(fake.page.waitForSelector).toHaveBeenCalledWith('[data-render-ready="true"]', { timeout: 5000 });
+        expect(fake.page.waitForSelector).toHaveBeenCalledWith('[data-render-ready="true"]', { timeout: expect.any(Number) });
+        const stepTimeout = timeoutOf(fake.page.waitForSelector);
+        expect(stepTimeout).toBeGreaterThan(0);
+        expect(stepTimeout).toBeLessThanOrEqual(5000);
     });
 
     test('should return 500 with an error envelope when the browser cannot launch', async () => {
@@ -209,7 +230,7 @@ describe('RenderRouter', () => {
             .post('/calm/render/thumbnail')
             .send({ ...VALID_BODY, uiBaseUrl: ' http://localhost:8080/ ' });
 
-        expect(fake.page.goto).toHaveBeenCalledWith('http://localhost:8080/#/render', { timeout: 20000 });
+        expect(fake.page.goto).toHaveBeenCalledWith('http://localhost:8080/#/render', { timeout: expect.any(Number) });
     });
 
     test('should accept documents larger than the 100kb express default', async () => {

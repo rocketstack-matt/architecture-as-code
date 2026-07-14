@@ -26,8 +26,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Optional;
 
 import static org.finos.calm.resources.ResourceValidationConstants.NAMESPACE_MESSAGE;
 import static org.finos.calm.resources.ResourceValidationConstants.NAMESPACE_REGEX;
@@ -40,7 +38,7 @@ import static org.finos.calm.resources.ResourceValidationConstants.VERSION_REGEX
 public class PatternResource {
 
     private final PatternStore store;
-    private final ThumbnailService thumbnailService;
+    private final ThumbnailEndpointSupport thumbnails;
 
     private final Logger logger = LoggerFactory.getLogger(PatternResource.class);
 
@@ -48,9 +46,9 @@ public class PatternResource {
     Boolean allowPutOperations;
 
     @Inject
-    public PatternResource(PatternStore store, ThumbnailService thumbnailService) {
+    public PatternResource(PatternStore store, ThumbnailEndpointSupport thumbnails) {
         this.store = store;
-        this.thumbnailService = thumbnailService;
+        this.thumbnails = thumbnails;
     }
 
     @GET
@@ -293,78 +291,39 @@ public class PatternResource {
                 .setId(patternId)
                 .build();
 
-        try {
-            List<String> versions = store.getPatternVersions(pattern);
-            Optional<String> latest = ThumbnailService.pickLatestVersion(versions);
-            if (latest.isEmpty()) {
-                return thumbnailNotFoundResponse();
-            }
-            return patternThumbnailResponse(new Pattern.PatternBuilder()
-                    .setNamespace(namespace)
-                    .setId(patternId)
-                    .setVersion(latest.get())
-                    .build());
-        } catch (NamespaceNotFoundException | PatternNotFoundException e) {
-            logger.debug("Could not resolve latest version for pattern thumbnail [{}]", pattern, e);
-            return thumbnailNotFoundResponse();
-        }
+        return thumbnails.latestThumbnailResponse(pattern,
+                () -> store.getPatternVersions(pattern),
+                version -> patternThumbnailResponse(new Pattern.PatternBuilder()
+                        .setNamespace(namespace)
+                        .setId(patternId)
+                        .setVersion(version)
+                        .build()));
     }
 
-    /**
-     * Serves the stored thumbnail for the given pattern version, attempting a
-     * self-healing synchronous render on a miss (single-flight per version). Any
-     * failure resolves to a 404 — thumbnails are best-effort.
-     */
+    /** Thumbnail flow shared with ArchitectureResource — see {@link ThumbnailEndpointSupport}. */
     private Response patternThumbnailResponse(Pattern pattern) {
-        try {
-            byte[] png = store.getThumbnail(pattern);
-            if (png == null) {
-                png = renderPatternThumbnailOnDemand(pattern);
-            }
-            if (png == null) {
-                return thumbnailNotFoundResponse();
-            }
-            return Response.ok(png)
-                    .type("image/png")
-                    .header("Cache-Control", "private, max-age=300")
-                    .build();
-        } catch (NamespaceNotFoundException | PatternNotFoundException | PatternVersionNotFoundException e) {
-            logger.debug("Thumbnail requested for unknown pattern version [{}]", pattern, e);
-            return thumbnailNotFoundResponse();
-        }
-    }
-
-    private byte[] renderPatternThumbnailOnDemand(Pattern pattern)
-            throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
-        if (!thumbnailService.isEnabled()) {
-            return null;
-        }
-        String documentJson = store.getPatternForVersion(pattern);
-        String key = pattern.getNamespace() + "/patterns/" + pattern.getId() + "/" + pattern.getDotVersion();
-        return thumbnailService.renderSync(key, ThumbnailService.DOCUMENT_TYPE_PATTERN, documentJson,
-                        bytes -> storeThumbnailQuietly(pattern, bytes))
-                .orElse(null);
+        return thumbnails.thumbnailResponse(
+                thumbnailKey(pattern),
+                ThumbnailService.DOCUMENT_TYPE_PATTERN,
+                pattern,
+                () -> store.getThumbnail(pattern),
+                () -> store.getPatternForVersion(pattern),
+                bytes -> store.storeThumbnail(pattern, bytes));
     }
 
     /** Fire-and-forget render after a successful write; never affects the write response. */
     private void triggerThumbnailRender(Pattern pattern) {
-        String key = pattern.getNamespace() + "/patterns/" + pattern.getId() + "/" + pattern.getDotVersion();
-        thumbnailService.triggerRender(key, ThumbnailService.DOCUMENT_TYPE_PATTERN, pattern.getPatternJson(),
-                bytes -> storeThumbnailQuietly(pattern, bytes));
+        thumbnails.triggerThumbnailRender(
+                thumbnailKey(pattern),
+                ThumbnailService.DOCUMENT_TYPE_PATTERN,
+                pattern.getPatternJson(),
+                pattern,
+                bytes -> store.storeThumbnail(pattern, bytes));
     }
 
-    private void storeThumbnailQuietly(Pattern pattern, byte[] bytes) {
-        try {
-            store.storeThumbnail(pattern, bytes);
-        } catch (NamespaceNotFoundException | PatternNotFoundException | PatternVersionNotFoundException e) {
-            logger.debug("Could not store rendered thumbnail for [{}]", pattern, e);
-        }
-    }
-
-    private Response thumbnailNotFoundResponse() {
-        // Explicit text/plain: the thumbnail endpoints @Produces image/png, and a text
-        // entity must not be negotiated onto the image media type.
-        return Response.status(Response.Status.NOT_FOUND).entity("No thumbnail available").type(MediaType.TEXT_PLAIN).build();
+    /** Single-flight render key: {@code namespace/patterns/id/version}. */
+    private String thumbnailKey(Pattern pattern) {
+        return pattern.getNamespace() + "/patterns/" + pattern.getId() + "/" + pattern.getDotVersion();
     }
 
     private Response patternWithLocationResponse(Pattern pattern) throws URISyntaxException {

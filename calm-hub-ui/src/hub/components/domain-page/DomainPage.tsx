@@ -5,6 +5,7 @@ import { ControlService } from '../../../service/control-service.js';
 import { ControlData, ControlDetail } from '../../../model/control.js';
 import { colors } from '../../../theme/colors.js';
 import { ControlCard } from './ControlCard.js';
+import { CARD_GRID_CLASS } from '../namespace-page/ItemCard.js';
 
 interface DomainPageProps {
     domain: string;
@@ -89,7 +90,7 @@ export function DomainPage({ domain, controlCount, onControlLoad, selectedContro
                         No controls in this domain yet.
                     </p>
                 ) : (
-                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(280px,1fr))] max-w-[1240px]">
+                    <div className={`${CARD_GRID_CLASS} max-w-[1240px]`}>
                         {controls.map((control) => (
                             <ControlCard
                                 key={control.id}

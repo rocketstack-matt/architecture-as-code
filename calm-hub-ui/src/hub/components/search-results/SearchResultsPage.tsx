@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SearchService } from '../../../service/search-service.js';
 import { GroupedSearchResults, SearchResult } from '../../../model/search.js';
-import { TYPE_LABELS, flattenResults, useSearchNavigation } from '../../../hooks/useSearchNavigation.js';
-import { getSearchGroupIcon, getSearchGroupType } from '../../../theme/resource-type-meta.js';
-import { ItemCard } from '../namespace-page/ItemCard.js';
+import { TYPE_LABELS, useSearchNavigation } from '../../../hooks/useSearchNavigation.js';
+import { getSearchGroupType } from '../../../theme/resource-type-meta.js';
+import { SearchGroupIcon } from '../../../components/search-group-icon.js';
+import { CARD_GRID_CLASS, ItemCard } from '../namespace-page/ItemCard.js';
+import { latestThumbnailUrl } from '../../../service/thumbnail-url.js';
 import { colors } from '../../../theme/colors.js';
 
 interface SearchResultsPageProps {
@@ -72,16 +74,9 @@ export function SearchResultsPage({ searchService }: SearchResultsPageProps) {
               ([type, items]) => (items as SearchResult[]).length > 0 && getSearchGroupType(type) !== undefined
           )
         : [];
-    const totalCount = results ? flattenResults(results).length : 0;
-
-    // Registry type glyph for a group header; the visual types (architectures /
-    // patterns) have none and their headers stay label-only. Inherits the
-    // header's muted text colour via currentColor.
-    const renderGroupIcon = (type: string) => {
-        const GroupIcon = getSearchGroupIcon(type);
-        if (!GroupIcon) return null;
-        return <GroupIcon size={12} className="shrink-0" data-testid={`search-group-icon-${type}`} />;
-    };
+    // Counted over the FILTERED groups, so the headline count never includes items
+    // from unknown groups that are dropped from rendering.
+    const totalCount = groups.reduce((n, [, items]) => n + (items as SearchResult[]).length, 0);
 
     return (
         <div className="h-full overflow-auto bg-base-100" style={{ padding: '44px 48px' }}>
@@ -136,10 +131,10 @@ export function SearchResultsPage({ searchService }: SearchResultsPageProps) {
                                     className="flex items-center gap-1.5 font-mono-jb text-[11px] uppercase tracking-[0.1em] mb-3"
                                     style={{ color: colors.redesign.faintAlt }}
                                 >
-                                    {renderGroupIcon(type)}
+                                    <SearchGroupIcon type={type} />
                                     {TYPE_LABELS[type] ?? type} ({(items as SearchResult[]).length})
                                 </div>
-                                <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
+                                <div className={CARD_GRID_CLASS}>
                                     {(items as SearchResult[]).map((item) => (
                                         <ItemCard
                                             key={`${type}-${item.namespace}-${item.id}`}
@@ -149,7 +144,7 @@ export function SearchResultsPage({ searchService }: SearchResultsPageProps) {
                                             meta={item.namespace}
                                             thumbnailUrl={
                                                 type === 'architectures' || type === 'patterns'
-                                                    ? `/api/calm/namespaces/${encodeURIComponent(item.namespace)}/${type}/${encodeURIComponent(String(item.id))}/thumbnail`
+                                                    ? latestThumbnailUrl(item.namespace, type, item.id)
                                                     : undefined
                                             }
                                             onActivate={() => navigateToResult({ type, result: item })}

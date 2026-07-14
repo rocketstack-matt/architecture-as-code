@@ -2,6 +2,7 @@ import { initLogger, launchBrowser } from '@finos/calm-shared';
 import type { Logger } from '@finos/calm-shared';
 import express, { Router, Request, Response } from 'express';
 import type { Browser } from 'playwright-core';
+import { ErrorResponse } from './error-response';
 
 const DEFAULT_TIMEOUT_MS = 20000;
 const MAX_TIMEOUT_MS = 60000;
@@ -181,6 +182,11 @@ export class RenderRouter {
         }
 
         const timeoutMs = clampTimeout(req.body.timeoutMs);
+        // One deadline shared by the navigation and readiness waits: giving each step
+        // the full budget could take ~2x timeoutMs — longer than the hub client waits
+        // (timeoutMs + grace), which would failure-cache a healthy-but-slow render.
+        const deadline = Date.now() + timeoutMs;
+        const remainingBudget = () => Math.max(1, deadline - Date.now());
 
         // Launched per request, disposed in finally — no pooling.
         let browser: Browser | undefined;
@@ -199,9 +205,9 @@ export class RenderRouter {
                 },
                 { documentType, document }
             );
-            // Navigation bounded by the request timeout, not Playwright's 30s default.
-            await page.goto(`${base}/#/render`, { timeout: timeoutMs });
-            await page.waitForSelector(RENDER_READY_SELECTOR, { timeout: timeoutMs });
+            // Each step bounded by the shared deadline, not Playwright's 30s default.
+            await page.goto(`${base}/#/render`, { timeout: remainingBudget() });
+            await page.waitForSelector(RENDER_READY_SELECTOR, { timeout: remainingBudget() });
             // Clip to the diagram's real content bounds rather than the fixed viewport:
             // fitView centres the graph in the strip, so a graph narrower than the frame
             // would otherwise ship (and later display) large empty margins. The clip is
@@ -225,11 +231,4 @@ export class RenderRouter {
             }
         }
     };
-}
-
-class ErrorResponse {
-    error: string;
-    constructor(error: string) {
-        this.error = error;
-    }
 }

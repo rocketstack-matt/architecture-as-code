@@ -6,7 +6,7 @@ import { NamespaceCounts } from '../../../model/counts.js';
 import { resolveResourceDetailPath } from '../tree-navigation/navigation-loaders.js';
 import { NamespacePageHeader } from './NamespacePageHeader.js';
 import { SegmentedTypeTabs } from './SegmentedTypeTabs.js';
-import { ItemCard } from './ItemCard.js';
+import { CARD_GRID_CLASS, ItemCard } from './ItemCard.js';
 import { EmptyState } from './EmptyState.js';
 import { useNamespaceItems } from './useNamespaceItems.js';
 import { useActiveType } from './useActiveType.js';
@@ -89,7 +89,7 @@ export function NamespacePage({ namespace, counts }: NamespacePageProps) {
                         message={`No ${getResourceTypeMeta(active).pluralLabel} in this namespace yet`}
                     />
                 ) : (
-                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(280px,1fr))] max-w-[1240px]">
+                    <div className={`${CARD_GRID_CLASS} max-w-[1240px]`}>
                         {activeItems.map((item) => (
                             <ItemCard
                                 key={`${active}-${item.id}`}

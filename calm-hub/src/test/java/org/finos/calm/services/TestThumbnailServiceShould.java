@@ -47,6 +47,7 @@ public class TestThumbnailServiceShould {
     private static final String UI_BASE_URL = "http://localhost:8080";
     private static final long TIMEOUT_MS = 20000;
     private static final long FAILURE_TTL_MS = 60000;
+    private static final int MAX_CONCURRENT_RENDERS = 2;
     private static final String DOCUMENT_JSON = "{\"nodes\": []}";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -56,7 +57,7 @@ public class TestThumbnailServiceShould {
     @Test
     void be_disabled_and_never_call_the_render_service_when_no_url_is_configured() {
         HttpClient mockClient = mock(HttpClient.class);
-        ThumbnailService service = new ThumbnailService("", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, mockClient);
+        ThumbnailService service = new ThumbnailService("", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, MAX_CONCURRENT_RENDERS, mockClient);
 
         assertThat(service.isEnabled(), is(false));
 
@@ -106,7 +107,7 @@ public class TestThumbnailServiceShould {
 
     private ThumbnailService serviceAgainstFixture(long failureCacheTtlMs) {
         String url = "http://127.0.0.1:" + server.getAddress().getPort();
-        return new ThumbnailService(url, UI_BASE_URL, TIMEOUT_MS, failureCacheTtlMs, HttpClient.newHttpClient());
+        return new ThumbnailService(url, UI_BASE_URL, TIMEOUT_MS, failureCacheTtlMs, MAX_CONCURRENT_RENDERS, HttpClient.newHttpClient());
     }
 
     @Test
@@ -114,7 +115,7 @@ public class TestThumbnailServiceShould {
         // A configured base URL of "http://host:3000/" must not produce a
         // "//calm/render/thumbnail" request path.
         String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/";
-        ThumbnailService service = new ThumbnailService(url, UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, HttpClient.newHttpClient());
+        ThumbnailService service = new ThumbnailService(url, UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, MAX_CONCURRENT_RENDERS, HttpClient.newHttpClient());
         @SuppressWarnings("unchecked")
         Consumer<byte[]> callback = mock(Consumer.class);
 
@@ -235,7 +236,7 @@ public class TestThumbnailServiceShould {
         when(mockClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenReturn(slowRender);
 
-        ThumbnailService service = new ThumbnailService("http://render.example", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, mockClient);
+        ThumbnailService service = new ThumbnailService("http://render.example", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, MAX_CONCURRENT_RENDERS, mockClient);
         AtomicInteger storeCount = new AtomicInteger(0);
         Consumer<byte[]> callback = bytes -> storeCount.incrementAndGet();
 
@@ -277,7 +278,7 @@ public class TestThumbnailServiceShould {
         when(mockClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenReturn(CompletableFuture.completedFuture(response));
 
-        ThumbnailService service = new ThumbnailService("http://render.example", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, mockClient);
+        ThumbnailService service = new ThumbnailService("http://render.example", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, MAX_CONCURRENT_RENDERS, mockClient);
         Consumer<byte[]> callback = bytes -> { };
 
         service.renderSync("same/key", "architecture", DOCUMENT_JSON, callback);
@@ -395,7 +396,7 @@ public class TestThumbnailServiceShould {
                 .thenReturn(firstRender)
                 .thenReturn(CompletableFuture.completedFuture(response));
 
-        ThumbnailService service = new ThumbnailService("http://render.example", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, mockClient);
+        ThumbnailService service = new ThumbnailService("http://render.example", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, MAX_CONCURRENT_RENDERS, mockClient);
         AtomicInteger storeCount = new AtomicInteger(0);
         Consumer<byte[]> callback = bytes -> storeCount.incrementAndGet();
 
@@ -408,5 +409,58 @@ public class TestThumbnailServiceShould {
         firstRender.complete(response);
 
         verify(mockClient, timeout(10000).times(2)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    // --- Concurrent render bound ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void resolve_empty_without_failure_caching_when_render_permits_are_saturated() {
+        HttpClient mockClient = mock(HttpClient.class);
+        HttpResponse<byte[]> response = (HttpResponse<byte[]>) mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(PNG_BYTES);
+
+        // First render holds the single permit until we complete it; later calls succeed.
+        CompletableFuture<HttpResponse<byte[]>> permitHolder = new CompletableFuture<>();
+        when(mockClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(permitHolder)
+                .thenReturn(CompletableFuture.completedFuture(response));
+
+        ThumbnailService service = new ThumbnailService(
+                "http://render.example", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, 1, mockClient);
+        Consumer<byte[]> callback = bytes -> { };
+
+        service.triggerRender("key/a", "architecture", DOCUMENT_JSON, callback);
+
+        // Saturated: the attempt for a different key resolves empty without rendering...
+        assertThat(service.renderSync("key/b", "architecture", DOCUMENT_JSON, callback), is(Optional.empty()));
+        verify(mockClient, times(1)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+
+        // ...and is NOT failure-cached: once the permit frees, the next view renders.
+        permitHolder.complete(response);
+        assertTrue(service.renderSync("key/b", "architecture", DOCUMENT_JSON, callback).isPresent());
+        verify(mockClient, times(2)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void release_the_render_permit_when_a_render_completes() {
+        HttpClient mockClient = mock(HttpClient.class);
+        HttpResponse<byte[]> response = (HttpResponse<byte[]>) mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(PNG_BYTES);
+        when(mockClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(CompletableFuture.completedFuture(response));
+
+        ThumbnailService service = new ThumbnailService(
+                "http://render.example", UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, 1, mockClient);
+        Consumer<byte[]> callback = bytes -> { };
+
+        // Sequential renders on a single permit: each must reacquire successfully,
+        // proving the permit is released when a render completes (even synchronously).
+        assertTrue(service.renderSync("key/a", "architecture", DOCUMENT_JSON, callback).isPresent());
+        assertTrue(service.renderSync("key/b", "architecture", DOCUMENT_JSON, callback).isPresent());
+        verify(mockClient, times(2)).sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 }

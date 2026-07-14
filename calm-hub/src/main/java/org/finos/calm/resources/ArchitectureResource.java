@@ -36,8 +36,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Optional;
 
 import static org.finos.calm.resources.ResourceValidationConstants.NAMESPACE_MESSAGE;
 import static org.finos.calm.resources.ResourceValidationConstants.NAMESPACE_REGEX;
@@ -56,7 +54,7 @@ public class ArchitectureResource {
 
     private final ArchitectureStore store;
     private final ArchitectureTimelineService timelineService;
-    private final ThumbnailService thumbnailService;
+    private final ThumbnailEndpointSupport thumbnails;
 
     private final Logger logger = LoggerFactory.getLogger(ArchitectureResource.class);
 
@@ -64,10 +62,10 @@ public class ArchitectureResource {
     Boolean allowPutOperations;
 
     @Inject
-    public ArchitectureResource(ArchitectureStore store, ArchitectureTimelineService timelineService, ThumbnailService thumbnailService) {
+    public ArchitectureResource(ArchitectureStore store, ArchitectureTimelineService timelineService, ThumbnailEndpointSupport thumbnails) {
         this.store = store;
         this.timelineService = timelineService;
-        this.thumbnailService = thumbnailService;
+        this.thumbnails = thumbnails;
     }
 
     /**
@@ -343,78 +341,39 @@ public class ArchitectureResource {
                 .setId(architectureId)
                 .build();
 
-        try {
-            List<String> versions = store.getArchitectureVersions(architecture);
-            Optional<String> latest = ThumbnailService.pickLatestVersion(versions);
-            if (latest.isEmpty()) {
-                return thumbnailNotFoundResponse();
-            }
-            return architectureThumbnailResponse(new Architecture.ArchitectureBuilder()
-                    .setNamespace(namespace)
-                    .setId(architectureId)
-                    .setVersion(latest.get())
-                    .build());
-        } catch (NamespaceNotFoundException | ArchitectureNotFoundException e) {
-            logger.debug("Could not resolve latest version for architecture thumbnail [{}]", architecture, e);
-            return thumbnailNotFoundResponse();
-        }
+        return thumbnails.latestThumbnailResponse(architecture,
+                () -> store.getArchitectureVersions(architecture),
+                version -> architectureThumbnailResponse(new Architecture.ArchitectureBuilder()
+                        .setNamespace(namespace)
+                        .setId(architectureId)
+                        .setVersion(version)
+                        .build()));
     }
 
-    /**
-     * Serves the stored thumbnail for the given architecture version, attempting a
-     * self-healing synchronous render on a miss (single-flight per version). Any
-     * failure resolves to a 404 — thumbnails are best-effort.
-     */
+    /** Thumbnail flow shared with PatternResource — see {@link ThumbnailEndpointSupport}. */
     private Response architectureThumbnailResponse(Architecture architecture) {
-        try {
-            byte[] png = store.getThumbnail(architecture);
-            if (png == null) {
-                png = renderArchitectureThumbnailOnDemand(architecture);
-            }
-            if (png == null) {
-                return thumbnailNotFoundResponse();
-            }
-            return Response.ok(png)
-                    .type("image/png")
-                    .header("Cache-Control", "private, max-age=300")
-                    .build();
-        } catch (NamespaceNotFoundException | ArchitectureNotFoundException | ArchitectureVersionNotFoundException e) {
-            logger.debug("Thumbnail requested for unknown architecture version [{}]", architecture, e);
-            return thumbnailNotFoundResponse();
-        }
-    }
-
-    private byte[] renderArchitectureThumbnailOnDemand(Architecture architecture)
-            throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
-        if (!thumbnailService.isEnabled()) {
-            return null;
-        }
-        String documentJson = store.getArchitectureForVersion(architecture);
-        String key = architecture.getNamespace() + "/architectures/" + architecture.getId() + "/" + architecture.getDotVersion();
-        return thumbnailService.renderSync(key, ThumbnailService.DOCUMENT_TYPE_ARCHITECTURE, documentJson,
-                        bytes -> storeThumbnailQuietly(architecture, bytes))
-                .orElse(null);
+        return thumbnails.thumbnailResponse(
+                thumbnailKey(architecture),
+                ThumbnailService.DOCUMENT_TYPE_ARCHITECTURE,
+                architecture,
+                () -> store.getThumbnail(architecture),
+                () -> store.getArchitectureForVersion(architecture),
+                bytes -> store.storeThumbnail(architecture, bytes));
     }
 
     /** Fire-and-forget render after a successful write; never affects the write response. */
     private void triggerThumbnailRender(Architecture architecture) {
-        String key = architecture.getNamespace() + "/architectures/" + architecture.getId() + "/" + architecture.getDotVersion();
-        thumbnailService.triggerRender(key, ThumbnailService.DOCUMENT_TYPE_ARCHITECTURE, architecture.getArchitectureJson(),
-                bytes -> storeThumbnailQuietly(architecture, bytes));
+        thumbnails.triggerThumbnailRender(
+                thumbnailKey(architecture),
+                ThumbnailService.DOCUMENT_TYPE_ARCHITECTURE,
+                architecture.getArchitectureJson(),
+                architecture,
+                bytes -> store.storeThumbnail(architecture, bytes));
     }
 
-    private void storeThumbnailQuietly(Architecture architecture, byte[] bytes) {
-        try {
-            store.storeThumbnail(architecture, bytes);
-        } catch (NamespaceNotFoundException | ArchitectureNotFoundException | ArchitectureVersionNotFoundException e) {
-            logger.debug("Could not store rendered thumbnail for [{}]", architecture, e);
-        }
-    }
-
-    private Response thumbnailNotFoundResponse() {
-        // Explicit text/plain: the thumbnail endpoints @Produces image/png, and a text
-        // entity must not be negotiated onto the image media type.
-        return Response.status(Response.Status.NOT_FOUND).entity("No thumbnail available").type(MediaType.TEXT_PLAIN).build();
+    /** Single-flight render key: {@code namespace/architectures/id/version}. */
+    private String thumbnailKey(Architecture architecture) {
+        return architecture.getNamespace() + "/architectures/" + architecture.getId() + "/" + architecture.getDotVersion();
     }
 
     private Response architectureWithLocationResponse(Architecture architecture) throws URISyntaxException {
