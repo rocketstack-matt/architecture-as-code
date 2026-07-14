@@ -3,7 +3,7 @@ import { colors } from '../../../theme/colors.js';
 import { redesignTokens } from '../../../theme/redesign-tokens.js';
 import { CountBadge } from '../explore-rail/CountBadge.js';
 import { useIsMobile } from '../../../hooks/useMediaQuery.js';
-import { type NamespaceResourceType, tabId, TYPE_PANEL_ID } from './resource-type-meta.js';
+import { type NamespaceResourceType, tabId, TYPE_PANEL_ID } from '../../../theme/resource-type-meta.js';
 
 export interface TypeTab {
     type: NamespaceResourceType;

@@ -1,5 +1,3 @@
-import { IoShieldCheckmarkOutline } from 'react-icons/io5';
-import { colors } from '../../../theme/colors.js';
 import { ItemCard } from '../namespace-page/ItemCard.js';
 
 interface ControlCardProps {
@@ -20,8 +18,9 @@ interface ControlCardProps {
  * item cards.
  *
  * Control-specific bits are passed through: the `Controls` type paints the blue
- * thumbnail + "Control" pill, a shield glyph marks the header, the mono footer shows
- * the control id (`#5`), and `active` drives the selected treatment + `aria-pressed`.
+ * thumbnail + "Control" pill and the registry's shield glyph in the header, the mono
+ * footer shows the control id (`#5`), and `active` drives the selected treatment +
+ * `aria-pressed`.
  */
 export function ControlCard({ name, description, controlId, active = false, onActivate }: ControlCardProps) {
     return (
@@ -30,14 +29,6 @@ export function ControlCard({ name, description, controlId, active = false, onAc
             description={description}
             type="Controls"
             meta={`#${controlId}`}
-            thumbnailIcon={
-                <IoShieldCheckmarkOutline
-                    size={30}
-                    // Same control-type accent the striped header and pill use, so the
-                    // shield can't drift if the control colours are adjusted independently.
-                    style={{ color: colors.resourceTypes.control.accentText, opacity: 0.55 }}
-                />
-            }
             active={active}
             testId="control-card"
             onActivate={onActivate}

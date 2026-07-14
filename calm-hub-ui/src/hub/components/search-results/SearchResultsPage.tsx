@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { SearchService } from '../../../service/search-service.js';
 import { GroupedSearchResults, SearchResult } from '../../../model/search.js';
 import { TYPE_LABELS, flattenResults, useSearchNavigation } from '../../../hooks/useSearchNavigation.js';
+import { getSearchGroupIcon } from '../../../theme/resource-type-meta.js';
 import { colors } from '../../../theme/colors.js';
 
 interface SearchResultsPageProps {
@@ -67,6 +68,15 @@ export function SearchResultsPage({ searchService }: SearchResultsPageProps) {
         : [];
     const totalCount = results ? flattenResults(results).length : 0;
 
+    // Registry type glyph for a group header; the visual types (architectures /
+    // patterns) have none and their headers stay label-only. Inherits the
+    // header's muted text colour via currentColor.
+    const renderGroupIcon = (type: string) => {
+        const GroupIcon = getSearchGroupIcon(type);
+        if (!GroupIcon) return null;
+        return <GroupIcon size={12} className="shrink-0" data-testid={`search-group-icon-${type}`} />;
+    };
+
     return (
         <div className="h-full overflow-auto bg-base-100" style={{ padding: '44px 48px' }}>
             <div className="max-w-[880px] mx-auto flex flex-col gap-8">
@@ -117,9 +127,10 @@ export function SearchResultsPage({ searchService }: SearchResultsPageProps) {
                         {groups.map(([type, items]) => (
                             <section key={type}>
                                 <div
-                                    className="font-mono-jb text-[11px] uppercase tracking-[0.1em] mb-3"
+                                    className="flex items-center gap-1.5 font-mono-jb text-[11px] uppercase tracking-[0.1em] mb-3"
                                     style={{ color: colors.redesign.faintAlt }}
                                 >
+                                    {renderGroupIcon(type)}
                                     {TYPE_LABELS[type] ?? type} ({(items as SearchResult[]).length})
                                 </div>
                                 <div className="flex flex-col gap-2">

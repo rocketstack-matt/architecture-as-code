@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { NamespaceCounts } from '../../../model/counts.js';
 import { mapTypeInUIToTypeInUrl } from '../tree-navigation/navigation-loaders.js';
 import { type TypeTab } from './SegmentedTypeTabs.js';
-import { NAMESPACE_RESOURCE_TYPES, type NamespaceResourceType, COUNT_FIELD } from './resource-type-meta.js';
+import { NAMESPACE_RESOURCE_TYPES, type NamespaceResourceType, COUNT_FIELD } from '../../../theme/resource-type-meta.js';
 
 /**
  * Resolves the `?type=` param to a valid browse type, defaulting deterministically,

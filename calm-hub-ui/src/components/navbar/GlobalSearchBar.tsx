@@ -7,6 +7,7 @@ import { AdrService } from '../../service/adr-service/adr-service.js';
 import { SearchResult } from '../../model/search.js';
 import { FlatResult, TYPE_LABELS, useSearchNavigation } from '../../hooks/useSearchNavigation.js';
 import { useCatalogueSearch } from '../../hooks/useCatalogueSearch.js';
+import { getSearchGroupIcon } from '../../theme/resource-type-meta.js';
 import { colors } from '../../theme/colors.js';
 
 interface GlobalSearchBarProps {
@@ -94,6 +95,15 @@ export function GlobalSearchBar({ searchService, calmService: calmServiceProp, a
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [closeDropdown]);
 
+    // Registry type glyph for a group header; the visual types (architectures /
+    // patterns) have none and their headers stay label-only. Inherits the
+    // header's muted text colour via currentColor.
+    const renderGroupIcon = (type: string) => {
+        const GroupIcon = getSearchGroupIcon(type);
+        if (!GroupIcon) return null;
+        return <GroupIcon size={12} className="shrink-0" data-testid={`search-group-icon-${type}`} />;
+    };
+
     const renderGroupedResults = () => {
         if (error) {
             return <div className="p-3 text-sm text-error">Search failed, please try again</div>;
@@ -114,9 +124,10 @@ export function GlobalSearchBar({ searchService, calmService: calmServiceProp, a
         return groups.map(([type, items]) => (
             <div key={type}>
                 <div
-                    className="px-3 py-1 font-mono-jb text-[10px] uppercase tracking-[0.1em]"
+                    className="flex items-center gap-1.5 px-3 py-1 font-mono-jb text-[10px] uppercase tracking-[0.1em]"
                     style={{ color: colors.redesign.faintAlt, backgroundColor: colors.redesign.surface }}
                 >
+                    {renderGroupIcon(type)}
                     {TYPE_LABELS[type] ?? type}
                 </div>
                 {(items as SearchResult[]).map((item) => {

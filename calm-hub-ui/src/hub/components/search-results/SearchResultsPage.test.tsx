@@ -20,6 +20,14 @@ const controlResults: GroupedSearchResults = {
     controls: [{ namespace: 'security', id: 7, name: 'PCI-DSS', description: 'Encryption at rest' }],
 };
 
+// One group with a registry icon (flows) and one visual type without (architectures),
+// so the header-icon test can assert both treatments on a single page.
+const iconGroupResults: GroupedSearchResults = {
+    ...emptyResults,
+    architectures: [{ namespace: 'finos', id: 1, name: 'Test Architecture', description: 'A test architecture' }],
+    flows: [{ namespace: 'finos', id: 3, name: 'Trade Flow', description: 'A test flow' }],
+};
+
 function createMockSearchService(searchFn: (q: string) => Promise<GroupedSearchResults>) {
     return { search: searchFn } as unknown as SearchService;
 }
@@ -78,6 +86,17 @@ describe('SearchResultsPage', () => {
         await waitFor(() =>
             expect(screen.getByTestId('location')).toHaveTextContent('/security/controls/PCI-DSS/detail')
         );
+    });
+
+    it('shows the registry type icon on group headers that have one, label-only otherwise', async () => {
+        renderPage('/search?q=test', createMockSearchService(vi.fn().mockResolvedValue(iconGroupResults)));
+
+        expect(await screen.findByText('Trade Flow')).toBeInTheDocument();
+        // Flows carries its registry glyph in the group header...
+        expect(screen.getByTestId('search-group-icon-flows')).toBeInTheDocument();
+        // ...but Architectures (a visual type with no registry icon) stays label-only.
+        expect(screen.getByText(/Architectures \(1\)/)).toBeInTheDocument();
+        expect(screen.queryByTestId('search-group-icon-architectures')).not.toBeInTheDocument();
     });
 
     it('shows an empty state when nothing matches', async () => {

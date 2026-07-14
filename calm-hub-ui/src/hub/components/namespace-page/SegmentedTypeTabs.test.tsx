@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { SegmentedTypeTabs, type TypeTab } from './SegmentedTypeTabs.js';
-import { TYPE_PANEL_ID } from './resource-type-meta.js';
+import { TYPE_PANEL_ID } from '../../../theme/resource-type-meta.js';
 import { colors } from '../../../theme/colors.js';
 
 /** Drive `useIsMobile()` via window.matchMedia. Returns a restore function. */

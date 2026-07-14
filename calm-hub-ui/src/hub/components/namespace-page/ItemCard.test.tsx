@@ -133,4 +133,28 @@ describe('ItemCard', () => {
         );
         expect(screen.getByTestId('thumb-icon')).toBeInTheDocument();
     });
+
+    it('derives the registry type icon for a type that has one', () => {
+        render(<ItemCard name="Trade Flow" type="Flows" onActivate={() => {}} />);
+        expect(screen.getByTestId('thumbnail-type-icon')).toBeInTheDocument();
+    });
+
+    it('leaves the thumbnail a plain stripe for the visual types (no registry icon)', () => {
+        render(<ItemCard name="TraderX" type="Architectures" onActivate={() => {}} />);
+        expect(screen.queryByTestId('thumbnail-type-icon')).not.toBeInTheDocument();
+    });
+
+    it('lets an explicit thumbnailIcon override the registry icon', () => {
+        // Controls has a registry icon, so the explicit prop must win over it.
+        render(
+            <ItemCard
+                name="Override"
+                type="Controls"
+                thumbnailIcon={<svg data-testid="custom-thumb-icon" />}
+                onActivate={() => {}}
+            />
+        );
+        expect(screen.getByTestId('custom-thumb-icon')).toBeInTheDocument();
+        expect(screen.queryByTestId('thumbnail-type-icon')).not.toBeInTheDocument();
+    });
 });

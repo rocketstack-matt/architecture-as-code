@@ -1,6 +1,15 @@
-import { colors } from '../../../theme/colors.js';
-import { type TypeInUI } from '../tree-navigation/navigation-loaders.js';
-import { NamespaceCounts } from '../../../model/counts.js';
+import { type IconType } from 'react-icons';
+import {
+    IoDocumentTextOutline,
+    IoGitBranchOutline,
+    IoGitCommitOutline,
+    IoLinkOutline,
+    IoShieldCheckmarkOutline,
+} from 'react-icons/io5';
+import { colors } from './colors.js';
+import { type TypeInUI } from '../hub/components/tree-navigation/navigation-loaders.js';
+import { NamespaceCounts } from '../model/counts.js';
+import { type GroupedSearchResults } from '../model/search.js';
 
 /**
  * The resource types shown on the namespace browse page: every UI type except
@@ -37,6 +46,13 @@ interface ResourceTypeMeta {
     pluralLabel: string;
     /** Key into `colors.resourceTypes` for the accent / tint pair. */
     colorKey: ResourceTypeKey;
+    /**
+     * Type glyph shown on card thumbnails and search group headers. Only the
+     * non-visual types carry one; Architectures and Patterns are deliberately
+     * absent — they keep the plain striped placeholder until they get real
+     * diagram thumbnails.
+     */
+    icon?: IconType;
 }
 
 /**
@@ -54,11 +70,11 @@ interface ResourceTypeMeta {
 const RESOURCE_TYPE_META: Record<CardResourceType, ResourceTypeMeta> = {
     Architectures: { label: 'Architecture', pluralLabel: 'architectures', colorKey: 'architecture' },
     Patterns: { label: 'Pattern', pluralLabel: 'patterns', colorKey: 'pattern' },
-    Flows: { label: 'Flow', pluralLabel: 'flows', colorKey: 'flow' },
-    Standards: { label: 'Standard', pluralLabel: 'standards', colorKey: 'standard' },
-    ADRs: { label: 'ADR', pluralLabel: 'ADRs', colorKey: 'adr' },
-    Interfaces: { label: 'Interface', pluralLabel: 'interfaces', colorKey: 'interface' },
-    Controls: { label: 'Control', pluralLabel: 'controls', colorKey: 'control' },
+    Flows: { label: 'Flow', pluralLabel: 'flows', colorKey: 'flow', icon: IoGitBranchOutline },
+    Standards: { label: 'Standard', pluralLabel: 'standards', colorKey: 'standard', icon: IoDocumentTextOutline },
+    ADRs: { label: 'ADR', pluralLabel: 'ADRs', colorKey: 'adr', icon: IoGitCommitOutline },
+    Interfaces: { label: 'Interface', pluralLabel: 'interfaces', colorKey: 'interface', icon: IoLinkOutline },
+    Controls: { label: 'Control', pluralLabel: 'controls', colorKey: 'control', icon: IoShieldCheckmarkOutline },
 };
 
 /**
@@ -106,4 +122,41 @@ export function getResourceTypeColors(type: CardResourceType): {
     tint: string;
 } {
     return colors.resourceTypes[RESOURCE_TYPE_META[type].colorKey];
+}
+
+/**
+ * The type glyph for a browse (or control) card resource type, or `undefined`
+ * for the visual types (Architectures / Patterns) that keep a plain thumbnail.
+ */
+export function getResourceTypeIcon(type: CardResourceType): IconType | undefined {
+    return RESOURCE_TYPE_META[type].icon;
+}
+
+/**
+ * Maps a lowercase search group key (the `GroupedSearchResults` / `TYPE_LABELS`
+ * key, e.g. `'flows'`, `'adrs'`) back to its {@link CardResourceType}, so the
+ * search surfaces can pull the type icon from this registry rather than keeping
+ * their own copy of the mapping. Keyed on `keyof GroupedSearchResults`, so a new
+ * backend group fails to compile here instead of silently rendering icon-less.
+ */
+const SEARCH_GROUP_TYPE: Record<keyof GroupedSearchResults, CardResourceType> = {
+    architectures: 'Architectures',
+    patterns: 'Patterns',
+    flows: 'Flows',
+    standards: 'Standards',
+    adrs: 'ADRs',
+    interfaces: 'Interfaces',
+    controls: 'Controls',
+};
+
+/**
+ * The type glyph for a search result group header, keyed by the lowercase
+ * group key. `undefined` for unknown keys and for the icon-less visual types,
+ * whose headers render label-only.
+ */
+export function getSearchGroupIcon(groupKey: string): IconType | undefined {
+    // Callers hold plain-string keys (Object.entries); unknown keys miss the
+    // map and fall out as undefined at runtime, hence the narrowing cast.
+    const type: CardResourceType | undefined = SEARCH_GROUP_TYPE[groupKey as keyof GroupedSearchResults];
+    return type === undefined ? undefined : RESOURCE_TYPE_META[type].icon;
 }

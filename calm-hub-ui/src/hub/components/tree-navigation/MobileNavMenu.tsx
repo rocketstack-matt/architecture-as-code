@@ -12,7 +12,7 @@ import { NamespaceCounts, DomainControlCount } from '../../../model/counts.js';
 import { colors } from '../../../theme/colors.js';
 import { redesignTokens } from '../../../theme/redesign-tokens.js';
 import { CountBadge } from '../explore-rail/CountBadge.js';
-import { COUNT_FIELD, type NamespaceResourceType } from '../namespace-page/resource-type-meta.js';
+import { COUNT_FIELD, type NamespaceResourceType } from '../../../theme/resource-type-meta.js';
 import {
     type TypeInUI,
     mapTypeInUIToTypeInUrl,

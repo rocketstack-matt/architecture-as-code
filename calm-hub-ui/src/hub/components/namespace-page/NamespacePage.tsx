@@ -15,7 +15,7 @@ import {
     getResourceTypeMeta,
     tabId,
     TYPE_PANEL_ID,
-} from './resource-type-meta.js';
+} from '../../../theme/resource-type-meta.js';
 
 interface NamespacePageProps {
     namespace: string;

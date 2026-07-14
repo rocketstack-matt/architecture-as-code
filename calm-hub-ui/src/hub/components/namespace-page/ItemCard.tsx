@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { colors } from '../../../theme/colors.js';
 import { redesignTokens } from '../../../theme/redesign-tokens.js';
 import { TypeBadge } from './TypeBadge.js';
-import { type CardResourceType, getResourceTypeColors } from './resource-type-meta.js';
+import { type CardResourceType, getResourceTypeColors, getResourceTypeIcon } from '../../../theme/resource-type-meta.js';
 
 interface ItemCardProps {
     name: string;
@@ -26,8 +26,10 @@ interface ItemCardProps {
     /** Thumbnail header height in px (default 96; landing highlights use a shorter one). */
     thumbnailHeight?: number;
     /**
-     * Optional glyph centred in the striped thumbnail (e.g. a shield for a control).
-     * Namespace cards leave the header a plain stripe; only control-style cards set it.
+     * Overrides the glyph centred in the striped thumbnail. Pass a non-null node
+     * to override; when unset or `null` the type's registry icon
+     * ({@link getResourceTypeIcon}) is used, and types without one
+     * (Architectures / Patterns) keep the plain stripe.
      */
     thumbnailIcon?: ReactNode;
     /**
@@ -72,7 +74,21 @@ export function ItemCard({
     href,
     onActivate,
 }: ItemCardProps) {
-    const { accent, tint } = getResourceTypeColors(type);
+    const { accent, accentText, tint } = getResourceTypeColors(type);
+    // Registry-derived type glyph for the thumbnail; an explicit thumbnailIcon
+    // prop still wins so callers can override the header treatment.
+    const TypeIcon = getResourceTypeIcon(type);
+    const headerIcon =
+        thumbnailIcon ??
+        (TypeIcon ? (
+            <TypeIcon
+                size={30}
+                data-testid="thumbnail-type-icon"
+                // The type's own accent in its text/icon role, so the glyph
+                // can't drift if the type colours are adjusted independently.
+                style={{ color: accentText, opacity: 0.55 }}
+            />
+        ) : undefined);
     // Selected treatment mirrors the diagram's selected-node style: an interaction-blue
     // outline + elevated shadow while the item's detail panel is open. Uses the brand
     // interaction blue (not the type accent) so selection reads consistently. Only the
@@ -111,10 +127,10 @@ export function ItemCard({
             }}
         >
             <div
-                className={thumbnailIcon ? 'flex items-center justify-center' : undefined}
+                className={headerIcon ? 'flex items-center justify-center' : undefined}
                 style={{ height: thumbnailHeight, background: stripes }}
             >
-                {thumbnailIcon}
+                {headerIcon}
             </div>
             <div className="p-[14px]">
                 {href ? (

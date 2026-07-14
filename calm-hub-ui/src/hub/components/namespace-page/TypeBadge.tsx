@@ -2,7 +2,7 @@ import {
     type CardResourceType,
     getResourceTypeColors,
     getResourceTypeMeta,
-} from './resource-type-meta.js';
+} from '../../../theme/resource-type-meta.js';
 
 interface TypeBadgeProps {
     /** Resource type whose accent / tint and singular label the pill shows. */

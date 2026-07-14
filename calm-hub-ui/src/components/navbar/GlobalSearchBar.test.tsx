@@ -44,6 +44,20 @@ const duplicateNameResults: GroupedSearchResults = {
     adrs: [],
 };
 
+// One group with a registry icon (flows) and one visual type without (architectures),
+// so the header-icon test can assert both treatments in a single dropdown.
+const iconGroupResults: GroupedSearchResults = {
+    architectures: [
+        { namespace: 'finos', id: 1, name: 'Test Architecture', description: 'A test architecture' },
+    ],
+    patterns: [],
+    flows: [{ namespace: 'finos', id: 3, name: 'Trade Flow', description: 'A test flow' }],
+    standards: [],
+    interfaces: [],
+    controls: [],
+    adrs: [],
+};
+
 function createMockSearchService(searchFn: (q: string) => Promise<GroupedSearchResults>) {
     return { search: searchFn } as unknown as SearchService;
 }
@@ -173,6 +187,26 @@ describe('GlobalSearchBar', () => {
         const chips = screen.getAllByTestId('result-namespace-chip');
         const chipText = chips.map((c) => c.textContent).sort();
         expect(chipText).toEqual(['finos', 'traderx']);
+    });
+
+    it('shows the registry type icon on group headers that have one, label-only otherwise', async () => {
+        const searchFn = vi.fn().mockResolvedValue(iconGroupResults);
+        const service = createMockSearchService(searchFn);
+        renderSearchBar(service);
+
+        const input = screen.getByPlaceholderText('Search CALM Hub...');
+        await act(async () => {
+            fireEvent.change(input, { target: { value: 'test' } });
+        });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(300);
+        });
+
+        // Flows carries its registry glyph in the group header...
+        expect(screen.getByTestId('search-group-icon-flows')).toBeInTheDocument();
+        // ...but Architectures (a visual type with no registry icon) stays label-only.
+        expect(screen.getByText('Architectures')).toBeInTheDocument();
+        expect(screen.queryByTestId('search-group-icon-architectures')).not.toBeInTheDocument();
     });
 
     it('shows no results message when search returns empty', async () => {

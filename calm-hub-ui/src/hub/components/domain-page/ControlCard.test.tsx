@@ -38,6 +38,11 @@ describe('ControlCard', () => {
         expect(screen.getByTestId('control-card')).toHaveAttribute('aria-pressed', 'false');
     });
 
+    it('renders the shield glyph in the thumbnail header (from the type registry)', () => {
+        render(<ControlCard name="Encryption" controlId={5} onActivate={vi.fn()} />);
+        expect(screen.getByTestId('thumbnail-type-icon')).toBeInTheDocument();
+    });
+
     it('renders without a description', () => {
         render(<ControlCard name="Audit Logging" controlId={9} onActivate={vi.fn()} />);
 
