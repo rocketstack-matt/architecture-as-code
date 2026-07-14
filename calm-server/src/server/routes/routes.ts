@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { ValidationRouter } from './validation-route';
 import { HealthRouter } from './health-route';
+import { RenderRouter } from './render-route';
 import { SchemaDirectory } from '@finos/calm-shared';
 
 const HEALTH_ROUTE_PATH = '/health';
 const VALIDATE_ROUTE_PATH = '/calm/validate';
+const RENDER_ROUTE_PATH = '/calm/render';
 
 export class ServerRoutes {
     router: Router;
@@ -23,5 +25,11 @@ export class ServerRoutes {
         const healthRouter = Router();
         this.router.use(HEALTH_ROUTE_PATH, healthRouter);
         new HealthRouter(healthRouter);
+
+        // Internal render endpoint — no rate limiting: calm-server has no auth and is
+        // expected to be reachable only by a trusted CALM Hub on a private network.
+        const renderRouter = Router();
+        this.router.use(RENDER_ROUTE_PATH, renderRouter);
+        new RenderRouter(renderRouter, debug);
     }
 }

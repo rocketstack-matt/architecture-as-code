@@ -20,7 +20,16 @@ export function startServer(
     );
     const allRoutes = serverRoutesInstance.router;
 
-    app.use(express.json());
+    // The render endpoint accepts whole CALM documents, which routinely exceed
+    // express.json's 100kb default. RenderRouter mounts its own higher-limit parser,
+    // so the app-level parser must skip that route or it would 413 large bodies first.
+    const jsonParser = express.json();
+    app.use((req, res, next) => {
+        if (req.path.startsWith('/calm/render')) {
+            return next();
+        }
+        return jsonParser(req, res, next);
+    });
     app.use('/', allRoutes);
 
     return app.listen(parseInt(port), host, () => {

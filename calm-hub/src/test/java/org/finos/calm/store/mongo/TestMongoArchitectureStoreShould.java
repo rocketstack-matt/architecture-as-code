@@ -33,6 +33,7 @@ import java.util.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -514,5 +515,80 @@ public class TestMongoArchitectureStoreShould {
 
         verify(architectureCollection).updateOne(any(Bson.class), any(Bson.class), any(UpdateOptions.class));
         verify(architectureCollection).updateOne(any(Bson.class), any(Bson.class));
+    }
+
+    // --- Thumbnails ---
+
+    private static final byte[] PNG_BYTES = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
+
+    @Test
+    void store_a_thumbnail_in_a_sibling_thumbnails_sub_document() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        mockSetupArchitectureDocumentWithVersions();
+
+        Architecture architecture = new Architecture.ArchitectureBuilder().setNamespace(NAMESPACE)
+                .setId(42).setVersion("1.0.0").build();
+
+        mongoArchitectureStore.storeThumbnail(architecture, PNG_BYTES);
+
+        Document expectedFilter = new Document("namespace", NAMESPACE)
+                .append("architectures.architectureId", 42);
+        Document expectedUpdate = new Document("$set",
+                new Document("architectures.$.thumbnails.1-0-0", Base64.getEncoder().encodeToString(PNG_BYTES)));
+
+        verify(architectureCollection).updateOne(eq(expectedFilter), eq(expectedUpdate));
+    }
+
+    @Test
+    void throw_a_version_exception_when_storing_a_thumbnail_for_a_missing_version() {
+        mockSetupArchitectureDocumentWithVersions();
+
+        Architecture architecture = new Architecture.ArchitectureBuilder().setNamespace(NAMESPACE)
+                .setId(42).setVersion("9.0.0").build();
+
+        assertThrows(ArchitectureVersionNotFoundException.class,
+                () -> mongoArchitectureStore.storeThumbnail(architecture, PNG_BYTES));
+
+        verify(architectureCollection, Mockito.never()).updateOne(any(Bson.class), any(Bson.class));
+    }
+
+    @Test
+    void return_null_when_no_thumbnail_is_stored_for_a_version() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        mockSetupArchitectureDocumentWithVersions();
+
+        Architecture architecture = new Architecture.ArchitectureBuilder().setNamespace(NAMESPACE)
+                .setId(42).setVersion("1.0.0").build();
+
+        assertThat(mongoArchitectureStore.getThumbnail(architecture), is((byte[]) null));
+    }
+
+    @Test
+    void return_stored_thumbnail_bytes_for_a_version() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        Document storedArchitecture = new Document("architectureId", 42)
+                .append("versions", new Document("1-0-0", Document.parse(validJson)))
+                .append("thumbnails", new Document("1-0-0", Base64.getEncoder().encodeToString(PNG_BYTES)));
+        Document namespaceDoc = new Document("namespace", NAMESPACE)
+                .append("architectures", List.of(storedArchitecture));
+
+        FindIterable<Document> findIterable = Mockito.mock(DocumentFindIterable.class);
+        when(namespaceStore.namespaceExists(anyString())).thenReturn(true);
+        when(architectureCollection.find(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.projection(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(namespaceDoc);
+
+        Architecture architecture = new Architecture.ArchitectureBuilder().setNamespace(NAMESPACE)
+                .setId(42).setVersion("1.0.0").build();
+
+        assertArrayEquals(PNG_BYTES, mongoArchitectureStore.getThumbnail(architecture));
+    }
+
+    @Test
+    void throw_an_architecture_exception_when_getting_a_thumbnail_for_a_missing_architecture() {
+        mockSetupArchitectureDocumentWithVersions();
+
+        Architecture architecture = new Architecture.ArchitectureBuilder().setNamespace(NAMESPACE)
+                .setId(99).setVersion("1.0.0").build();
+
+        assertThrows(ArchitectureNotFoundException.class,
+                () -> mongoArchitectureStore.getThumbnail(architecture));
     }
 }

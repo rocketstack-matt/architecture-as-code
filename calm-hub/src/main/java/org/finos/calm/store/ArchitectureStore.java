@@ -34,4 +34,23 @@ public interface ArchitectureStore {
     String getArchitectureForVersion(Architecture architecture) throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException;
     Architecture createArchitectureForVersion(Architecture architecture) throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionExistsException;
     Architecture updateArchitectureForVersion(Architecture architecture) throws NamespaceNotFoundException, ArchitectureNotFoundException;
+
+    /**
+     * Store a rendered PNG thumbnail for the architecture version identified by
+     * {@code architecture} (namespace, id, version). Stored base64-encoded alongside —
+     * never inside — the version's document value, so the document itself is untouched.
+     *
+     * @param architecture the architecture version the thumbnail belongs to
+     * @param png          the PNG bytes to store
+     */
+    void storeThumbnail(Architecture architecture, byte[] png) throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException;
+
+    /**
+     * Retrieve the stored thumbnail for the architecture version identified by
+     * {@code architecture} (namespace, id, version).
+     *
+     * @param architecture the architecture version to fetch the thumbnail for
+     * @return the PNG bytes, or {@code null} when no thumbnail is stored for the version
+     */
+    byte[] getThumbnail(Architecture architecture) throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException;
 }

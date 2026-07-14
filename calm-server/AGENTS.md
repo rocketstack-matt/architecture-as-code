@@ -9,7 +9,8 @@ The calm-server provides:
 - **Bundled CALM Schemas** - All CALM schemas (release and draft) are bundled during build
 - **Health Check Endpoint** (`/health`) - Status endpoint for monitoring
 - **Validation Endpoint** (`/calm/validate`) - POST endpoint for validating a CALM architecture. By default it resolves the architecture's `$schema` against the bundled schemas; if the request body also includes an optional `pattern`, the architecture is validated against that runtime-supplied pattern instead. When a pattern is supplied it must include a `$id` field that matches the architecture's `$schema` field
-- **Rate Limiting** - Protects against abuse with 100 requests per 15 minutes per IP
+- **Thumbnail Render Endpoint** (`/calm/render/thumbnail`) - Internal POST endpoint that renders a PNG thumbnail of a CALM architecture or pattern by driving a CALM Hub UI's chrome-free `/#/render` route in a local headless browser (requires a system Chrome or Edge install). Intended to be called by a trusted CALM Hub backend, not end users — it is unauthenticated and not rate limited, so keep calm-server bound to localhost or a private network
+- **Rate Limiting** - Protects against abuse with 100 requests per 15 minutes per IP (validation endpoint; the internal render endpoint is not rate limited)
 
 ## Project Structure
 
@@ -22,7 +23,8 @@ calm-server/
 │   │   └── routes/
 │   │       ├── routes.ts           # Router setup
 │   │       ├── health-route.ts     # Health check endpoint
-│   │       └── validation-route.ts # Architecture validation endpoints (/calm/validate, with optional pattern in the body)
+│   │       ├── validation-route.ts # Architecture validation endpoints (/calm/validate, with optional pattern in the body)
+│   │       └── render-route.ts     # Internal thumbnail render endpoint (/calm/render/thumbnail, drives a local headless Chrome/Edge against a CALM Hub UI)
 │   └── *.spec.ts                   # Unit tests
 ├── dist/                           # (generated) build output
 │   ├── index.js                    # Compiled executable

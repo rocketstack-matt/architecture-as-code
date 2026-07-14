@@ -48,6 +48,12 @@ export {
     type FrontMatterInjectionParams
 } from './template/front-matter.js';
 export { Docifier, DocifyMode, DiagramExportFormat } from './docify/docifier.js';
+export {
+    launchBrowser,
+    type BrowserLaunchOptions,
+    type LaunchedBrowser,
+} from './docify/diagram-rendering/browser-launch.js';
+export { BrowserLaunchError, BrowserOverrideError } from './docify/diagram-rendering/errors.js';
 export { C4Model } from './docify/graphing/c4.js';
 export { CalmRelationshipGraph } from './docify/graphing/relationship-graph.js';
 export { ValidationOutcome } from './commands/validate/validation.output';

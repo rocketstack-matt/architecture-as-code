@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ServerRoutes } from './routes';
 import { ValidationRouter } from './validation-route';
 import { HealthRouter } from './health-route';
+import { RenderRouter } from './render-route';
 import { SchemaDirectory } from '@finos/calm-shared';
 
 vi.mock('express', () => ({
@@ -20,6 +21,12 @@ vi.mock('./health-route', () => {
     };
 });
 
+vi.mock('./render-route', () => {
+    return {
+        RenderRouter: vi.fn()
+    };
+});
+
 vi.mock('@finos/calm-shared', () => {
     return {
         SchemaDirectory: vi.fn()
@@ -31,17 +38,20 @@ describe('ServerRoutes', () => {
     let mainRouter: Router;
     let validateRouter: Router;
     let healthRouter: Router;
+    let renderRouter: Router;
 
     beforeEach(() => {
         mainRouter = { use: vi.fn() } as unknown as Router;
         validateRouter = { use: vi.fn() } as unknown as Router;
         healthRouter = { use: vi.fn() } as unknown as Router;
+        renderRouter = { use: vi.fn() } as unknown as Router;
         const routerMock = Router as unknown as vi.Mock;
         routerMock.mockReset();
         routerMock
             .mockImplementationOnce(() => mainRouter)
             .mockImplementationOnce(() => validateRouter)
-            .mockImplementationOnce(() => healthRouter);
+            .mockImplementationOnce(() => healthRouter)
+            .mockImplementationOnce(() => renderRouter);
         serverRoutes = new ServerRoutes(schemaDirectory);
         void serverRoutes;
     });
@@ -58,5 +68,10 @@ describe('ServerRoutes', () => {
     it('should set up health route', () => {
         expect(mainRouter.use).toHaveBeenCalledWith('/health', healthRouter);
         expect(HealthRouter).toHaveBeenCalledWith(healthRouter);
+    });
+
+    it('should set up render route', () => {
+        expect(mainRouter.use).toHaveBeenCalledWith('/calm/render', renderRouter);
+        expect(RenderRouter).toHaveBeenCalledWith(renderRouter, false);
     });
 });

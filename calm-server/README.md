@@ -9,6 +9,7 @@ The `calm-server` executable provides HTTP endpoints for CALM architecture valid
 - **Bundled CALM Schemas** - All CALM schemas (release and draft) are bundled with the executable
 - **Health Check Endpoint** (`GET /health`) - Status endpoint for monitoring
 - **Validation Endpoint** (`POST /calm/validate`) - Validate CALM architectures against bundled schemas, or against an optional pattern supplied in the request
+- **Thumbnail Render Endpoint** (`POST /calm/render/thumbnail`) - Internal endpoint that renders a PNG thumbnail of a CALM architecture or pattern by driving a CALM Hub UI's chrome-free `/#/render` route in a local headless browser (requires a system Chrome or Edge install). Intended to be called by CALM Hub, not end users
 
 ## Usage
 
@@ -120,6 +121,24 @@ Response (validation errors):
   "hasWarnings":false
 }
 ```
+
+### Render a Thumbnail (internal)
+
+Render a PNG thumbnail of a CALM document by driving a running CALM Hub UI in a local headless browser. This endpoint is intended to be called by a CALM Hub backend (see `calm.render.service-url` in calm-hub), requires a system Chrome or Edge install, and is neither authenticated nor rate limited — keep the server on localhost or a private network:
+
+```bash
+curl -X POST http://localhost:3000/calm/render/thumbnail \
+  -H "Content-Type: application/json" \
+  -o thumbnail.png \
+  -d '{
+    "uiBaseUrl": "http://localhost:8080",
+    "documentType": "architecture",
+    "documentJson": "{\"nodes\":[],\"relationships\":[]}"
+  }'
+```
+
+- `documentType` is `architecture` or `pattern`; `documentJson` is the raw CALM document as a JSON-encoded string; optional `timeoutMs` bounds the render (default 20000, capped at 60000).
+- Responds `200` with `image/png` bytes, `400` for an invalid body, or `500` with a JSON error envelope when the render fails (e.g. no local Chromium-based browser found).
 
 ## Development
 

@@ -14,6 +14,12 @@ export interface NamespaceItem {
     customId?: string;
     /** Stored-version count for the version-map types; drives the "N versions" scent. */
     versionCount?: number;
+    /**
+     * Latest-version thumbnail endpoint, set only for architectures and patterns
+     * (the diagram types calm-hub renders thumbnails for). The card's `<img>`
+     * falls back to the stripe header when the endpoint 404s.
+     */
+    thumbnailUrl?: string;
 }
 
 export interface NamespaceItemGroup {
@@ -27,6 +33,20 @@ const summaryToItem = (s: ResourceSummary): NamespaceItem => ({
     description: s.description,
     customId: s.customId,
     versionCount: s.versionCount,
+});
+
+/**
+ * Maps an architecture/pattern summary to an item carrying its latest-version
+ * thumbnail URL. Built on the numeric-ID storage API (the same base path the
+ * summary fetches use), so it uses the summary's numeric `id`, not the slug.
+ */
+const summaryToThumbnailItem = (
+    s: ResourceSummary,
+    namespace: string,
+    typePath: 'architectures' | 'patterns'
+): NamespaceItem => ({
+    ...summaryToItem(s),
+    thumbnailUrl: `/api/calm/namespaces/${encodeURIComponent(namespace)}/${typePath}/${encodeURIComponent(String(s.id))}/thumbnail`,
 });
 
 /**
@@ -58,8 +78,8 @@ export function useNamespaceItems(namespace: string): { groups: NamespaceItemGro
         ]).then(([architectures, patterns, flows, standards, adrs, interfaces]) => {
             if (cancelled) return;
             setGroups([
-                { type: 'Architectures', items: architectures.map(summaryToItem) },
-                { type: 'Patterns', items: patterns.map(summaryToItem) },
+                { type: 'Architectures', items: architectures.map((s) => summaryToThumbnailItem(s, namespace, 'architectures')) },
+                { type: 'Patterns', items: patterns.map((s) => summaryToThumbnailItem(s, namespace, 'patterns')) },
                 { type: 'Flows', items: flows.map(summaryToItem) },
                 { type: 'Standards', items: standards.map(summaryToItem) },
                 {

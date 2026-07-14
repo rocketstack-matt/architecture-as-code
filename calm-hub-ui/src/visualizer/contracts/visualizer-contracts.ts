@@ -55,6 +55,14 @@ export interface ArchitectureGraphProps {
     onEdgeClick?: (edge: CalmRelationshipSchema) => void;
     /** Identifies the diagram (namespace/id) so its viewport can be remembered. */
     viewportKey?: string;
+    /**
+     * Headless-render mode (the `/render` route driven by calm-server): suppresses
+     * the Controls, MiniMap and SearchBar chrome (the `<Background>` stays), fits
+     * the whole graph regardless of the desktop zoom floor, and sets
+     * `data-render-ready="true"` on the graph wrapper once nodes are measured and
+     * the first paint has settled. Defaults to false (normal interactive mode).
+     */
+    chromeless?: boolean;
 }
 
 /**

@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { SearchService } from '../../../service/search-service.js';
 import { GroupedSearchResults, SearchResult } from '../../../model/search.js';
 import { TYPE_LABELS, flattenResults, useSearchNavigation } from '../../../hooks/useSearchNavigation.js';
-import { getSearchGroupIcon } from '../../../theme/resource-type-meta.js';
+import { getSearchGroupIcon, getSearchGroupType } from '../../../theme/resource-type-meta.js';
+import { ItemCard } from '../namespace-page/ItemCard.js';
 import { colors } from '../../../theme/colors.js';
 
 interface SearchResultsPageProps {
@@ -63,8 +64,13 @@ export function SearchResultsPage({ searchService }: SearchResultsPageProps) {
         return () => controller.abort();
     }, [query, service]);
 
+    // Groups the registry doesn't know are dropped rather than rendered with a
+    // guessed card type; the model's GroupedSearchResults keys make this a no-op
+    // until the backend grows a new group.
     const groups = results
-        ? Object.entries(results).filter(([, items]) => (items as SearchResult[]).length > 0)
+        ? Object.entries(results).filter(
+              ([type, items]) => (items as SearchResult[]).length > 0 && getSearchGroupType(type) !== undefined
+          )
         : [];
     const totalCount = results ? flattenResults(results).length : 0;
 
@@ -79,7 +85,7 @@ export function SearchResultsPage({ searchService }: SearchResultsPageProps) {
 
     return (
         <div className="h-full overflow-auto bg-base-100" style={{ padding: '44px 48px' }}>
-            <div className="max-w-[880px] mx-auto flex flex-col gap-8">
+            <div className="max-w-[1240px] mx-auto flex flex-col gap-8">
                 <header>
                     <h1 className="text-[28px] font-bold" style={{ color: colors.redesign.ink }}>
                         {query ? (
@@ -133,41 +139,21 @@ export function SearchResultsPage({ searchService }: SearchResultsPageProps) {
                                     {renderGroupIcon(type)}
                                     {TYPE_LABELS[type] ?? type} ({(items as SearchResult[]).length})
                                 </div>
-                                <div className="flex flex-col gap-2">
+                                <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
                                     {(items as SearchResult[]).map((item) => (
-                                        <button
+                                        <ItemCard
                                             key={`${type}-${item.namespace}-${item.id}`}
-                                            className="w-full text-left rounded-xl px-4 py-3 hover:bg-base-200 transition-colors cursor-pointer"
-                                            style={{ border: `1px solid ${colors.redesign.border}` }}
-                                            onClick={() => navigateToResult({ type, result: item })}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <span
-                                                    className="font-medium truncate min-w-0"
-                                                    style={{ color: colors.redesign.ink }}
-                                                >
-                                                    {item.name}
-                                                </span>
-                                                <span
-                                                    data-testid="result-namespace-chip"
-                                                    className="ml-auto shrink-0 font-mono-jb text-[10px] rounded-[6px] px-1.5 py-0.5"
-                                                    style={{
-                                                        backgroundColor: colors.redesign.badgeBg,
-                                                        color: colors.redesign.mutedAlt,
-                                                    }}
-                                                >
-                                                    {item.namespace}
-                                                </span>
-                                            </div>
-                                            {item.description && (
-                                                <div
-                                                    className="text-sm mt-1"
-                                                    style={{ color: colors.redesign.muted }}
-                                                >
-                                                    {item.description}
-                                                </div>
-                                            )}
-                                        </button>
+                                            name={item.name}
+                                            description={item.description}
+                                            type={getSearchGroupType(type)!}
+                                            meta={item.namespace}
+                                            thumbnailUrl={
+                                                type === 'architectures' || type === 'patterns'
+                                                    ? `/api/calm/namespaces/${encodeURIComponent(item.namespace)}/${type}/${encodeURIComponent(String(item.id))}/thumbnail`
+                                                    : undefined
+                                            }
+                                            onActivate={() => navigateToResult({ type, result: item })}
+                                        />
                                     ))}
                                 </div>
                             </section>

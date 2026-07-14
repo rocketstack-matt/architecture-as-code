@@ -29,12 +29,15 @@ import org.finos.calm.domain.exception.ArchitectureVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.security.CalmHubScopes;
 import org.finos.calm.services.ArchitectureTimelineService;
+import org.finos.calm.services.ThumbnailService;
 import org.finos.calm.store.ArchitectureStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Optional;
 
 import static org.finos.calm.resources.ResourceValidationConstants.NAMESPACE_MESSAGE;
 import static org.finos.calm.resources.ResourceValidationConstants.NAMESPACE_REGEX;
@@ -53,6 +56,7 @@ public class ArchitectureResource {
 
     private final ArchitectureStore store;
     private final ArchitectureTimelineService timelineService;
+    private final ThumbnailService thumbnailService;
 
     private final Logger logger = LoggerFactory.getLogger(ArchitectureResource.class);
 
@@ -60,9 +64,10 @@ public class ArchitectureResource {
     Boolean allowPutOperations;
 
     @Inject
-    public ArchitectureResource(ArchitectureStore store, ArchitectureTimelineService timelineService) {
+    public ArchitectureResource(ArchitectureStore store, ArchitectureTimelineService timelineService, ThumbnailService thumbnailService) {
         this.store = store;
         this.timelineService = timelineService;
+        this.thumbnailService = thumbnailService;
     }
 
     /**
@@ -115,7 +120,9 @@ public class ArchitectureResource {
                 .build();
 
         try {
-            return architectureWithLocationResponse(store.createArchitectureForNamespace(architecture));
+            Architecture persisted = store.createArchitectureForNamespace(architecture);
+            triggerThumbnailRender(persisted);
+            return architectureWithLocationResponse(persisted);
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when creating architecture", namespace, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
@@ -207,6 +214,7 @@ public class ArchitectureResource {
 
         try {
             store.createArchitectureForVersion(architecture);
+            triggerThumbnailRender(architecture);
             return architectureWithLocationResponse(architecture);
         } catch (ArchitectureVersionExistsException e) {
             logger.error("Architecture version already exists [{}] when trying to create new architecture", architecture, e);
@@ -252,6 +260,7 @@ public class ArchitectureResource {
 
         try {
             store.updateArchitectureForVersion(architecture);
+            triggerThumbnailRender(architecture);
             return architectureWithLocationResponse(architecture);
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when trying to put architecture", architecture, e);
@@ -293,6 +302,117 @@ public class ArchitectureResource {
             logger.error("Failed to serialise timeline for architecture [{}] in namespace [{}]", architectureId, namespace, e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Failed to build timeline for architecture: " + architectureId).build();
         }
+    }
+
+    @GET
+    @Path("{namespace}/architectures/{architectureId}/versions/{version}/thumbnail")
+    @Produces("image/png")
+    @Operation(
+            summary = "Retrieve the rendered thumbnail for an architecture version",
+            description = "Returns the PNG thumbnail rendered for this architecture version. When absent and a "
+                    + "render service is configured, a synchronous render is attempted before returning 404."
+    )
+    @PermissionsAllowed(CalmHubScopes.READ)
+    public Response getArchitectureThumbnail(
+            @PathParam("namespace") @Pattern(regexp = NAMESPACE_REGEX, message = NAMESPACE_MESSAGE) String namespace,
+            @PathParam("architectureId") int architectureId,
+            @PathParam("version") @Pattern(regexp = VERSION_REGEX, message = VERSION_MESSAGE) String version) {
+        Architecture architecture = new Architecture.ArchitectureBuilder()
+                .setNamespace(namespace)
+                .setId(architectureId)
+                .setVersion(version)
+                .build();
+
+        return architectureThumbnailResponse(architecture);
+    }
+
+    @GET
+    @Path("{namespace}/architectures/{architectureId}/thumbnail")
+    @Produces("image/png")
+    @Operation(
+            summary = "Retrieve the rendered thumbnail for an architecture's latest version",
+            description = "Returns the PNG thumbnail of the latest stored version of the architecture. When absent "
+                    + "and a render service is configured, a synchronous render is attempted before returning 404."
+    )
+    @PermissionsAllowed(CalmHubScopes.READ)
+    public Response getLatestArchitectureThumbnail(
+            @PathParam("namespace") @Pattern(regexp = NAMESPACE_REGEX, message = NAMESPACE_MESSAGE) String namespace,
+            @PathParam("architectureId") int architectureId) {
+        Architecture architecture = new Architecture.ArchitectureBuilder()
+                .setNamespace(namespace)
+                .setId(architectureId)
+                .build();
+
+        try {
+            List<String> versions = store.getArchitectureVersions(architecture);
+            Optional<String> latest = ThumbnailService.pickLatestVersion(versions);
+            if (latest.isEmpty()) {
+                return thumbnailNotFoundResponse();
+            }
+            return architectureThumbnailResponse(new Architecture.ArchitectureBuilder()
+                    .setNamespace(namespace)
+                    .setId(architectureId)
+                    .setVersion(latest.get())
+                    .build());
+        } catch (NamespaceNotFoundException | ArchitectureNotFoundException e) {
+            logger.debug("Could not resolve latest version for architecture thumbnail [{}]", architecture, e);
+            return thumbnailNotFoundResponse();
+        }
+    }
+
+    /**
+     * Serves the stored thumbnail for the given architecture version, attempting a
+     * self-healing synchronous render on a miss (single-flight per version). Any
+     * failure resolves to a 404 — thumbnails are best-effort.
+     */
+    private Response architectureThumbnailResponse(Architecture architecture) {
+        try {
+            byte[] png = store.getThumbnail(architecture);
+            if (png == null) {
+                png = renderArchitectureThumbnailOnDemand(architecture);
+            }
+            if (png == null) {
+                return thumbnailNotFoundResponse();
+            }
+            return Response.ok(png)
+                    .type("image/png")
+                    .header("Cache-Control", "private, max-age=300")
+                    .build();
+        } catch (NamespaceNotFoundException | ArchitectureNotFoundException | ArchitectureVersionNotFoundException e) {
+            logger.debug("Thumbnail requested for unknown architecture version [{}]", architecture, e);
+            return thumbnailNotFoundResponse();
+        }
+    }
+
+    private byte[] renderArchitectureThumbnailOnDemand(Architecture architecture)
+            throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        if (!thumbnailService.isEnabled()) {
+            return null;
+        }
+        String documentJson = store.getArchitectureForVersion(architecture);
+        String key = architecture.getNamespace() + "/architectures/" + architecture.getId() + "/" + architecture.getDotVersion();
+        return thumbnailService.renderSync(key, ThumbnailService.DOCUMENT_TYPE_ARCHITECTURE, documentJson,
+                        bytes -> storeThumbnailQuietly(architecture, bytes))
+                .orElse(null);
+    }
+
+    /** Fire-and-forget render after a successful write; never affects the write response. */
+    private void triggerThumbnailRender(Architecture architecture) {
+        String key = architecture.getNamespace() + "/architectures/" + architecture.getId() + "/" + architecture.getDotVersion();
+        thumbnailService.triggerRender(key, ThumbnailService.DOCUMENT_TYPE_ARCHITECTURE, architecture.getArchitectureJson(),
+                bytes -> storeThumbnailQuietly(architecture, bytes));
+    }
+
+    private void storeThumbnailQuietly(Architecture architecture, byte[] bytes) {
+        try {
+            store.storeThumbnail(architecture, bytes);
+        } catch (NamespaceNotFoundException | ArchitectureNotFoundException | ArchitectureVersionNotFoundException e) {
+            logger.debug("Could not store rendered thumbnail for [{}]", architecture, e);
+        }
+    }
+
+    private Response thumbnailNotFoundResponse() {
+        return Response.status(Response.Status.NOT_FOUND).entity("No thumbnail available").build();
     }
 
     private Response architectureWithLocationResponse(Architecture architecture) throws URISyntaxException {

@@ -157,4 +157,44 @@ describe('ItemCard', () => {
         expect(screen.getByTestId('custom-thumb-icon')).toBeInTheDocument();
         expect(screen.queryByTestId('thumbnail-type-icon')).not.toBeInTheDocument();
     });
+
+    it('renders a lazy cover image in the header when thumbnailUrl is set', () => {
+        render(
+            <ItemCard
+                name="TraderX"
+                type="Architectures"
+                thumbnailUrl="/api/calm/namespaces/traderx/architectures/1/thumbnail"
+                onActivate={() => {}}
+            />
+        );
+        const img = screen.getByTestId('item-card-thumbnail');
+        expect(img).toHaveAttribute('src', '/api/calm/namespaces/traderx/architectures/1/thumbnail');
+        expect(img).toHaveAttribute('loading', 'lazy');
+        expect(img).toHaveAttribute('alt', '');
+        expect(img.className).toContain('object-cover');
+    });
+
+    it('falls back to the stripe(+icon) header when the thumbnail image fails to load', () => {
+        // Flows has a registry icon, so the error fallback must restore it.
+        render(
+            <ItemCard
+                name="Trade Flow"
+                type="Flows"
+                thumbnailUrl="/api/calm/namespaces/traderx/flows/1/thumbnail"
+                onActivate={() => {}}
+            />
+        );
+        // While loading, the image replaces the icon.
+        expect(screen.queryByTestId('thumbnail-type-icon')).not.toBeInTheDocument();
+
+        fireEvent.error(screen.getByTestId('item-card-thumbnail'));
+
+        expect(screen.queryByTestId('item-card-thumbnail')).not.toBeInTheDocument();
+        expect(screen.getByTestId('thumbnail-type-icon')).toBeInTheDocument();
+    });
+
+    it('renders no thumbnail image when thumbnailUrl is unset', () => {
+        render(<ItemCard name="TraderX" type="Architectures" onActivate={() => {}} />);
+        expect(screen.queryByTestId('item-card-thumbnail')).not.toBeInTheDocument();
+    });
 });

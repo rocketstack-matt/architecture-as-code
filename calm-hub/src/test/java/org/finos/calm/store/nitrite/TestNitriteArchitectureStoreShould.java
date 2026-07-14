@@ -13,6 +13,7 @@ import org.finos.calm.domain.exception.ArchitectureVersionExistsException;
 import org.finos.calm.domain.exception.ArchitectureVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.PageRequest;
+import org.finos.calm.store.util.TypeSafeNitriteDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,11 +22,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -880,5 +883,125 @@ public class TestNitriteArchitectureStoreShould {
         assertThat(result, is(architecture));
         verify(mockNamespaceStore, atLeastOnce()).namespaceExists(NAMESPACE);
         verify(mockCollection).update(any(Filter.class), any(Document.class));
+    }
+
+    // --- Thumbnails ---
+
+    private static final byte[] PNG_BYTES = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
+
+    private Document setupNamespaceDocWithVersion(Document extraArchitectureFields) {
+        Document versions = Document.createDocument()
+                .put("1-0-0", VALID_JSON);
+
+        Document architectureDoc = Document.createDocument()
+                .put("architectureId", ARCHITECTURE_ID)
+                .put("versions", versions);
+        if (extraArchitectureFields != null) {
+            for (String field : extraArchitectureFields.getFields()) {
+                architectureDoc.put(field, extraArchitectureFields.get(field));
+            }
+        }
+
+        List<Document> architectures = new ArrayList<>();
+        architectures.add(architectureDoc);
+
+        Document namespaceDoc = Document.createDocument()
+                .put("namespace", NAMESPACE)
+                .put("architectures", architectures);
+
+        DocumentCursor cursor = mock(DocumentCursor.class);
+        when(cursor.firstOrNull()).thenReturn(namespaceDoc);
+        when(mockCollection.find(any(Filter.class))).thenReturn(cursor);
+        when(mockNamespaceStore.namespaceExists(NAMESPACE)).thenReturn(true);
+
+        return namespaceDoc;
+    }
+
+    @Test
+    public void testStoreThumbnail_whenVersionExists_storesBase64InSiblingThumbnailsDocument() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        // Arrange
+        Document namespaceDoc = setupNamespaceDocWithVersion(null);
+
+        Architecture architecture = new Architecture.ArchitectureBuilder()
+                .setNamespace(NAMESPACE)
+                .setId(ARCHITECTURE_ID)
+                .setVersion(VERSION)
+                .build();
+
+        // Act
+        architectureStore.storeThumbnail(architecture, PNG_BYTES);
+
+        // Assert
+        verify(mockCollection).update(any(Filter.class), any(Document.class));
+        List<Document> architectures = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class).getList("architectures");
+        Document thumbnails = architectures.get(0).get("thumbnails", Document.class);
+        assertThat(thumbnails.get("1-0-0"), is(Base64.getEncoder().encodeToString(PNG_BYTES)));
+        // The version's JSON value is untouched by the thumbnail write.
+        assertThat(architectures.get(0).get("versions", Document.class).get("1-0-0"), is(VALID_JSON));
+    }
+
+    @Test
+    public void testStoreThumbnail_whenVersionDoesNotExist_throwsException() {
+        // Arrange
+        setupNamespaceDocWithVersion(null);
+
+        Architecture architecture = new Architecture.ArchitectureBuilder()
+                .setNamespace(NAMESPACE)
+                .setId(ARCHITECTURE_ID)
+                .setVersion("9.0.0")
+                .build();
+
+        // Act & Assert
+        assertThrows(ArchitectureVersionNotFoundException.class,
+                () -> architectureStore.storeThumbnail(architecture, PNG_BYTES));
+        verify(mockCollection, never()).update(any(Filter.class), any(Document.class));
+    }
+
+    @Test
+    public void testGetThumbnail_whenNoThumbnailStored_returnsNull() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        // Arrange
+        setupNamespaceDocWithVersion(null);
+
+        Architecture architecture = new Architecture.ArchitectureBuilder()
+                .setNamespace(NAMESPACE)
+                .setId(ARCHITECTURE_ID)
+                .setVersion(VERSION)
+                .build();
+
+        // Act & Assert
+        assertThat(architectureStore.getThumbnail(architecture), is((byte[]) null));
+    }
+
+    @Test
+    public void testGetThumbnail_whenThumbnailStored_returnsDecodedBytes() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        // Arrange
+        Document thumbnails = Document.createDocument()
+                .put("1-0-0", Base64.getEncoder().encodeToString(PNG_BYTES));
+        setupNamespaceDocWithVersion(Document.createDocument().put("thumbnails", thumbnails));
+
+        Architecture architecture = new Architecture.ArchitectureBuilder()
+                .setNamespace(NAMESPACE)
+                .setId(ARCHITECTURE_ID)
+                .setVersion(VERSION)
+                .build();
+
+        // Act & Assert
+        assertArrayEquals(PNG_BYTES, architectureStore.getThumbnail(architecture));
+    }
+
+    @Test
+    public void testGetThumbnail_whenArchitectureDoesNotExist_throwsException() {
+        // Arrange
+        setupNamespaceDocWithVersion(null);
+
+        Architecture architecture = new Architecture.ArchitectureBuilder()
+                .setNamespace(NAMESPACE)
+                .setId(999)
+                .setVersion(VERSION)
+                .build();
+
+        // Act & Assert
+        assertThrows(ArchitectureNotFoundException.class,
+                () -> architectureStore.getThumbnail(architecture));
     }
 }

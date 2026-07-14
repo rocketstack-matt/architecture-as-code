@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
     Node,
     Background,
@@ -17,6 +17,7 @@ import { readViewportForKey, saveViewportForKey } from './utils/viewportStore.js
 import { FloatingEdge } from './FloatingEdge.js';
 import { CustomNode } from './CustomNode.js';
 import { SystemGroupNode } from './SystemGroupNode.js';
+import { RenderReadySignal } from './RenderReadySignal.js';
 import { SearchBar } from './SearchBar.js';
 import { THEME } from './theme.js';
 import { colors } from '../../../theme/colors.js';
@@ -56,6 +57,17 @@ const FIT_VIEW_OPTIONS = { padding: 0.2, minZoom: 0.6, maxZoom: 1.2 } as const;
  */
 const MOBILE_FIT_VIEW_OPTIONS = { padding: 0.1, minZoom: 0.1, maxZoom: FIT_VIEW_OPTIONS.maxZoom } as const;
 
+/**
+ * Chromeless (thumbnail render) fit: the screenshot must show the whole graph in a
+ * fixed wide-and-short viewport (a minimap-style strip), so the zoom floor drops well
+ * below the interactive modes' legibility floors — a partially cropped thumbnail is
+ * worse than a small one. Padding matches the mobile fit; margins don't matter
+ * to framing because the screenshot is clipped to the graph's content server-side.
+ * maxZoom sits below the interactive fits so tiny graphs (e.g. two nodes) don't
+ * render as oversized strips that overflow the clip's card-aspect expansion.
+ */
+const CHROMELESS_FIT_VIEW_OPTIONS = { padding: 0.1, minZoom: 0.05, maxZoom: 0.8 } as const;
+
 /** Persist the minimap show/hide choice so it survives a refresh. */
 const MINIMAP_HIDDEN_KEY = 'calmHub.diagramMinimapHidden';
 
@@ -67,8 +79,14 @@ function readMinimapHidden(): boolean {
     }
 }
 
-export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewportKey }: ArchitectureGraphProps) {
+export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewportKey, chromeless = false }: ArchitectureGraphProps) {
     const isMobile = useIsMobile();
+
+    // Chromeless render mode: true once nodes are measured and the first paint has
+    // settled (RenderReadySignal), surfaced as data-render-ready on the wrapper so
+    // calm-server's headless browser knows the graph is safe to screenshot.
+    const [renderReady, setRenderReady] = useState(false);
+    const markRenderReady = useCallback(() => setRenderReady(true), []);
 
     // The viewport store key is namespaced by device. Mobile fits to a far lower zoom
     // floor (0.1 vs desktop's 0.6), so a viewport saved while mobile must not be
@@ -131,6 +149,10 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
         persistKey: viewportKey,
     });
 
+    // Distinguishes "not parsed yet" (initial empty node state) from a genuinely
+    // empty document, so chromeless mode never signals ready before the parse ran.
+    const [parsed, setParsed] = useState(false);
+
     useEffect(() => {
         const { nodes: parsedNodes, edges: parsedEdges } = parseCALMData(jsonData, onNodeClick);
         sourceNodesRef.current = parsedNodes;
@@ -139,6 +161,7 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
         setNodes(viewportKey ? applyStoredPositions(viewportKey, parsedNodes) : parsedNodes);
         setEdges(parsedEdges);
         setAvailableNodeTypes(getUniqueNodeTypes(parsedNodes));
+        setParsed(true);
     }, [jsonData, setNodes, setEdges, setAvailableNodeTypes, onNodeClick, viewportKey]);
 
     // Search & filter
@@ -180,19 +203,31 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
     }, [isMobile]);
 
     if (nodes.length === 0) {
-        return <EmptyGraphState message="No architecture data to display. Load a CALM architecture to visualize." />;
+        const emptyState = <EmptyGraphState message="No architecture data to display. Load a CALM architecture to visualize." />;
+        // A chromeless render of a genuinely empty document must still signal ready,
+        // otherwise calm-server waits out its full render timeout for nothing.
+        return chromeless && parsed ? (
+            <div style={{ height: '100%', width: '100%' }} data-render-ready="true">
+                {emptyState}
+            </div>
+        ) : (
+            emptyState
+        );
     }
 
     // One derived config so the device-dependent fit props can't drift out of sync.
-    // Mobile always fits on load (ignoring any persisted viewport) so the whole graph
+    // Chromeless always fits the whole graph (thumbnails must not crop); mobile
+    // always fits on load (ignoring any persisted viewport) so the whole graph
     // fits 390px (redesign problem #10); desktop restores its saved viewport, or fits
     // when there's none.
-    const flowConfig = isMobile
-        ? { fitView: true, defaultViewport: undefined, fitViewOptions: MOBILE_FIT_VIEW_OPTIONS }
-        : { fitView: !savedViewport, defaultViewport: savedViewport, fitViewOptions: FIT_VIEW_OPTIONS };
+    const flowConfig = chromeless
+        ? { fitView: true, defaultViewport: undefined, fitViewOptions: CHROMELESS_FIT_VIEW_OPTIONS }
+        : isMobile
+          ? { fitView: true, defaultViewport: undefined, fitViewOptions: MOBILE_FIT_VIEW_OPTIONS }
+          : { fitView: !savedViewport, defaultViewport: savedViewport, fitViewOptions: FIT_VIEW_OPTIONS };
 
     return (
-        <div style={{ height: '100%', width: '100%' }}>
+        <div style={{ height: '100%', width: '100%' }} data-render-ready={renderReady ? 'true' : undefined}>
             <ReactFlow
                 // Remount when the diagram (resource) changes so a new architecture fits
                 // afresh; switching versions/moments keeps the same key and preserves the view.
@@ -223,7 +258,8 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
                     prop into an SVG `fill` presentation attribute, where `var()` does
                     not resolve. */}
                 <Background gap={16} />
-                {!isMobile && (
+                {chromeless && <RenderReadySignal onReady={markRenderReady} />}
+                {!chromeless && !isMobile && (
                     <Controls
                         style={{
                             background: THEME.colors.card,
@@ -244,7 +280,7 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
                         </ControlButton>
                     </Controls>
                 )}
-                {isMobile && (
+                {!chromeless && isMobile && (
                     // Mobile gets visible zoom controls (redesign problem #11) —
                     // larger touch cells, bottom-right per Frame F, no minimap
                     // toggle (mobile has no minimap) and no lock cell. Sized via the
@@ -259,7 +295,7 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
                         fitViewOptions={MOBILE_FIT_VIEW_OPTIONS}
                     />
                 )}
-                {!isMobile && !minimapHidden && (
+                {!chromeless && !isMobile && !minimapHidden && (
                     <MiniMap
                         data-testid="diagram-minimap"
                         className="calm-minimap-mask-surface"
@@ -289,7 +325,7 @@ export function ArchitectureGraph({ jsonData, onNodeClick, onEdgeClick, viewport
                         maskStrokeWidth={1.5}
                     />
                 )}
-                {!externalSearch && (
+                {!chromeless && !externalSearch && (
                     <Panel position="top-right">
                         <SearchBar
                             searchTerm={searchTerm}

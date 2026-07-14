@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { colors } from '../../../theme/colors.js';
 import { redesignTokens } from '../../../theme/redesign-tokens.js';
@@ -23,8 +23,15 @@ interface ItemCardProps {
      * When unset the footer falls back to the "N versions" scent or {@link customId}.
      */
     meta?: string;
-    /** Thumbnail header height in px (default 96; landing highlights use a shorter one). */
+    /** Thumbnail header height in px. The tall default gives rendered diagram thumbnails enough vertical space that the cover-fit crop stays modest. */
     thumbnailHeight?: number;
+    /**
+     * URL of a rendered diagram thumbnail (architectures/patterns). When set, an
+     * `<img>` fills the thumbnail header on top of the stripe background; if the
+     * image fails to load (e.g. no thumbnail rendered yet — the endpoint 404s)
+     * the header falls back to exactly the stripe(+icon) rendering.
+     */
+    thumbnailUrl?: string;
     /**
      * Overrides the glyph centred in the striped thumbnail. Pass a non-null node
      * to override; when unset or `null` the type's registry icon
@@ -67,13 +74,20 @@ export function ItemCard({
     customId,
     versionCount,
     meta,
-    thumbnailHeight = 96,
+    thumbnailHeight = 160,
+    thumbnailUrl,
     thumbnailIcon,
     active,
     testId = 'item-card',
     href,
     onActivate,
 }: ItemCardProps) {
+    // Tracks the thumbnail URL that failed to load, so the header falls back to
+    // the stripe(+icon) treatment; keying on the URL (not a boolean) means a
+    // changed thumbnailUrl naturally retries without an effect to reset state.
+    const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | undefined>(undefined);
+    const showThumbnailImage = thumbnailUrl !== undefined && thumbnailUrl !== failedThumbnailUrl;
+
     const { accent, accentText, tint } = getResourceTypeColors(type);
     // Registry-derived type glyph for the thumbnail; an explicit thumbnailIcon
     // prop still wins so callers can override the header treatment.
@@ -127,10 +141,28 @@ export function ItemCard({
             }}
         >
             <div
-                className={headerIcon ? 'flex items-center justify-center' : undefined}
+                className={!showThumbnailImage && headerIcon ? 'flex items-center justify-center' : undefined}
                 style={{ height: thumbnailHeight, background: stripes }}
             >
-                {headerIcon}
+                {showThumbnailImage ? (
+                    // Rendered diagram thumbnail on top of the stripe background; on
+                    // load failure fall back to the stripe(+icon) treatment below.
+                    // object-cover so the header is always fully filled (no letterbox
+                    // gaps); the image is clipped server-side to the diagram's own
+                    // bounds, so what the cover crop discards is real margin-free
+                    // content overflow, kept small by the taller header and the
+                    // near-card-shaped render stage.
+                    <img
+                        src={thumbnailUrl}
+                        alt=""
+                        loading="lazy"
+                        data-testid="item-card-thumbnail"
+                        className="h-full w-full object-cover"
+                        onError={() => setFailedThumbnailUrl(thumbnailUrl)}
+                    />
+                ) : (
+                    headerIcon
+                )}
             </div>
             <div className="p-[14px]">
                 {href ? (

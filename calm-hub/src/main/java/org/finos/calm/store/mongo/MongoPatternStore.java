@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import io.quarkus.arc.lookup.LookupIfProperty;
@@ -232,6 +233,41 @@ public class MongoPatternStore implements PatternStore {
         }
         writePatternToMongo(pattern);
         return pattern;
+    }
+
+    @Override
+    public void storeThumbnail(Pattern pattern, byte[] png) throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        // Validates namespace, pattern and version existence — no orphan thumbnails.
+        getPatternForVersion(pattern);
+
+        // Thumbnails live in a sibling sub-document keyed by dashed version
+        // (thumbnails.<1-0-0>), so the version's document value is untouched.
+        Document filter = new Document("namespace", pattern.getNamespace())
+                .append("patterns.patternId", pattern.getId());
+        Document update = new Document("$set",
+                new Document("patterns.$.thumbnails." + pattern.getMongoVersion(),
+                        Base64.getEncoder().encodeToString(png)));
+
+        patternCollection.updateOne(filter, update);
+    }
+
+    @Override
+    public byte[] getThumbnail(Pattern pattern) throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        Document result = retrievePatternVersions(pattern);
+
+        List<Document> patterns = result.getList("patterns", Document.class);
+        for (Document patternDoc : patterns) {
+            if (pattern.getId() == patternDoc.getInteger("patternId")) {
+                Document thumbnails = (Document) patternDoc.get("thumbnails");
+                if (thumbnails == null) {
+                    return null;
+                }
+                String encoded = thumbnails.getString(pattern.getMongoVersion());
+                return encoded == null ? null : Base64.getDecoder().decode(encoded);
+            }
+        }
+
+        throw new PatternNotFoundException();
     }
 
     private void writePatternToMongo(Pattern pattern) throws PatternNotFoundException, NamespaceNotFoundException {

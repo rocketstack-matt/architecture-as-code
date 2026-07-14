@@ -5,6 +5,7 @@ import { NamespacesPanel } from './admin/panels/NamespacesPanel.js';
 import { DomainsPanel } from './admin/panels/DomainsPanel.js';
 import { EntitlementsPanel } from './admin/panels/EntitlementsPanel.js';
 import { UserAccessProvider } from './admin/context/UserAccessContext.js';
+import { RenderView } from './render/RenderView.js';
 
 function App() {
     //TODO: The artifacts route will eventually need to be changed/replaced once we create a unique identifier for resources that can be used across CalmHubs.
@@ -18,6 +19,8 @@ function App() {
                     <Route path="/search" element={<Hub />} />
                     {/* The standalone /visualizer page was removed; redirect old links to the hub. */}
                     <Route path="/visualizer" element={<Navigate to="/" replace />} />
+                    {/* Chrome-free diagram page driven headlessly by calm-server for thumbnails. */}
+                    <Route path="/render" element={<RenderView />} />
                     <Route path="/namespace/:ns" element={<Hub />} />
                     <Route path="/domain/:domain" element={<Hub />} />
                     <Route path="/:namespace/:type/:id/:version" element={<Hub />} />

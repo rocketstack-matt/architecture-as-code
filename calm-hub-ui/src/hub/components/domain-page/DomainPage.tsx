@@ -89,7 +89,7 @@ export function DomainPage({ domain, controlCount, onControlLoad, selectedContro
                         No controls in this domain yet.
                     </p>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(280px,1fr))] max-w-[1240px]">
                         {controls.map((control) => (
                             <ControlCard
                                 key={control.id}

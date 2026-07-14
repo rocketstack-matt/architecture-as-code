@@ -21,6 +21,9 @@ vi.mock('reactflow', async () => {
     return {
         ...actual,
         __esModule: true,
+        // Nodes never measure in jsdom (and the stubbed ReactFlow provides no store
+        // context), so report them initialized for the chromeless ready-signal tests.
+        useNodesInitialized: () => true,
         default: (props: Record<string, unknown>) => {
             reactFlowProps.current = props;
             return <div data-testid="react-flow">{props.children as ReactNode}</div>;
@@ -147,6 +150,45 @@ describe('ArchitectureGraph', () => {
             render(<ArchitectureGraph jsonData={mockCalmData} />);
             expect(screen.queryByTestId('diagram-minimap')).not.toBeInTheDocument();
             expect(screen.getByRole('button', { name: /show minimap/i })).toBeInTheDocument();
+        });
+    });
+
+    describe('chromeless (thumbnail render mode)', () => {
+        it('suppresses the Controls, MiniMap and SearchBar chrome but keeps the Background', () => {
+            render(<ArchitectureGraph jsonData={mockCalmData} chromeless />);
+            expect(screen.queryByTestId('rf-controls')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('diagram-minimap')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('rf-panel')).not.toBeInTheDocument();
+            expect(screen.getByTestId('rf-background')).toBeInTheDocument();
+        });
+
+        it('always fits the whole graph, dropping below the desktop zoom floor', () => {
+            render(<ArchitectureGraph jsonData={mockCalmData} chromeless />);
+            expect(reactFlowProps.current?.fitView).toBe(true);
+            expect(reactFlowProps.current?.defaultViewport).toBeUndefined();
+            expect(reactFlowProps.current?.fitViewOptions).toEqual({
+                padding: 0.1,
+                minZoom: 0.05,
+                maxZoom: 0.8,
+            });
+        });
+
+        it('sets data-render-ready on the wrapper once nodes initialize and paint settles', async () => {
+            const { container } = render(<ArchitectureGraph jsonData={mockCalmData} chromeless />);
+            // Set asynchronously: one requestAnimationFrame after useNodesInitialized.
+            await vi.waitFor(() => {
+                expect(container.querySelector('[data-render-ready="true"]')).toBeInTheDocument();
+            });
+        });
+
+        it('signals ready immediately for a genuinely empty document', () => {
+            const { container } = render(<ArchitectureGraph jsonData={{}} chromeless />);
+            expect(container.querySelector('[data-render-ready="true"]')).toBeInTheDocument();
+        });
+
+        it('never sets data-render-ready in normal interactive mode', () => {
+            const { container } = render(<ArchitectureGraph jsonData={mockCalmData} />);
+            expect(container.querySelector('[data-render-ready]')).not.toBeInTheDocument();
         });
     });
 

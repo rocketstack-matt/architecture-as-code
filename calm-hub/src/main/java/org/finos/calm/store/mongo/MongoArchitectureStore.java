@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import io.quarkus.arc.lookup.LookupIfProperty;
@@ -236,6 +237,41 @@ public class MongoArchitectureStore implements ArchitectureStore {
 
         writeArchitectureToMongo(architecture);
         return architecture;
+    }
+
+    @Override
+    public void storeThumbnail(Architecture architecture, byte[] png) throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        // Validates namespace, architecture and version existence — no orphan thumbnails.
+        getArchitectureForVersion(architecture);
+
+        // Thumbnails live in a sibling sub-document keyed by dashed version
+        // (thumbnails.<1-0-0>), so the version's document value is untouched.
+        Document filter = new Document("namespace", architecture.getNamespace())
+                .append("architectures.architectureId", architecture.getId());
+        Document update = new Document("$set",
+                new Document("architectures.$.thumbnails." + architecture.getMongoVersion(),
+                        Base64.getEncoder().encodeToString(png)));
+
+        architectureCollection.updateOne(filter, update);
+    }
+
+    @Override
+    public byte[] getThumbnail(Architecture architecture) throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        Document result = retrieveArchitectureVersions(architecture);
+
+        List<Document> architectures = result.getList("architectures", Document.class);
+        for (Document architectureDoc : architectures) {
+            if (architecture.getId() == architectureDoc.getInteger("architectureId")) {
+                Document thumbnails = (Document) architectureDoc.get("thumbnails");
+                if (thumbnails == null) {
+                    return null;
+                }
+                String encoded = thumbnails.getString(architecture.getMongoVersion());
+                return encoded == null ? null : Base64.getDecoder().decode(encoded);
+            }
+        }
+
+        throw new ArchitectureNotFoundException();
     }
 
     private void writeArchitectureToMongo(Architecture architecture) throws ArchitectureNotFoundException, NamespaceNotFoundException {

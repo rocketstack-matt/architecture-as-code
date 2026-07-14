@@ -150,13 +150,21 @@ const SEARCH_GROUP_TYPE: Record<keyof GroupedSearchResults, CardResourceType> = 
 };
 
 /**
+ * The {@link CardResourceType} behind a lowercase search group key, or `undefined`
+ * for keys this registry doesn't know. Callers hold plain-string keys
+ * (`Object.entries`); unknown keys miss the map and fall out as undefined at
+ * runtime, hence the narrowing cast.
+ */
+export function getSearchGroupType(groupKey: string): CardResourceType | undefined {
+    return SEARCH_GROUP_TYPE[groupKey as keyof GroupedSearchResults];
+}
+
+/**
  * The type glyph for a search result group header, keyed by the lowercase
  * group key. `undefined` for unknown keys and for the icon-less visual types,
  * whose headers render label-only.
  */
 export function getSearchGroupIcon(groupKey: string): IconType | undefined {
-    // Callers hold plain-string keys (Object.entries); unknown keys miss the
-    // map and fall out as undefined at runtime, hence the narrowing cast.
-    const type: CardResourceType | undefined = SEARCH_GROUP_TYPE[groupKey as keyof GroupedSearchResults];
+    const type = getSearchGroupType(groupKey);
     return type === undefined ? undefined : RESOURCE_TYPE_META[type].icon;
 }

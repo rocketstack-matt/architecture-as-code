@@ -11,6 +11,7 @@ import org.finos.calm.domain.exception.PatternVersionExistsException;
 import org.finos.calm.domain.exception.PatternVersionNotFoundException;
 import org.finos.calm.domain.pattern.CreatePatternRequest;
 import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
+import org.finos.calm.services.ThumbnailService;
 import org.finos.calm.store.PageRequest;
 import org.finos.calm.store.PatternStore;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
@@ -31,8 +33,10 @@ import static org.finos.calm.resources.ResourceValidationConstants.OFFSET_MESSAG
 import static org.finos.calm.resources.ResourceValidationConstants.VERSION_MESSAGE;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @TestSecurity(authorizationEnabled = false)
@@ -42,6 +46,9 @@ public class TestPatternResourceShould {
 
     @InjectMock
     PatternStore mockPatternStore;
+
+    @InjectMock
+    ThumbnailService mockThumbnailService;
 
     @Test
     void return_a_404_when_an_invalid_namespace_is_provided_on_get_patterns() throws NamespaceNotFoundException {
@@ -422,5 +429,154 @@ public class TestPatternResourceShould {
                 .put("/api/calm/namespaces/test/patterns/20/versions/1.0.1")
                 .then()
                 .statusCode(403);
+    }
+
+    // --- Thumbnails ---
+
+    private static final byte[] PNG_BYTES = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
+
+    @Test
+    void return_stored_thumbnail_bytes_for_a_pattern_version() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        when(mockPatternStore.getThumbnail(any(Pattern.class))).thenReturn(PNG_BYTES);
+
+        byte[] body = given()
+                .when()
+                .get("/api/calm/namespaces/finos/patterns/12/versions/1.0.0/thumbnail")
+                .then()
+                .statusCode(200)
+                .contentType("image/png")
+                .header("Cache-Control", equalTo("private, max-age=300"))
+                .extract().asByteArray();
+
+        assertArrayEquals(PNG_BYTES, body);
+        Pattern expected = new Pattern.PatternBuilder()
+                .setNamespace("finos").setId(12).setVersion("1.0.0").build();
+        verify(mockPatternStore, times(1)).getThumbnail(expected);
+    }
+
+    @Test
+    void return_a_404_for_a_missing_pattern_thumbnail_when_rendering_is_disabled() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        when(mockPatternStore.getThumbnail(any(Pattern.class))).thenReturn(null);
+        when(mockThumbnailService.isEnabled()).thenReturn(false);
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/patterns/12/versions/1.0.0/thumbnail")
+                .then()
+                .statusCode(404);
+
+        verify(mockThumbnailService, never()).renderSync(anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void render_a_missing_pattern_thumbnail_on_demand_and_return_it() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        String patternJson = "{ \"test\": \"json\" }";
+        when(mockPatternStore.getThumbnail(any(Pattern.class))).thenReturn(null);
+        when(mockPatternStore.getPatternForVersion(any(Pattern.class))).thenReturn(patternJson);
+        when(mockThumbnailService.isEnabled()).thenReturn(true);
+        when(mockThumbnailService.renderSync(anyString(), anyString(), anyString(), any()))
+                .thenReturn(Optional.of(PNG_BYTES));
+
+        byte[] body = given()
+                .when()
+                .get("/api/calm/namespaces/finos/patterns/12/versions/1.0.0/thumbnail")
+                .then()
+                .statusCode(200)
+                .contentType("image/png")
+                .extract().asByteArray();
+
+        assertArrayEquals(PNG_BYTES, body);
+        verify(mockThumbnailService, times(1)).renderSync(
+                eq("finos/patterns/12/1.0.0"), eq("pattern"), eq(patternJson), any());
+    }
+
+    @Test
+    void return_a_404_when_the_on_demand_pattern_thumbnail_render_fails() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        when(mockPatternStore.getThumbnail(any(Pattern.class))).thenReturn(null);
+        when(mockPatternStore.getPatternForVersion(any(Pattern.class))).thenReturn("{}");
+        when(mockThumbnailService.isEnabled()).thenReturn(true);
+        when(mockThumbnailService.renderSync(anyString(), anyString(), anyString(), any()))
+                .thenReturn(Optional.empty());
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/patterns/12/versions/1.0.0/thumbnail")
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    void return_the_latest_version_pattern_thumbnail_when_no_version_is_specified() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        // 10.0.0 is latest under numeric segment comparison (a lexical compare would pick 9.0.0)
+        when(mockPatternStore.getPatternVersions(any(Pattern.class)))
+                .thenReturn(List.of("1.0.0", "10.0.0", "9.0.0"));
+        when(mockPatternStore.getThumbnail(any(Pattern.class))).thenReturn(PNG_BYTES);
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/patterns/12/thumbnail")
+                .then()
+                .statusCode(200)
+                .contentType("image/png");
+
+        Pattern expected = new Pattern.PatternBuilder()
+                .setNamespace("finos").setId(12).setVersion("10.0.0").build();
+        verify(mockPatternStore, times(1)).getThumbnail(expected);
+    }
+
+    @Test
+    void return_a_404_for_a_latest_thumbnail_of_an_unknown_pattern() throws NamespaceNotFoundException, PatternNotFoundException {
+        when(mockPatternStore.getPatternVersions(any(Pattern.class)))
+                .thenThrow(new PatternNotFoundException());
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/patterns/99/thumbnail")
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    void trigger_an_async_thumbnail_render_after_a_successful_pattern_version_create() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionExistsException {
+        String patternJson = "{ \"test\": \"json\" }";
+        when(mockPatternStore.createPatternForVersion(any(Pattern.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreatePatternRequest patternRequest = new CreatePatternRequest();
+        patternRequest.setName("test-pattern");
+        patternRequest.setDescription("test description");
+        patternRequest.setPatternJson(patternJson);
+
+        given()
+                .header("Content-Type", "application/json")
+                .body(patternRequest)
+                .when()
+                .post("/api/calm/namespaces/test/patterns/20/versions/1.0.1")
+                .then()
+                .statusCode(201);
+
+        verify(mockThumbnailService, times(1)).triggerRender(
+                eq("test/patterns/20/1.0.1"), eq("pattern"), eq(patternJson), any());
+    }
+
+    @Test
+    void not_trigger_a_thumbnail_render_when_the_pattern_version_create_fails() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionExistsException {
+        when(mockPatternStore.createPatternForVersion(any(Pattern.class)))
+                .thenThrow(new PatternVersionExistsException());
+
+        CreatePatternRequest patternRequest = new CreatePatternRequest();
+        patternRequest.setName("test-pattern");
+        patternRequest.setDescription("test description");
+        patternRequest.setPatternJson("{ \"test\": \"json\" }");
+
+        given()
+                .header("Content-Type", "application/json")
+                .body(patternRequest)
+                .when()
+                .post("/api/calm/namespaces/test/patterns/20/versions/1.0.1")
+                .then()
+                .statusCode(409);
+
+        verify(mockThumbnailService, never()).triggerRender(anyString(), anyString(), anyString(), any());
     }
 }

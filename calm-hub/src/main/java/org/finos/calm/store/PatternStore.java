@@ -36,4 +36,23 @@ public interface PatternStore {
     String getPatternForVersion(Pattern pattern) throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException;
     Pattern createPatternForVersion(Pattern pattern) throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionExistsException;
     Pattern updatePatternForVersion(Pattern pattern) throws NamespaceNotFoundException, PatternNotFoundException;
+
+    /**
+     * Store a rendered PNG thumbnail for the pattern version identified by
+     * {@code pattern} (namespace, id, version). Stored base64-encoded alongside —
+     * never inside — the version's document value, so the document itself is untouched.
+     *
+     * @param pattern the pattern version the thumbnail belongs to
+     * @param png     the PNG bytes to store
+     */
+    void storeThumbnail(Pattern pattern, byte[] png) throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException;
+
+    /**
+     * Retrieve the stored thumbnail for the pattern version identified by
+     * {@code pattern} (namespace, id, version).
+     *
+     * @param pattern the pattern version to fetch the thumbnail for
+     * @return the PNG bytes, or {@code null} when no thumbnail is stored for the version
+     */
+    byte[] getThumbnail(Pattern pattern) throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException;
 }

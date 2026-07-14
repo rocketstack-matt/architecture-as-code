@@ -58,14 +58,26 @@ src/
 │   ├── helpers/          # Pure helpers (e.g. set-functions)
 │   └── services/         # e.g. node-position-service
 ├── diff/                 # Architecture diff view (components, model, fixtures)
+├── render/               # Chrome-free /#/render route (RenderView), driven headlessly by calm-server for card thumbnails
 ├── components/           # Shared/common components
 ├── fixtures/             # Test fixtures
-└── theme/                # Theme configuration
+└── theme/                # Theme configuration + resource-type registry
 ```
 
 The `visualizer/contracts/*-contracts.ts` files hold the typed interfaces shared
 across the visualiser (nodes, edges, decorators, panels, etc.); add new
 visualiser-facing types there rather than inline.
+
+`src/render/RenderView.tsx` backs the `/#/render` route: it reads the
+`window.__CALM_RENDER_DATA` payload injected by calm-server's thumbnail endpoint and
+mounts the architecture/pattern graph in a `chromeless` mode (no Controls/MiniMap/search
+chrome, whole-graph fit) that sets `data-render-ready` once layout settles so the
+headless browser knows when to screenshot. There is no fetch fallback — the injected
+payload is the only supported path.
+
+`src/theme/resource-type-meta.ts` is the single registry for per-resource-type
+presentation (label, colors, icon) used by browse cards, type tabs and search group
+headers — extend it there rather than hardcoding per-type values in components.
 
 ## Conventions
 

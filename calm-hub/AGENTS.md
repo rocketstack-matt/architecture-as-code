@@ -106,6 +106,38 @@ Resource types are not limited to architectures/patterns/controls — the `resou
 package also covers ADR, Decorator, Domain, Flow, Interface, Standard, Timeline,
 Search, and UserAccess (per-namespace and domain-level access grants).
 
+### Diagram Thumbnails (calm-server render pipeline)
+
+Architecture and pattern versions can carry a rendered PNG thumbnail, produced by an
+external calm-server instance that drives this hub's own UI (`/#/render`) in a headless
+browser. Disabled by default; enabled by configuring the render service URL.
+
+**Configuration** (`application.properties`, unset/commented in all profiles):
+- `calm.render.service-url` — base URL of a calm-server whose `/calm/render/thumbnail`
+  endpoint does the rendering. Unset/empty = feature disabled (thumbnail GETs 404,
+  writes never attempt a render)
+- `calm.render.timeout-ms` — per-render timeout (default 20000)
+- `calm.render.failure-cache-ttl-ms` — how long a failed render/store is remembered per
+  version; GET misses within the window 404 immediately instead of re-rendering (default 60000)
+
+**Endpoints** (on `ArchitectureResource`/`PatternResource`, `@PermissionsAllowed(READ)`,
+respond `image/png` or 404):
+- `GET {namespace}/architectures/{id}/versions/{version}/thumbnail` (patterns likewise)
+- `GET {namespace}/architectures/{id}/thumbnail` — latest version (numeric per-segment
+  version ordering, mirroring the UI's `pickLatestVersion`)
+
+**Flow**: after a successful architecture/pattern write the resource fires an async
+render via `ThumbnailService` (`services/ThumbnailService.java`) — render failures never
+fail the write. A GET for a missing thumbnail attempts a synchronous self-healing render
+(single-flight per `namespace/type/id/version`) before 404ing. Thumbnails are stored
+base64-encoded per version in a `thumbnails` sub-document sibling to `versions` in both
+the Mongo and Nitrite stores, so the version's document value is untouched.
+
+**Deployment caveat**: the pipeline needs the Hub UI and the thumbnail GETs reachable
+without interactive auth (standalone / no-auth / proxy-auth / public-read) — in secure
+OIDC mode the headless browser cannot log in and the browse cards' `<img>` requests
+cannot send bearer tokens, so leave `calm.render.service-url` unset there.
+
 ### Storage Mode Selection
 
 CALM Hub supports pluggable storage backends via CDI Producers:

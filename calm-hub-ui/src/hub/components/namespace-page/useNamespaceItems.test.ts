@@ -65,6 +65,27 @@ describe('useNamespaceItems', () => {
         ]);
     });
 
+    it('builds a latest-version thumbnail URL for architectures from the numeric id', async () => {
+        const { result } = renderHook(() => useNamespaceItems('traderx'));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        const arch = result.current.groups.find((g) => g.type === 'Architectures');
+        // The numeric summary id (1), not the customId slug, addresses the storage API.
+        expect(arch?.items[0].thumbnailUrl).toBe('/api/calm/namespaces/traderx/architectures/1/thumbnail');
+    });
+
+    it('sets no thumbnail URL on non-diagram types', async () => {
+        const { result } = renderHook(() => useNamespaceItems('traderx'));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        for (const type of ['Flows', 'Standards', 'ADRs', 'Interfaces'] as const) {
+            const group = result.current.groups.find((g) => g.type === type);
+            for (const item of group?.items ?? []) {
+                expect(item.thumbnailUrl).toBeUndefined();
+            }
+        }
+    });
+
     it('labels ADRs with title and status, and keeps numeric interface ids', async () => {
         const { result } = renderHook(() => useNamespaceItems('traderx'));
         await waitFor(() => expect(result.current.loading).toBe(false));

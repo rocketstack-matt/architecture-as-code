@@ -89,7 +89,7 @@ export function NamespacePage({ namespace, counts }: NamespacePageProps) {
                         message={`No ${getResourceTypeMeta(active).pluralLabel} in this namespace yet`}
                     />
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(280px,1fr))] max-w-[1240px]">
                         {activeItems.map((item) => (
                             <ItemCard
                                 key={`${active}-${item.id}`}
@@ -98,6 +98,7 @@ export function NamespacePage({ namespace, counts }: NamespacePageProps) {
                                 type={active}
                                 customId={item.customId}
                                 versionCount={item.versionCount}
+                                thumbnailUrl={item.thumbnailUrl}
                                 onActivate={() => openItem(active, item.id)}
                             />
                         ))}

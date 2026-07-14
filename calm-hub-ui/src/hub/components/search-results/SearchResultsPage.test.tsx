@@ -99,6 +99,38 @@ describe('SearchResultsPage', () => {
         expect(screen.queryByTestId('search-group-icon-architectures')).not.toBeInTheDocument();
     });
 
+    it('renders results as browse cards: thumbnails for architectures, meta namespace chip', async () => {
+        renderPage('/search?q=test', createMockSearchService(vi.fn().mockResolvedValue(iconGroupResults)));
+
+        expect(await screen.findByText('Test Architecture')).toBeInTheDocument();
+        // Both results render as shared ItemCards...
+        expect(screen.getAllByTestId('item-card')).toHaveLength(2);
+        // ...the architecture card carries its latest-version thumbnail image...
+        const img = screen.getByTestId('item-card-thumbnail');
+        expect(img).toHaveAttribute('src', '/api/calm/namespaces/finos/architectures/1/thumbnail');
+        // ...while the flow card has no thumbnail (registry icon instead).
+        expect(screen.getByTestId('thumbnail-type-icon')).toBeInTheDocument();
+        // The namespace rides in the card's footer meta chip.
+        expect(screen.getAllByText('finos')).toHaveLength(2);
+    });
+
+    it('drops result groups the registry does not know instead of crashing', async () => {
+        // A newer backend may return group keys this UI predates; those groups must
+        // be dropped before ItemCard's non-null type assertion, not rendered.
+        const withUnknownGroup = {
+            ...iconGroupResults,
+            widgets: [{ namespace: 'finos', id: 9, name: 'Mystery Widget', description: 'Unknown group' }],
+        } as unknown as GroupedSearchResults;
+        renderPage('/search?q=test', createMockSearchService(vi.fn().mockResolvedValue(withUnknownGroup)));
+
+        // The known groups still render...
+        expect(await screen.findByText('Test Architecture')).toBeInTheDocument();
+        expect(screen.getByText('Trade Flow')).toBeInTheDocument();
+        // ...while the unknown group and its items are dropped entirely.
+        expect(screen.queryByText('Mystery Widget')).not.toBeInTheDocument();
+        expect(screen.queryByText(/widgets/i)).not.toBeInTheDocument();
+    });
+
     it('shows an empty state when nothing matches', async () => {
         renderPage('/search?q=zzz', createMockSearchService(vi.fn().mockResolvedValue(emptyResults)));
         expect(await screen.findByText(/No results found for/i)).toBeInTheDocument();

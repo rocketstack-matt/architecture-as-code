@@ -13,6 +13,7 @@ import org.finos.calm.domain.exception.ArchitectureNotFoundException;
 import org.finos.calm.domain.exception.ArchitectureVersionExistsException;
 import org.finos.calm.domain.exception.ArchitectureVersionNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
+import org.finos.calm.services.ThumbnailService;
 import org.finos.calm.store.ArchitectureStore;
 import org.finos.calm.store.PageRequest;
 import org.finos.calm.store.TimelineStore;
@@ -24,6 +25,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
@@ -33,8 +35,10 @@ import static org.finos.calm.resources.ResourceValidationConstants.OFFSET_MESSAG
 import static org.finos.calm.resources.ResourceValidationConstants.VERSION_MESSAGE;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @TestSecurity(authorizationEnabled = false)
@@ -49,6 +53,9 @@ public class TestArchitectureResourceShould {
 
     @InjectMock
     TimelineStore mockTimelineStore;
+
+    @InjectMock
+    ThumbnailService mockThumbnailService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -499,5 +506,165 @@ public class TestArchitectureResourceShould {
                 .body("moments[0].details.'detailed-architecture'",
                         equalTo("/api/calm/namespaces/finos/architectures/42/versions/1.0.0"))
                 .body("moments[1].'unique-id'", equalTo("1.1.0"));
+    }
+
+    // --- Thumbnails ---
+
+    private static final byte[] PNG_BYTES = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
+
+    @Test
+    void return_stored_thumbnail_bytes_for_an_architecture_version() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        when(mockArchitectureStore.getThumbnail(any(Architecture.class))).thenReturn(PNG_BYTES);
+
+        byte[] body = given()
+                .when()
+                .get("/api/calm/namespaces/finos/architectures/12/versions/1.0.0/thumbnail")
+                .then()
+                .statusCode(200)
+                .contentType("image/png")
+                .header("Cache-Control", equalTo("private, max-age=300"))
+                .extract().asByteArray();
+
+        assertArrayEquals(PNG_BYTES, body);
+        Architecture expected = new Architecture.ArchitectureBuilder()
+                .setNamespace("finos").setId(12).setVersion("1.0.0").build();
+        verify(mockArchitectureStore, times(1)).getThumbnail(expected);
+    }
+
+    @Test
+    void return_a_404_for_a_missing_thumbnail_when_rendering_is_disabled() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        when(mockArchitectureStore.getThumbnail(any(Architecture.class))).thenReturn(null);
+        when(mockThumbnailService.isEnabled()).thenReturn(false);
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/architectures/12/versions/1.0.0/thumbnail")
+                .then()
+                .statusCode(404);
+
+        verify(mockThumbnailService, never()).renderSync(anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void render_a_missing_thumbnail_on_demand_and_return_it() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        String architectureJson = "{ \"test\": \"json\" }";
+        when(mockArchitectureStore.getThumbnail(any(Architecture.class))).thenReturn(null);
+        when(mockArchitectureStore.getArchitectureForVersion(any(Architecture.class))).thenReturn(architectureJson);
+        when(mockThumbnailService.isEnabled()).thenReturn(true);
+        when(mockThumbnailService.renderSync(anyString(), anyString(), anyString(), any()))
+                .thenReturn(Optional.of(PNG_BYTES));
+
+        byte[] body = given()
+                .when()
+                .get("/api/calm/namespaces/finos/architectures/12/versions/1.0.0/thumbnail")
+                .then()
+                .statusCode(200)
+                .contentType("image/png")
+                .extract().asByteArray();
+
+        assertArrayEquals(PNG_BYTES, body);
+        verify(mockThumbnailService, times(1)).renderSync(
+                eq("finos/architectures/12/1.0.0"), eq("architecture"), eq(architectureJson), any());
+    }
+
+    @Test
+    void return_a_404_when_the_on_demand_thumbnail_render_fails() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        when(mockArchitectureStore.getThumbnail(any(Architecture.class))).thenReturn(null);
+        when(mockArchitectureStore.getArchitectureForVersion(any(Architecture.class))).thenReturn("{}");
+        when(mockThumbnailService.isEnabled()).thenReturn(true);
+        when(mockThumbnailService.renderSync(anyString(), anyString(), anyString(), any()))
+                .thenReturn(Optional.empty());
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/architectures/12/versions/1.0.0/thumbnail")
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    void return_a_404_for_a_thumbnail_of_an_unknown_architecture_version() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        when(mockArchitectureStore.getThumbnail(any(Architecture.class))).thenThrow(new ArchitectureVersionNotFoundException());
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/architectures/12/versions/9.9.9/thumbnail")
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    void return_the_latest_version_thumbnail_when_no_version_is_specified() throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        // 10.0.0 is latest under numeric segment comparison (a lexical compare would pick 9.0.0)
+        when(mockArchitectureStore.getArchitectureVersions(any(Architecture.class)))
+                .thenReturn(List.of("1.0.0", "10.0.0", "9.0.0"));
+        when(mockArchitectureStore.getThumbnail(any(Architecture.class))).thenReturn(PNG_BYTES);
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/architectures/12/thumbnail")
+                .then()
+                .statusCode(200)
+                .contentType("image/png");
+
+        Architecture expected = new Architecture.ArchitectureBuilder()
+                .setNamespace("finos").setId(12).setVersion("10.0.0").build();
+        verify(mockArchitectureStore, times(1)).getThumbnail(expected);
+    }
+
+    @Test
+    void return_a_404_for_a_latest_thumbnail_of_an_unknown_architecture() throws NamespaceNotFoundException, ArchitectureNotFoundException {
+        when(mockArchitectureStore.getArchitectureVersions(any(Architecture.class)))
+                .thenThrow(new ArchitectureNotFoundException());
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/architectures/99/thumbnail")
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    void trigger_an_async_thumbnail_render_after_a_successful_version_create() throws ArchitectureNotFoundException, ArchitectureVersionExistsException, NamespaceNotFoundException {
+        String architectureJson = "{ \"test\": \"json\" }";
+        when(mockArchitectureStore.createArchitectureForVersion(any(Architecture.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ArchitectureRequest architectureRequest = new ArchitectureRequest();
+        architectureRequest.setName(TEST_NAME);
+        architectureRequest.setDescription(TEST_DESCRIPTION);
+        architectureRequest.setArchitectureJson(architectureJson);
+
+        given()
+                .header("Content-Type", "application/json")
+                .body(architectureRequest)
+                .when()
+                .post("/api/calm/namespaces/test/architectures/20/versions/1.0.1")
+                .then()
+                .statusCode(201);
+
+        verify(mockThumbnailService, times(1)).triggerRender(
+                eq("test/architectures/20/1.0.1"), eq("architecture"), eq(architectureJson), any());
+    }
+
+    @Test
+    void not_trigger_a_thumbnail_render_when_the_version_create_fails() throws ArchitectureNotFoundException, ArchitectureVersionExistsException, NamespaceNotFoundException {
+        when(mockArchitectureStore.createArchitectureForVersion(any(Architecture.class)))
+                .thenThrow(new ArchitectureVersionExistsException());
+
+        ArchitectureRequest architectureRequest = new ArchitectureRequest();
+        architectureRequest.setName(TEST_NAME);
+        architectureRequest.setDescription(TEST_DESCRIPTION);
+        architectureRequest.setArchitectureJson("{ \"test\": \"json\" }");
+
+        given()
+                .header("Content-Type", "application/json")
+                .body(architectureRequest)
+                .when()
+                .post("/api/calm/namespaces/test/architectures/20/versions/1.0.1")
+                .then()
+                .statusCode(409);
+
+        verify(mockThumbnailService, never()).triggerRender(anyString(), anyString(), anyString(), any());
     }
 }

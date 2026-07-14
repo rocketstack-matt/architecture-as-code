@@ -37,6 +37,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -54,6 +55,7 @@ public class TestMongoPatternStoreShould {
     MongoNamespaceStore namespaceStore;
 
     private final String validJson = "{\"test\": \"test\"}";
+    private static final String NAMESPACE = "finos";
 
     private MongoPatternStore mongoPatternStore;
     private MongoCollection<Document> patternCollection;
@@ -559,5 +561,80 @@ public class TestMongoPatternStoreShould {
         Document set = (Document) updateCaptor.getValue().get("$set");
         assertThat(set.getString("patterns.$.name"), is("updated"));
         assertThat(set.getString("patterns.$.description"), is("updated desc"));
+    }
+
+    // --- Thumbnails ---
+
+    private static final byte[] PNG_BYTES = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
+
+    @Test
+    void store_a_thumbnail_in_a_sibling_thumbnails_sub_document() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        mockSetupPatternDocumentWithVersions();
+
+        Pattern pattern = new Pattern.PatternBuilder().setNamespace(NAMESPACE)
+                .setId(42).setVersion("1.0.0").build();
+
+        mongoPatternStore.storeThumbnail(pattern, PNG_BYTES);
+
+        Document expectedFilter = new Document("namespace", NAMESPACE)
+                .append("patterns.patternId", 42);
+        Document expectedUpdate = new Document("$set",
+                new Document("patterns.$.thumbnails.1-0-0", Base64.getEncoder().encodeToString(PNG_BYTES)));
+
+        verify(patternCollection).updateOne(eq(expectedFilter), eq(expectedUpdate));
+    }
+
+    @Test
+    void throw_a_version_exception_when_storing_a_thumbnail_for_a_missing_version() {
+        mockSetupPatternDocumentWithVersions();
+
+        Pattern pattern = new Pattern.PatternBuilder().setNamespace(NAMESPACE)
+                .setId(42).setVersion("9.0.0").build();
+
+        assertThrows(PatternVersionNotFoundException.class,
+                () -> mongoPatternStore.storeThumbnail(pattern, PNG_BYTES));
+
+        verify(patternCollection, never()).updateOne(any(Bson.class), any(Bson.class));
+    }
+
+    @Test
+    void return_null_when_no_thumbnail_is_stored_for_a_version() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        mockSetupPatternDocumentWithVersions();
+
+        Pattern pattern = new Pattern.PatternBuilder().setNamespace(NAMESPACE)
+                .setId(42).setVersion("1.0.0").build();
+
+        assertThat(mongoPatternStore.getThumbnail(pattern), is((byte[]) null));
+    }
+
+    @Test
+    void return_stored_thumbnail_bytes_for_a_version() throws NamespaceNotFoundException, PatternNotFoundException, PatternVersionNotFoundException {
+        Document storedPattern = new Document("patternId", 42)
+                .append("versions", new Document("1-0-0", Document.parse(validJson)))
+                .append("thumbnails", new Document("1-0-0", Base64.getEncoder().encodeToString(PNG_BYTES)));
+        Document namespaceDoc = new Document("namespace", NAMESPACE)
+                .append("patterns", List.of(storedPattern));
+
+        DocumentFindIterable findIterable = Mockito.mock(DocumentFindIterable.class);
+        when(namespaceStore.namespaceExists(anyString())).thenReturn(true);
+        when(patternCollection.find(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.projection(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(namespaceDoc);
+
+        Pattern pattern = new Pattern.PatternBuilder().setNamespace(NAMESPACE)
+                .setId(42).setVersion("1.0.0").build();
+
+        assertArrayEquals(PNG_BYTES, mongoPatternStore.getThumbnail(pattern));
+    }
+
+    @Test
+    void throw_a_pattern_exception_when_getting_a_thumbnail_for_a_missing_pattern() {
+        mockSetupPatternDocumentWithVersions();
+
+        Pattern pattern = new Pattern.PatternBuilder().setNamespace(NAMESPACE)
+                .setId(99).setVersion("1.0.0").build();
+
+        assertThrows(PatternNotFoundException.class,
+                () -> mongoPatternStore.getThumbnail(pattern));
     }
 }

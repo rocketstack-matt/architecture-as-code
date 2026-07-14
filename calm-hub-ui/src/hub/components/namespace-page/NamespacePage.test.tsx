@@ -163,6 +163,21 @@ describe('NamespacePage', () => {
         });
     });
 
+    it('renders architecture cards with the latest-version thumbnail image', async () => {
+        renderPage();
+        await screen.findByText('Arch One');
+        expect(screen.getByTestId('item-card-thumbnail')).toHaveAttribute(
+            'src',
+            '/api/calm/namespaces/traderx/architectures/1/thumbnail'
+        );
+    });
+
+    it('renders interface cards without a thumbnail image', async () => {
+        renderPage(['/namespace/traderx?type=interfaces']);
+        await screen.findByText('My Interface');
+        expect(screen.queryByTestId('item-card-thumbnail')).not.toBeInTheDocument();
+    });
+
     it('wires the tabpanel to the active tab (aria-controls / aria-labelledby)', async () => {
         renderPage();
         const panel = screen.getByRole('tabpanel');

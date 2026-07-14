@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
@@ -46,6 +47,7 @@ public class NitriteArchitectureStore implements ArchitectureStore {
     private static final String ARCHITECTURE_ID_FIELD = "architectureId";
     private static final String ARCHITECTURES_FIELD = "architectures";
     private static final String VERSIONS_FIELD = "versions";
+    private static final String THUMBNAILS_FIELD = "thumbnails";
     private static final String NAME_FIELD = "name";
     private static final String DESCRIPTION_FIELD = "description";
 
@@ -265,8 +267,80 @@ public class NitriteArchitectureStore implements ArchitectureStore {
 
         validateArchitectureJson(architecture.getArchitectureJson());
 
-        writeArchitectureToNitrite(architecture);
+        // Locked like the create path: the write is a whole-namespace-document
+        // read-modify-write, so an unlocked update racing another RMW (e.g. an async
+        // storeThumbnail callback) could silently discard this PUT's content.
+        lock.lock();
+        try {
+            writeArchitectureToNitrite(architecture);
+        } finally {
+            lock.unlock();
+        }
         return architecture;
+    }
+
+    @Override
+    public void storeThumbnail(Architecture architecture, byte[] png) throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        // Validates namespace, architecture and version existence — no orphan thumbnails.
+        getArchitectureForVersion(architecture);
+
+        lock.lock();
+        try {
+            Filter filter = where(NAMESPACE_FIELD).eq(architecture.getNamespace());
+            Document namespaceDoc = architectureCollection.find(filter).firstOrNull();
+            if (namespaceDoc == null) {
+                throw new NamespaceNotFoundException();
+            }
+
+            List<Document> architectures = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class).getList(ARCHITECTURES_FIELD);
+            if (architectures == null) {
+                throw new ArchitectureNotFoundException();
+            }
+            architectures = new ArrayList<>(architectures); // Make a mutable copy
+
+            for (int i = 0; i < architectures.size(); i++) {
+                Document architectureDoc = architectures.get(i);
+                if (architectureDoc.get(ARCHITECTURE_ID_FIELD, Integer.class) == architecture.getId()) {
+                    // Thumbnails live in a sibling nested document keyed by dashed
+                    // version, so the version's JSON string value is untouched.
+                    Document thumbnails = architectureDoc.get(THUMBNAILS_FIELD, Document.class);
+                    if (thumbnails == null) {
+                        thumbnails = Document.createDocument();
+                    }
+                    thumbnails.put(architecture.getMongoVersion(), Base64.getEncoder().encodeToString(png));
+                    architectureDoc.put(THUMBNAILS_FIELD, thumbnails);
+                    architectures.set(i, architectureDoc);
+                    namespaceDoc.put(ARCHITECTURES_FIELD, architectures);
+                    architectureCollection.update(filter, namespaceDoc);
+                    LOG.debug("Stored thumbnail for version '{}' of architecture {} in namespace '{}'",
+                            architecture.getDotVersion(), architecture.getId(), architecture.getNamespace());
+                    return;
+                }
+            }
+
+            throw new ArchitectureNotFoundException();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public byte[] getThumbnail(Architecture architecture) throws NamespaceNotFoundException, ArchitectureNotFoundException, ArchitectureVersionNotFoundException {
+        Document result = retrieveArchitectureVersions(architecture);
+
+        List<Document> architectures = new TypeSafeNitriteDocument<>(result, Document.class).getList(ARCHITECTURES_FIELD);
+        for (Document architectureDoc : architectures) {
+            if (architecture.getId() == architectureDoc.get(ARCHITECTURE_ID_FIELD, Integer.class)) {
+                Document thumbnails = architectureDoc.get(THUMBNAILS_FIELD, Document.class);
+                if (thumbnails == null) {
+                    return null;
+                }
+                Object encoded = thumbnails.get(architecture.getMongoVersion());
+                return encoded instanceof String s ? Base64.getDecoder().decode(s) : null;
+            }
+        }
+
+        throw new ArchitectureNotFoundException();
     }
 
     /**
