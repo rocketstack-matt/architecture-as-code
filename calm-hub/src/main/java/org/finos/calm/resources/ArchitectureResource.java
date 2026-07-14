@@ -412,7 +412,9 @@ public class ArchitectureResource {
     }
 
     private Response thumbnailNotFoundResponse() {
-        return Response.status(Response.Status.NOT_FOUND).entity("No thumbnail available").build();
+        // Explicit text/plain: the thumbnail endpoints @Produces image/png, and a text
+        // entity must not be negotiated onto the image media type.
+        return Response.status(Response.Status.NOT_FOUND).entity("No thumbnail available").type(MediaType.TEXT_PLAIN).build();
     }
 
     private Response architectureWithLocationResponse(Architecture architecture) throws URISyntaxException {

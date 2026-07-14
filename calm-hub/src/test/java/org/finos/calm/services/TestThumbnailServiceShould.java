@@ -73,6 +73,7 @@ public class TestThumbnailServiceShould {
 
     private HttpServer server;
     private final AtomicReference<String> capturedBody = new AtomicReference<>();
+    private final AtomicReference<String> capturedPath = new AtomicReference<>();
     private final AtomicInteger responseStatus = new AtomicInteger(200);
     private final AtomicInteger requestCount = new AtomicInteger(0);
 
@@ -81,6 +82,7 @@ public class TestThumbnailServiceShould {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/calm/render/thumbnail", exchange -> {
             requestCount.incrementAndGet();
+            capturedPath.set(exchange.getRequestURI().getPath());
             capturedBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             int status = responseStatus.get();
             byte[] payload = status == 200 ? PNG_BYTES : "{\"error\":\"render failed\"}".getBytes(StandardCharsets.UTF_8);
@@ -105,6 +107,21 @@ public class TestThumbnailServiceShould {
     private ThumbnailService serviceAgainstFixture(long failureCacheTtlMs) {
         String url = "http://127.0.0.1:" + server.getAddress().getPort();
         return new ThumbnailService(url, UI_BASE_URL, TIMEOUT_MS, failureCacheTtlMs, HttpClient.newHttpClient());
+    }
+
+    @Test
+    void normalise_a_trailing_slash_on_the_render_service_url() throws Exception {
+        // A configured base URL of "http://host:3000/" must not produce a
+        // "//calm/render/thumbnail" request path.
+        String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/";
+        ThumbnailService service = new ThumbnailService(url, UI_BASE_URL, TIMEOUT_MS, FAILURE_TTL_MS, HttpClient.newHttpClient());
+        @SuppressWarnings("unchecked")
+        Consumer<byte[]> callback = mock(Consumer.class);
+
+        Optional<byte[]> result = service.renderSync("finos/architectures/1/1.0.0", "architecture", DOCUMENT_JSON, callback);
+
+        assertTrue(result.isPresent());
+        assertThat(capturedPath.get(), is("/calm/render/thumbnail"));
     }
 
     @Test

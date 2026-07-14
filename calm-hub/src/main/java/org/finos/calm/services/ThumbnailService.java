@@ -86,7 +86,9 @@ public class ThumbnailService {
 
     /** Visible-for-testing constructor allowing an injected {@link HttpClient}. */
     ThumbnailService(String renderServiceUrl, String uiBaseUrl, long timeoutMs, long failureCacheTtlMs, HttpClient httpClient) {
-        this.renderServiceUrl = renderServiceUrl == null ? "" : renderServiceUrl.trim();
+        // Trailing slashes are stripped so a configured base URL of "http://host:3000/"
+        // doesn't produce a double-slash render path (mirrors calm-server's uiBaseUrl handling).
+        this.renderServiceUrl = renderServiceUrl == null ? "" : renderServiceUrl.trim().replaceAll("/+$", "");
         this.uiBaseUrl = uiBaseUrl;
         this.timeoutMs = timeoutMs;
         this.failureCacheTtlMs = failureCacheTtlMs;

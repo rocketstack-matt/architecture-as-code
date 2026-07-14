@@ -58,6 +58,20 @@ function clampTimeout(timeoutMs: unknown): number {
     return Math.min(timeoutMs, MAX_TIMEOUT_MS);
 }
 
+/*
+ * Minimal shapes of the two browser globals {@link computeDiagramClip} touches.
+ * The function executes inside the page via `page.evaluate`, but calm-server is a
+ * Node service whose tsconfig deliberately excludes the DOM lib — these local
+ * declarations keep the in-page function type-checked without dragging DOM typings
+ * into the rest of the server.
+ */
+declare const document: {
+    querySelectorAll(selector: string): Iterable<{
+        getBoundingClientRect(): { left: number; top: number; right: number; bottom: number; width: number; height: number };
+    }>;
+};
+declare const window: { innerWidth: number; innerHeight: number };
+
 /**
  * Runs inside the page: the union bounding box of every rendered node and edge,
  * padded, widened to a minimum aspect ratio and clamped to the viewport, in page
