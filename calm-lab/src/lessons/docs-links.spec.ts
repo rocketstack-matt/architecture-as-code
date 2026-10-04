@@ -20,7 +20,8 @@ describe('docs links to the lab', () => {
     it('link every registered lesson from the tutorial it follows', async () => {
         const docs = await docsLabLessons();
         for (const lesson of LESSONS) {
-            expect(docs[docPath(lesson.tutorial!.url)], lesson.id).toBe(lesson.id);
+            if (!lesson.tutorial) continue; // a stand-alone lesson is reached by its link, not from a tutorial page
+            expect(docs[docPath(lesson.tutorial.url)], lesson.id).toBe(lesson.id);
         }
     });
 

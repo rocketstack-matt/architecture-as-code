@@ -43,7 +43,7 @@ the lab has no lesson picker.
    |---|---|
    | `id` | Lowercase, hyphenated. It is the `?lesson=` value and the storage key. Do not change it after release. |
    | `title` | The lesson's name, used in notices. |
-   | `tutorial` | The tutorial page this lesson follows: `{ title, url }`, with the page's own title. The top of the lesson guide links to it in a new tab. |
+   | `tutorial` | Optional. The tutorial page this lesson follows: `{ title, url }`, with the page's own title. The top of the lesson guide links to it in a new tab. A lesson that stands on its own (a workshop, for example) leaves it out and is reached only by its `?lesson=` link. |
    | `editorFile` | The lesson's main architecture. The editor opens it first, and `state.doc` and the status badge describe it. |
    | `editableFiles` | The files the learner can open in the editor, for example an ADR next to the architecture. It must include `editorFile`. Each file must be in `seedFiles` or be written by a hint (for example the output of `calm generate -o`); the selector lists a file only when it exists. Default: `[editorFile]`. With more than one file, a "File" selector shows in the editor tab bar. The diagram shows the open file when it is an architecture (it has a `nodes` array), else `editorFile`. |
    | `seedFiles` | The workspace at the start: absolute path under `/workspace` → contents. |

@@ -17,9 +17,11 @@ describe('lesson registry', () => {
         expect(findLesson(DEFAULT_LESSON_ID)).toBeDefined();
     });
 
-    it.each(LESSONS.map((lesson) => [lesson.id, lesson] as const))('%s names the tutorial page it follows', (_, lesson) => {
-        expect(lesson.tutorial?.title).toMatch(/\S/);
-        expect(lesson.tutorial?.url).toMatch(/^https:\/\/calm\.finos\.org\/tutorials\/(beginner|intermediate)\/[a-z0-9-]+\/$/);
+    // A lesson that follows a tutorial links to its page; a lesson that stands on its own has no tutorial.
+    it.each(LESSONS.map((lesson) => [lesson.id, lesson] as const))('%s names a tutorial page when it follows one', (_, lesson) => {
+        if (!lesson.tutorial) return;
+        expect(lesson.tutorial.title).toMatch(/\S/);
+        expect(lesson.tutorial.url).toMatch(/^https:\/\/calm\.finos\.org\/tutorials\/(beginner|intermediate)\/[a-z0-9-]+\/$/);
     });
 });
 
