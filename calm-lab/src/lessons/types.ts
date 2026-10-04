@@ -48,6 +48,12 @@ export interface Lesson {
     tutorial?: { title: string; url: string };
     /** The lesson whose end state this one's seed starts from. */
     chainsFrom?: string;
+    /**
+     * A URL mapping file (absolute workspace path) the editor's live validation resolves URLs through, as
+     * `calm validate -u` does: for an editor file whose controls cite `requirement-url`s or whose nodes cite
+     * Standards that are served by copies in the workspace.
+     */
+    urlMapping?: string;
     editorFile: string;
     /** The files the learner can open in the editor. Default: `[editorFile]`. */
     editableFiles?: string[];

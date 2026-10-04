@@ -8,6 +8,7 @@ import ErrorBoundary from '../ErrorBoundary';
 import {createVfs, type Vfs} from './vfs';
 import {clearProgress, loadProgress, loadUiPrefs, saveProgress, saveUiPrefs, workspaceKey} from './storage';
 import {validateArchitecture, CLI_VERSION, type LabValidation} from '../engine';
+import {editorSchemaDirectory} from '../lessons/mapping';
 import {completeCommand, runCommand, type Line} from '../shell';
 import type {CommandEvent, CommandOutcome} from '../cli/outcome';
 import {freshOutcomes} from '../lessons/checks';
@@ -280,7 +281,9 @@ export default function Lab({lesson}: LabProps) {
         const epoch = sessionEpoch.current;
         let result: LabValidation;
         try {
-            result = await validateArchitecture(text);
+            // Only a lesson with a URL mapping validates through its own directory; the rest keep the session default.
+            const directory = await editorSchemaDirectory(vfs, lesson);
+            result = directory ? await validateArchitecture(text, directory) : await validateArchitecture(text);
         } catch (error) {
             if (seq !== validationSeq.current || epoch !== sessionEpoch.current) {
                 return;

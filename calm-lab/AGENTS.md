@@ -116,6 +116,9 @@ Follow "Write a lesson" in `README.md`. The rules an agent is most likely to bre
   imported from `src/lessons/chain.ts` (importing it from `index.ts` creates a circular import back
   through the registry). Never copy the previous lesson's JSON.
 - Never rename a released lesson id: it is the URL and the storage key.
+- An editor file that cites URLs only a mapping serves (control `requirement-url`s, Standards) needs the lesson's
+  `urlMapping`; `editorSchemaDirectory` (`src/lessons/mapping.ts`) then builds the directory the live validation and
+  the replay use, the way `calm validate -u` does.
 
 ## The diagram renders untrusted input
 

@@ -1,4 +1,5 @@
 import { validateArchitecture } from '../engine';
+import { editorSchemaDirectory } from './mapping';
 import { createVfs, type Vfs } from '../lab/vfs';
 import { runCommand, type Line } from '../shell';
 import type { CommandOutcome } from '../cli/outcome';
@@ -62,7 +63,8 @@ export function startReplay(lesson: Lesson): Replay {
         run,
         async stateFor() {
             const text = vfs.read(lesson.editorFile) ?? '';
-            const validation = await validateArchitecture(text);
+            const directory = await editorSchemaDirectory(vfs, lesson);
+            const validation = directory ? await validateArchitecture(text, directory) : await validateArchitecture(text);
             return {
                 doc: (validation.doc as Record<string, unknown> | undefined) ?? null,
                 validation,

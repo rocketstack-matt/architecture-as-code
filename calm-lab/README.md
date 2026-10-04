@@ -34,6 +34,8 @@ the lab has no lesson picker.
 | `intermediate-18` | [18-standards](https://calm.finos.org/tutorials/intermediate/18-standards) | Released |
 | `intermediate-19` | [19-enforcing-standards](https://calm.finos.org/tutorials/intermediate/19-enforcing-standards) | Released |
 | `intermediate-20` | [20-multi-pattern-validation](https://calm.finos.org/tutorials/intermediate/20-multi-pattern-validation) | Released |
+| `agentic-sdlc-model` | none: a stand-alone lesson on a governed agentic SDLC, controls from the SDLC Common Controls Catalog as data | Released |
+| `agentic-sdlc-change` | none: continues `agentic-sdlc-model` with a change to the model and `calm diff` | Released |
 
 ### Write a lesson
 
@@ -48,6 +50,7 @@ the lab has no lesson picker.
    | `editableFiles` | The files the learner can open in the editor, for example an ADR next to the architecture. It must include `editorFile`. Each file must be in `seedFiles` or be written by a hint (for example the output of `calm generate -o`); the selector lists a file only when it exists. Default: `[editorFile]`. With more than one file, a "File" selector shows in the editor tab bar. The diagram shows the open file when it is an architecture (it has a `nodes` array), else `editorFile`. |
    | `seedFiles` | The workspace at the start: absolute path under `/workspace` → contents. |
    | `chainsFrom` | The lesson whose end state this one starts from. Build the seed with `endFiles(previous)`, imported from `src/lessons/chain.ts` (not `index.ts`, to avoid a circular import). |
+   | `urlMapping` | Optional. A URL mapping file in the workspace that the editor's live validation resolves URLs through, as `calm validate -u` does. Set it when the editor file itself cites URLs only the mapping serves, such as a control's `requirement-url` or a Standard; without it the status badge reports those as load failures. |
    | `steps` | Ordered steps, below. |
    | `completion` | Heading, message and links shown when every step is done. |
 

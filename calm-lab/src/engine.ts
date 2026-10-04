@@ -97,15 +97,18 @@ function toIssues(outcome: ValidationOutcome): IssueSummary {
     return { issues, issueCount, errorCount };
 }
 
-/** Validate an architecture document with the real CALM engine (JSON Schema + Spectral rules). */
-export async function validateArchitecture(jsonText: string): Promise<LabValidation> {
+/**
+ * Validate an architecture document with the real CALM engine (JSON Schema + Spectral rules), through
+ * `directory` when given (a lesson's URL mapping, see `src/lessons/mapping.ts`), else the session default.
+ */
+export async function validateArchitecture(jsonText: string, directory?: SchemaDirectory): Promise<LabValidation> {
     let doc: object;
     try {
         doc = parseJson(jsonText, 'This file');
     } catch (error) {
         return { ok: false, parseError: (error as Error).message, issues: [], errors: [], issueCount: 1, errorCount: 1, pretty: (error as Error).message };
     }
-    const outcome = await validate(doc, undefined, undefined, await schemaDirectory());
+    const outcome = await validate(doc, undefined, undefined, directory ?? await schemaDirectory());
     const { issues, issueCount, errorCount } = toIssues(outcome);
     return {
         ok: !outcome.hasErrors,
