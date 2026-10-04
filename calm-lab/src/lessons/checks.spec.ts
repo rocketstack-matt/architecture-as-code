@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     completeNodes, composedOf, connectsBetween, connectsNodes, connectsRelationshipsBetween, connectsUsesInterfaces,
     controlsIn, everyHas, fileJson, fileText, filledAdr, flowsWithTransitions, freshOutcomes, hasDescription,
-    hasMetadata, hasPlaceholder, interactsWith, linkedAdrs, markdownSection, nodeById, nodeInterfaces, nodes,
+    frontMatterList, hasMetadata, hasPlaceholder, interactsWith, linkedAdrs, markdownSection, nodeById, nodeInterfaces, nodes,
     nodesOfType, patternArrayRefs, patternConnects, patternItemConsts, patternNodeIds, patternNodeTypes, patternRefs, patternRequires,
     ranFailed, ranOk, rejected, relationships, relationshipsOfKind, standardExample, standardRequires, urlMappingEntries,
     urlMappingTargets, withStandard, validatedEditorFile,
@@ -893,5 +893,26 @@ describe('everyHas', () => {
         expect(everyHas([null, { owner: 'a', costCenter: 'CC-1' }], names)).toBe(false);
         expect(everyHas(['owner', 42], names)).toBe(false);
         expect(everyHas([['owner', 'costCenter']], names)).toBe(false);
+    });
+});
+
+describe('frontMatterList', () => {
+    const spec = '---\nid: SPEC-002\nmodel-change: [trade-api, "position-service-to-trade-api"]\n---\n\n# SPEC-002\n\nmodel-change: [not-this]\n';
+
+    it('reads a list from the front matter, trimmed and unquoted', () => {
+        expect(frontMatterList(spec, 'model-change')).toEqual(['trade-api', 'position-service-to-trade-api']);
+    });
+
+    it('is empty for a missing key, an empty list, a scalar, no front matter or no text', () => {
+        expect(frontMatterList(spec, 'calm-nodes')).toEqual([]);
+        expect(frontMatterList('---\nmodel-change: []\n---\n', 'model-change')).toEqual([]);
+        expect(frontMatterList('---\nid: SPEC-002\n---\n', 'id')).toEqual([]);
+        expect(frontMatterList('model-change: [a]\n', 'model-change')).toEqual([]);
+        expect(frontMatterList(null, 'model-change')).toEqual([]);
+    });
+
+    it('ignores the same key in the body and survives a half-edited file', () => {
+        expect(frontMatterList('---\nid: SPEC-002\n---\nmodel-change: [a]\n', 'model-change')).toEqual([]);
+        expect(frontMatterList('---\nmodel-change: [trade-api', 'model-change')).toEqual([]);
     });
 });

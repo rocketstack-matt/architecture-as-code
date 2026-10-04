@@ -443,6 +443,22 @@ const MARKDOWN_FENCE = /^\s{0,3}(```|~~~)/;
  * heading or the end. Deeper headings (`###`) and fenced code stay in the body. '' when there is no
  * such heading.
  */
+/**
+ * The items of a `key: [a, b]` list in a markdown file's front matter (the block between the opening `---` lines),
+ * trimmed and unquoted; `[]` when the text, the front matter, the key or the list is missing. Never throws on a
+ * half-edited file.
+ */
+export function frontMatterList(text: string | null, key: string): string[] {
+    const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text ?? '');
+    if (!block) {
+        return [];
+    }
+    const line = block[1].split(/\r?\n/).find((entry) => entry.trimStart().startsWith(`${key}:`));
+    const value = line === undefined ? '' : line.slice(line.indexOf(':') + 1).trim();
+    const list = /^\[(.*)\]$/.exec(value);
+    return list ? list[1].split(',').map((item) => item.trim().replace(/^["']|["']$/g, '')).filter((item) => item.length > 0) : [];
+}
+
 export function markdownSection(text: string | null, heading: string): string {
     if (!text) {
         return '';
