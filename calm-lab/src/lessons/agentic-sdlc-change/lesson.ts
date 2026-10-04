@@ -130,7 +130,7 @@ export const AGENTIC_SDLC_CHANGE: Lesson = {
             body:
                 `Run \`${VALIDATE_MODEL}\`. The summary shows 0 errors. ` +
                 'The pattern leaves relationships free, and no schema can know what the code does. The rule on ' +
-                '`position-store` is enforced against the code by a gate in the repository; here, the next command shows ' +
+                '`position-store` is enforced against the code by a gate in the estate\'s own repository; here, the next command shows ' +
                 'what changed.',
             hint: { kind: 'commands', commands: [VALIDATE_MODEL] },
             check: (state) => shortcutTaken(state) && validated(state),
