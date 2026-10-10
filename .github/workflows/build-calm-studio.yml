@@ -72,6 +72,7 @@ jobs:
                   npm run test --if-present --workspace=@calmstudio/calm-core
                   npm run test --if-present --workspace=@calmstudio/extensions
                   npm run test --if-present --workspace=@calmstudio/mcp
+                  npm run test --if-present --workspace=@calmstudio/github-action
                   npm run test --if-present --workspace=@calmstudio/studio
                   npm run test --if-present --workspace=@calmstudio/diagram
                   npm run test --if-present --workspace=@finos/calm-docusaurus-plugin
