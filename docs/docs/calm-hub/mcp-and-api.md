@@ -123,6 +123,18 @@ calm.decorators.reserved."control-evaluation".writers=policy-engine
 
 A writer is a principal name, the same name that the audit log records for the caller.
 
+A reserved type is also append-only. An update of a reserved-type decorator does not change it. Hub stores a new decorator that supersedes the old one, returns `201` with the new `id` and a `Location` header, and keeps the old one. Hub stores the link in its own storage fields, not in the decorator `data`. Other types keep the in-place update (`200`).
+
+| Request | Effect |
+|:--------|:-------|
+| `GET .../decorators`, `GET .../decorators/values` | Lists only current decorators |
+| `GET .../decorators/{id}` | Returns the decorator, current or superseded |
+| `GET .../decorators/{id}/history` | Returns the history that contains `{id}`, current first. Each entry has `id`, `supersedes`, `supersededBy` and `decorator` |
+| `PUT .../decorators/{id}` on a superseded decorator | `409 Conflict`. Update the current decorator |
+| `DELETE .../decorators/{id}` | Deletes the decorator with its whole history |
+
+The MCP tool `getDecoratorHistory` returns the same history.
+
 ### Access Control
 
 Endpoints are protected by **per-namespace permissions**. Access is granted via `UserAccess` records stored in the active backend; each record ties a username to a permission level for a specific namespace or control domain.

@@ -6,6 +6,7 @@ import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.bson.json.JsonParseException;
 import org.finos.calm.domain.Decorator;
+import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
@@ -510,6 +512,70 @@ public class TestDecoratorResourceShould {
                 .statusCode(400);
 
         verify(decoratorStore, never()).getDecoratorValuesForNamespace(any(), any(), any());
+    }
+
+    // ---- GET /api/calm/namespaces/{namespace}/decorators/{id}/history ----
+
+    @Test
+    void return_the_history_of_a_decorator() throws Exception {
+        Decorator current = new Decorator.DecoratorBuilder().setUniqueId("eval-2").setType("control-evaluation").build();
+        Decorator old = new Decorator.DecoratorBuilder().setUniqueId("eval-1").setType("control-evaluation").build();
+        when(decoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(2, 1, null, current),
+                new DecoratorHistoryEntry(1, null, 2, old)));
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/decorators/1/history")
+                .then()
+                .statusCode(200)
+                .body("values.id", contains(2, 1))
+                .body("values[0].supersedes", equalTo(1))
+                .body("values[1].supersededBy", equalTo(2))
+                .body("values[1].decorator.uniqueId", equalTo("eval-1"));
+    }
+
+    @Test
+    void return_404_when_the_decorator_of_a_history_does_not_exist() throws Exception {
+        when(decoratorStore.getDecoratorHistory("finos", 9)).thenThrow(new DecoratorNotFoundException());
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/decorators/9/history")
+                .then()
+                .statusCode(404)
+                .body(containsString("Decorator with ID 9 does not exist in namespace: finos"));
+    }
+
+    @Test
+    void return_404_when_the_namespace_of_a_history_does_not_exist() throws Exception {
+        when(decoratorStore.getDecoratorHistory("missing", 1)).thenThrow(new NamespaceNotFoundException());
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/missing/decorators/1/history")
+                .then()
+                .statusCode(404)
+                .body(containsString("Invalid namespace provided: missing"));
+    }
+
+    @Test
+    void return_400_when_the_history_path_is_invalid() throws Exception {
+        given()
+                .when()
+                .get("/api/calm/namespaces/invalid@namespace/decorators/1/history")
+                .then()
+                .statusCode(400)
+                .body(containsString("namespace must match pattern"));
+
+        given()
+                .when()
+                .get("/api/calm/namespaces/finos/decorators/0/history")
+                .then()
+                .statusCode(400)
+                .body(containsString("ID must be a positive integer"));
+
+        verify(decoratorStore, never()).getDecoratorHistory(anyString(), anyInt());
     }
 
     // ---- POST /api/calm/namespaces/{namespace}/decorators ----

@@ -38,6 +38,13 @@ public class CalmResourceErrorResponses {
         return Response.status(Response.Status.BAD_REQUEST).entity("Invalid decorator JSON: " + message).build();
     }
 
+    public static Response decoratorSupersededResponse(String namespace, int id) {
+        return Response.status(Response.Status.CONFLICT)
+                .entity("Decorator with ID " + id + " in namespace " + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(namespace)
+                        + " has been superseded. Update the current decorator in its history")
+                .build();
+    }
+
     public static Response reservedDecoratorTypeResponse(String type) {
         return Response.status(Response.Status.FORBIDDEN)
                 .entity("Decorator type is reserved and the caller may not write it: "

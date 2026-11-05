@@ -11,6 +11,7 @@ import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
+import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.store.DecoratorStore;
@@ -20,7 +21,8 @@ import java.util.Optional;
 
 /**
  * The write rules for decorators, shared by REST and MCP. A reserved type can only be written by
- * its configured principals, and a decorator whose {@code $schema} Hub knows must match it.
+ * its configured principals, a decorator whose {@code $schema} Hub knows must match it, and a reserved
+ * type is append-only.
  */
 @ApplicationScoped
 public class DecoratorWriteService {
@@ -52,18 +54,29 @@ public class DecoratorWriteService {
         return decoratorStore.createDecorator(namespace, decoratorJson);
     }
 
-    public void updateDecorator(String principal, String namespace, int id, String decoratorJson)
-            throws NamespaceNotFoundException, DecoratorNotFoundException, ReservedDecoratorTypeException,
-            DecoratorSchemaValidationException {
+    /**
+     * Updates a decorator in place, or, when the old or new type is reserved, stores a new decorator
+     * that supersedes it (reserved types are append-only).
+     *
+     * @return the ID of the current decorator: {@code id}, or the new ID if the decorator was superseded
+     */
+    public int updateDecorator(String principal, String namespace, int id, String decoratorJson)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException,
+            ReservedDecoratorTypeException, DecoratorSchemaValidationException {
         JsonObject decorator = parse(decoratorJson);
         Optional<Decorator> existing = decoratorStore.getDecoratorById(namespace, id);
         if (existing.isPresent()) {
             requireWriter(principal, existing.get().getType());
         }
-        requireWriter(principal, typeOf(decorator));
+        String type = typeOf(decorator);
+        requireWriter(principal, type);
         requireValid(decorator);
+        if (existing.isPresent() && (isReserved(existing.get().getType()) || isReserved(type))) {
+            return decoratorStore.supersedeDecorator(namespace, id, decoratorJson);
+        }
         // A missing decorator is left to the store, which reports it in its own way (GitHub mode: 501).
         decoratorStore.updateDecorator(namespace, id, decoratorJson);
+        return id;
     }
 
     public void deleteDecorator(String principal, String namespace, int id)

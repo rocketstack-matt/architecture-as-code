@@ -7,6 +7,7 @@ import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
+import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.store.DecoratorStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -126,9 +127,37 @@ class TestDecoratorWriteServiceShould {
     void update_an_unreserved_decorator_for_any_principal() throws Exception {
         when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
 
-        service.updateDecorator("alice", NAMESPACE, 1, UNRESERVED_JSON);
+        assertThat(service.updateDecorator("alice", NAMESPACE, 1, UNRESERVED_JSON), is(1));
 
         verify(mockDecoratorStore).updateDecorator(NAMESPACE, 1, UNRESERVED_JSON);
+        verify(mockDecoratorStore, never()).supersedeDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void supersede_a_reserved_decorator_instead_of_updating_it() throws Exception {
+        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
+        when(mockDecoratorStore.supersedeDecorator(NAMESPACE, 1, RESERVED_JSON)).thenReturn(8);
+
+        assertThat(service.updateDecorator(WRITER, NAMESPACE, 1, RESERVED_JSON), is(8));
+
+        verify(mockDecoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void supersede_an_unreserved_decorator_that_changes_to_a_reserved_type() throws Exception {
+        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
+        when(mockDecoratorStore.supersedeDecorator(NAMESPACE, 1, RESERVED_JSON)).thenReturn(8);
+
+        assertThat(service.updateDecorator(WRITER, NAMESPACE, 1, RESERVED_JSON), is(8));
+    }
+
+    @Test
+    void pass_on_that_a_decorator_has_already_been_superseded() throws Exception {
+        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
+        when(mockDecoratorStore.supersedeDecorator(NAMESPACE, 1, RESERVED_JSON)).thenThrow(new DecoratorSupersededException());
+
+        assertThrows(DecoratorSupersededException.class,
+                () -> service.updateDecorator(WRITER, NAMESPACE, 1, RESERVED_JSON));
     }
 
     @Test

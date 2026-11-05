@@ -9,9 +9,12 @@ import jakarta.enterprise.inject.Typed;
 import jakarta.inject.Inject;
 import org.bson.Document;
 import org.finos.calm.domain.Decorator;
+import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
+import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
+import org.finos.calm.store.util.DecoratorHistoryChain;
 import org.finos.calm.store.util.MongoUpsertPush;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +36,9 @@ public class MongoDecoratorStore implements DecoratorStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDecoratorStore.class);
     private static final String DECORATOR_ID_FIELD = "decoratorId";
+    // Hub-owned history links, stored beside the decorator rather than in it.
+    private static final String SUPERSEDES_FIELD = "supersedes";
+    private static final String SUPERSEDED_BY_FIELD = "supersededBy";
     private final MongoCollection<Document> decoratorCollection;
     private final MongoNamespaceStore namespaceStore;
     private final MongoCounterStore counterStore;
@@ -146,12 +152,64 @@ public class MongoDecoratorStore implements DecoratorStore {
     }
 
     @Override
+    public int supersedeDecorator(String namespace, int id, String decoratorJson)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
+        namespaceStore.requireNamespace(namespace);
+
+        Document parsedDecorator = Document.parse(decoratorJson);
+        int newId = counterStore.getNextDecoratorSequenceValue();
+
+        // Marking the old decorator first, only if it is still current, lets one of two concurrent updates win.
+        long modified = decoratorCollection.updateOne(
+                Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
+                        Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false)))),
+                Updates.set("decorators.$." + SUPERSEDED_BY_FIELD, newId)
+        ).getModifiedCount();
+
+        if (modified == 0) {
+            if (getDecoratorById(namespace, id).isPresent()) {
+                throw new DecoratorSupersededException();
+            }
+            throw new DecoratorNotFoundException();
+        }
+
+        decoratorCollection.updateOne(
+                Filters.eq("namespace", namespace),
+                Updates.push("decorators", new Document(DECORATOR_ID_FIELD, newId)
+                        .append("decorator", parsedDecorator)
+                        .append(SUPERSEDES_FIELD, id))
+        );
+
+        LOG.debug("Decorator with ID {} supersedes decorator {} in namespace '{}'", newId, id, namespace);
+        return newId;
+    }
+
+    @Override
+    public List<DecoratorHistoryEntry> getDecoratorHistory(String namespace, int id)
+            throws NamespaceNotFoundException, DecoratorNotFoundException {
+        namespaceStore.requireNamespace(namespace);
+
+        List<DecoratorHistoryEntry> history = DecoratorHistoryChain.of(historyEntries(namespace), id);
+        if (history.isEmpty()) {
+            throw new DecoratorNotFoundException();
+        }
+        return history;
+    }
+
+    @Override
     public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
+        List<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespace), id).stream()
+                .map(DecoratorHistoryEntry::getId)
+                .toList();
+        if (ids.isEmpty()) {
+            throw new DecoratorNotFoundException();
+        }
+
         long modified = decoratorCollection.updateOne(
                 Filters.eq("namespace", namespace),
-                Updates.pull("decorators", Filters.eq(DECORATOR_ID_FIELD, id))
+                Updates.pull("decorators", Filters.in(DECORATOR_ID_FIELD, ids))
         ).getModifiedCount();
 
         if (modified == 0) {
@@ -180,13 +238,29 @@ public class MongoDecoratorStore implements DecoratorStore {
         return decorators;
     }
 
-    private Stream<Document> streamWithValidId(List<Document> decorators) {
+    private List<DecoratorHistoryEntry> historyEntries(String namespace) {
+        Document namespaceDocument = fetchNamespaceDocument(namespace);
+        if (namespaceDocument == null) {
+            return List.of();
+        }
+        return extractDecorators(namespaceDocument, namespace).stream()
+                .filter(doc -> doc.getInteger(DECORATOR_ID_FIELD) != null)
+                .map(doc -> new DecoratorHistoryEntry(
+                        doc.getInteger(DECORATOR_ID_FIELD),
+                        doc.getInteger(SUPERSEDES_FIELD),
+                        doc.getInteger(SUPERSEDED_BY_FIELD),
+                        Decorator.fromDocument(doc.get("decorator", Document.class))))
+                .toList();
+    }
+
+    private Stream<Document> streamCurrent(List<Document> decorators) {
         return decorators.stream()
-                .filter(doc -> doc.getInteger(DECORATOR_ID_FIELD) != null);
+                .filter(doc -> doc.getInteger(DECORATOR_ID_FIELD) != null)
+                .filter(doc -> doc.get(SUPERSEDED_BY_FIELD) == null);
     }
 
     private List<Integer> filterDecorators(List<Document> decorators, String target, String type) {
-        return streamWithValidId(decorators)
+        return streamCurrent(decorators)
                 .filter(doc -> {
                     Document decorator = doc.get("decorator", Document.class);
                     return decorator == null || matchesFilters(decorator, target, type);
@@ -196,7 +270,7 @@ public class MongoDecoratorStore implements DecoratorStore {
     }
 
     private List<Decorator> filterDecoratorsToValues(List<Document> decorators, String target, String type) {
-        return streamWithValidId(decorators)
+        return streamCurrent(decorators)
                 .map(doc -> doc.get("decorator", Document.class))
                 .filter(Objects::nonNull)
                 .filter(decorator -> matchesFilters(decorator, target, type))

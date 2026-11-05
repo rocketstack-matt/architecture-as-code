@@ -9,8 +9,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.finos.calm.domain.Decorator;
+import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
+import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.security.CalmHubScopes;
@@ -50,7 +52,7 @@ public class DecoratorTools {
     SecurityIdentity identity;
 
     @PermissionsAllowed(CalmHubScopes.READ)
-    @Tool(description = "List decorators in a namespace, optionally filtered by target architecture path and/or type (e.g. 'threat-model', 'deployment').")
+    @Tool(description = "List the current decorators in a namespace (superseded decorators are left out; see getDecoratorHistory), optionally filtered by target architecture path and/or type (e.g. 'threat-model', 'deployment').")
     public ToolResponse listDecorators(
             @ToolArg(description = "The namespace to list decorators from") String namespace,
             @ToolArg(description = "Filter by target path (e.g. '/calm/namespaces/workshop/architectures/1/versions/1-0-0')", required = false) String target,
@@ -144,7 +146,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows.")
+    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows. A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
     public ToolResponse updateDecorator(
             @ToolArg(description = "The namespace containing the decorator") String namespace,
             @ToolArg(description = "The decorator numeric ID to update (positive integer)") int decoratorId,
@@ -160,15 +162,18 @@ public class DecoratorTools {
         if (err.isPresent()) return err.get();
 
         try {
-            decoratorWriteService.updateDecorator(DecoratorWriteService.principalName(identity), namespace, decoratorId, decoratorJson);
+            int currentId = decoratorWriteService.updateDecorator(DecoratorWriteService.principalName(identity), namespace, decoratorId, decoratorJson);
             logger.info("Decorator [{}] updated in namespace [{}]", decoratorId, namespace);
+            String outcome = currentId == decoratorId
+                    ? "Decorator " + decoratorId + " updated successfully."
+                    : "Decorator " + decoratorId + " superseded by new decorator " + currentId + " (reserved types are append-only).";
             // Return updated representation so callers can verify the change without a follow-up getDecorator call
-            Optional<Decorator> updated = decoratorStore.getDecoratorById(namespace, decoratorId);
+            Optional<Decorator> updated = decoratorStore.getDecoratorById(namespace, currentId);
             if (updated.isEmpty()) {
-                return ToolResponse.success("Decorator " + decoratorId + " updated successfully.");
+                return ToolResponse.success(outcome);
             }
             Decorator dec = updated.get();
-            return ToolResponse.success("Decorator " + decoratorId + " updated successfully.\n" +
+            return ToolResponse.success(outcome + "\n" +
                     "  unique-id: " + dec.getUniqueId() + "\n" +
                     "  type: " + dec.getType() + "\n" +
                     "  target: " + dec.getTarget() + "\n" +
@@ -179,10 +184,43 @@ public class DecoratorTools {
         } catch (DecoratorNotFoundException e) {
             logger.warn("Decorator [{}] not found in namespace [{}]", decoratorId, namespace, e);
             return ToolResponse.error("Error: Decorator " + decoratorId + " not found in namespace '" + namespace + "'.");
+        } catch (DecoratorSupersededException e) {
+            logger.warn("Decorator [{}] in namespace [{}] has been superseded", decoratorId, namespace);
+            return ToolResponse.error("Error: Decorator " + decoratorId + " has been superseded. Use getDecoratorHistory to find the current decorator.");
         } catch (ReservedDecoratorTypeException e) {
             return reservedTypeError(e);
         } catch (DecoratorSchemaValidationException e) {
             return schemaError(e);
+        }
+    }
+
+    @PermissionsAllowed(CalmHubScopes.READ)
+    @Tool(description = "Get the history of a decorator: the current decorator first, then each older decorator it supersedes. Only reserved (append-only) decorator types have more than one entry.")
+    public ToolResponse getDecoratorHistory(
+            @ToolArg(description = "The namespace containing the decorator") String namespace,
+            @ToolArg(description = "The numeric ID of any decorator in the history (positive integer)") int decoratorId) {
+        Optional<ToolResponse> err = McpValidationHelper.firstError(
+                () -> McpValidationHelper.checkEnabled(mcpEnabled),
+                () -> McpValidationHelper.validateNamespace(namespace),
+                () -> McpValidationHelper.validatePositiveId(decoratorId, "Decorator ID"));
+        if (err.isPresent()) return err.get();
+
+        try {
+            StringBuilder sb = new StringBuilder().append("History of decorator ").append(decoratorId).append(", current first:\n");
+            for (DecoratorHistoryEntry entry : decoratorStore.getDecoratorHistory(namespace, decoratorId)) {
+                Decorator dec = entry.getDecorator();
+                sb.append("- id: ").append(entry.getId())
+                  .append(entry.getSupersededBy() == null ? " (current)" : ", superseded by: " + entry.getSupersededBy())
+                  .append(dec == null ? "" : ", unique-id: " + dec.getUniqueId() + ", type: " + dec.getType() + ", data: " + dec.getData())
+                  .append("\n");
+            }
+            return ToolResponse.success(sb.toString());
+        } catch (NamespaceNotFoundException e) {
+            logger.warn("Namespace not found [{}]", namespace, e);
+            return ToolResponse.error("Error: Namespace '" + namespace + "' not found.");
+        } catch (DecoratorNotFoundException e) {
+            logger.warn("Decorator [{}] not found in namespace [{}]", decoratorId, namespace, e);
+            return ToolResponse.error("Error: Decorator " + decoratorId + " not found in namespace '" + namespace + "'.");
         }
     }
 

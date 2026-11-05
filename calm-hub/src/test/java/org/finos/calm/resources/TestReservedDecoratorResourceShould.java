@@ -7,6 +7,7 @@ import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.finos.calm.domain.Decorator;
+import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.store.DecoratorStore;
 import org.junit.jupiter.api.Test;
 
@@ -15,8 +16,10 @@ import java.util.Optional;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -149,6 +152,41 @@ class TestReservedDecoratorResourceShould {
                 .statusCode(204);
 
         verify(mockDecoratorStore).deleteDecorator("finos", 1);
+    }
+
+    @Test
+    @TestSecurity(user = "policy-engine", authorizationEnabled = false)
+    void return_201_with_the_new_id_when_a_writer_updates_a_reserved_decorator() throws Exception {
+        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("control-evaluation")));
+        when(mockDecoratorStore.supersedeDecorator(eq("finos"), eq(1), anyString())).thenReturn(5);
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(RESERVED_DECORATOR_JSON)
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(201)
+                .header("Location", containsString("/api/calm/namespaces/finos/decorators/5"))
+                .body("id", equalTo(5));
+
+        verify(mockDecoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    @TestSecurity(user = "policy-engine", authorizationEnabled = false)
+    void return_409_when_a_writer_updates_a_superseded_decorator() throws Exception {
+        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("control-evaluation")));
+        when(mockDecoratorStore.supersedeDecorator(eq("finos"), eq(1), anyString())).thenThrow(new DecoratorSupersededException());
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(RESERVED_DECORATOR_JSON)
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(409)
+                .body(containsString("superseded"));
     }
 
     private static Decorator decorator(String type) {
