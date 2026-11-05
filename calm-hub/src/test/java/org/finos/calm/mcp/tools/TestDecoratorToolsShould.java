@@ -1,9 +1,16 @@
 package org.finos.calm.mcp.tools;
 
 import io.quarkiverse.mcp.server.ToolResponse;
+import io.quarkus.security.identity.SecurityIdentity;
+import org.finos.calm.config.DecoratorConfig;
 import org.finos.calm.domain.Decorator;
+import org.finos.calm.domain.DecoratorHistoryEntry;
+import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
+import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
+import org.finos.calm.services.DecoratorSchemaValidator;
+import org.finos.calm.services.DecoratorWriteService;
 import org.finos.calm.store.DecoratorStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +22,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -23,6 +32,10 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +45,12 @@ class TestDecoratorToolsShould {
     @Mock
     DecoratorStore decoratorStore;
 
+    @Mock
+    DecoratorConfig mockConfig;
+
+    @Mock
+    DecoratorSchemaValidator mockSchemaValidator;
+
     @InjectMocks
     DecoratorTools decoratorTools;
 
@@ -39,6 +58,10 @@ class TestDecoratorToolsShould {
     void setup() {
         decoratorTools.mcpEnabled = true;
         decoratorTools.allowPutOperations = true;
+        DecoratorConfig.ReservedType reserved = () -> List.of("policy-engine");
+        lenient().when(mockConfig.reserved()).thenReturn(Map.of("control-evaluation", reserved));
+        lenient().when(mockSchemaValidator.validate(any())).thenReturn(List.of());
+        decoratorTools.decoratorWriteService = new DecoratorWriteService(decoratorStore, mockConfig, mockSchemaValidator);
     }
 
     private static String text(ToolResponse r) {
@@ -373,6 +396,142 @@ class TestDecoratorToolsShould {
         assertThat(result, containsString("updated-decorator"));
         assertThat(result, containsString("threat-model"));
         assertThat(result, containsString("updated-data"));
+    }
+
+    // --- write rules ---
+
+    @Test
+    void return_error_when_creating_a_reserved_type_as_another_principal() {
+        ToolResponse response = decoratorTools.createDecorator("workshop", "{\"type\":\"control-evaluation\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("'control-evaluation' is reserved"));
+        verifyNoInteractions(decoratorStore);
+    }
+
+    @Test
+    void create_a_reserved_type_as_a_configured_writer() throws NamespaceNotFoundException {
+        SecurityIdentity identity = mock(SecurityIdentity.class);
+        Principal principal = () -> "policy-engine";
+        when(identity.getPrincipal()).thenReturn(principal);
+        decoratorTools.identity = identity;
+        when(decoratorStore.createDecorator(eq("workshop"), anyString())).thenReturn(3);
+
+        String result = text(decoratorTools.createDecorator("workshop", "{\"type\":\"control-evaluation\"}"));
+
+        assertThat(result, containsString("ID: 3"));
+    }
+
+    @Test
+    void return_error_when_updating_a_reserved_decorator_as_another_principal() throws Exception {
+        when(decoratorStore.getDecoratorById("workshop", 1))
+                .thenReturn(Optional.of(new Decorator.DecoratorBuilder().setType("control-evaluation").build()));
+
+        ToolResponse response = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"threat-model\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("is reserved"));
+        verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void return_the_schema_errors_when_creating_a_decorator_that_does_not_match_its_schema() {
+        when(mockSchemaValidator.validate(any())).thenReturn(List.of(
+                new DecoratorSchemaError("/data/status", "bad status"),
+                new DecoratorSchemaError("", "missing property")));
+
+        ToolResponse response = decoratorTools.createDecorator("workshop", "{\"type\":\"deployment\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("- /data/status: bad status"));
+        assertThat(text(response), containsString("- (root): missing property"));
+        verifyNoInteractions(decoratorStore);
+    }
+
+    @Test
+    void return_the_schema_errors_when_updating_a_decorator_that_does_not_match_its_schema() throws Exception {
+        when(mockSchemaValidator.validate(any())).thenReturn(List.of(new DecoratorSchemaError("/data", "bad")));
+
+        ToolResponse response = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"deployment\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("does not match its $schema"));
+        verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void report_the_new_id_when_an_update_supersedes_a_reserved_decorator() throws Exception {
+        SecurityIdentity identity = mock(SecurityIdentity.class);
+        Principal principal = () -> "policy-engine";
+        when(identity.getPrincipal()).thenReturn(principal);
+        decoratorTools.identity = identity;
+        when(decoratorStore.getDecoratorById("workshop", 1))
+                .thenReturn(Optional.of(new Decorator.DecoratorBuilder().setType("control-evaluation").build()));
+        when(decoratorStore.supersedeDecorator(eq("workshop"), eq(1), anyString())).thenReturn(4);
+        when(decoratorStore.getDecoratorById("workshop", 4))
+                .thenReturn(Optional.of(new Decorator.DecoratorBuilder().setUniqueId("eval-4").setType("control-evaluation").build()));
+
+        String result = text(decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"control-evaluation\"}"));
+
+        assertThat(result, containsString("superseded by new decorator 4"));
+        assertThat(result, containsString("eval-4"));
+    }
+
+    @Test
+    void return_error_when_updating_a_superseded_decorator() throws Exception {
+        SecurityIdentity identity = mock(SecurityIdentity.class);
+        Principal principal = () -> "policy-engine";
+        when(identity.getPrincipal()).thenReturn(principal);
+        decoratorTools.identity = identity;
+        when(decoratorStore.getDecoratorById("workshop", 1))
+                .thenReturn(Optional.of(new Decorator.DecoratorBuilder().setType("control-evaluation").build()));
+        when(decoratorStore.supersedeDecorator(eq("workshop"), eq(1), anyString())).thenThrow(new DecoratorSupersededException());
+
+        ToolResponse response = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"control-evaluation\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("has been superseded"));
+    }
+
+    // --- getDecoratorHistory ---
+
+    @Test
+    void return_the_history_of_a_decorator() throws Exception {
+        when(decoratorStore.getDecoratorHistory("workshop", 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(2, 1, null, new Decorator.DecoratorBuilder().setUniqueId("eval-2").build()),
+                new DecoratorHistoryEntry(1, null, 2, null)));
+
+        String result = text(decoratorTools.getDecoratorHistory("workshop", 1));
+
+        assertThat(result, containsString("- id: 2 (current), unique-id: eval-2"));
+        assertThat(result, containsString("- id: 1, superseded by: 2"));
+    }
+
+    @Test
+    void return_error_for_the_history_of_a_missing_decorator() throws Exception {
+        when(decoratorStore.getDecoratorHistory("workshop", 9)).thenThrow(new DecoratorNotFoundException());
+
+        ToolResponse response = decoratorTools.getDecoratorHistory("workshop", 9);
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("not found"));
+    }
+
+    @Test
+    void return_error_for_the_history_in_a_missing_namespace() throws Exception {
+        when(decoratorStore.getDecoratorHistory("missing", 1)).thenThrow(new NamespaceNotFoundException());
+
+        ToolResponse response = decoratorTools.getDecoratorHistory("missing", 1);
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("Namespace 'missing' not found"));
+    }
+
+    @Test
+    void reject_invalid_arguments_for_the_history() {
+        assertThat(decoratorTools.getDecoratorHistory("bad ns", 1).isError(), is(true));
+        assertThat(decoratorTools.getDecoratorHistory("workshop", 0).isError(), is(true));
+        verifyNoInteractions(decoratorStore);
     }
 
     // --- MCP disabled ---
