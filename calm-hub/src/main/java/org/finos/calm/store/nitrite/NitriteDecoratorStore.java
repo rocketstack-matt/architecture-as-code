@@ -12,9 +12,12 @@ import org.dizitart.no2.collection.NitriteCollection;
 import org.dizitart.no2.filters.Filter;
 import org.finos.calm.config.StandaloneQualifier;
 import org.finos.calm.domain.Decorator;
+import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
+import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
+import org.finos.calm.store.util.DecoratorHistoryChain;
 import org.finos.calm.store.util.TypeSafeNitriteDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -46,6 +50,9 @@ public class NitriteDecoratorStore implements DecoratorStore {
     private static final String NAMESPACE_FIELD = "namespace";
     private static final String DECORATORS_FIELD = "decorators";
     private static final String DECORATOR_ID_FIELD = "decoratorId";
+    // Hub-owned history links, stored beside the decorator rather than in it.
+    private static final String SUPERSEDES_FIELD = "supersedes";
+    private static final String SUPERSEDED_BY_FIELD = "supersededBy";
 
     private final NitriteCollection decoratorCollection;
     private final NitriteNamespaceStore namespaceStore;
@@ -163,32 +170,101 @@ public class NitriteDecoratorStore implements DecoratorStore {
     public void updateDecorator(String namespace, int id, String decoratorJson) throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
+        lock.lock();
+        try {
+            Document namespaceDoc = fetchNamespaceDocument(namespace);
+            if (namespaceDoc == null) {
+                throw new DecoratorNotFoundException();
+            }
+
+            TypeSafeNitriteDocument<Document> typeSafeDoc = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class);
+            List<Document> decorators = typeSafeDoc.getList(DECORATORS_FIELD);
+            if (decorators == null) {
+                throw new DecoratorNotFoundException();
+            }
+
+            Document updatedDoc = parseJsonToNitriteDocument(decoratorJson);
+
+            decorators.stream()
+                    .filter(decoratorEntry -> decoratorEntry.get(SUPERSEDED_BY_FIELD) == null)
+                    .filter(decoratorEntry -> Integer.valueOf(id).equals(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)))
+                    .findFirst()
+                    .orElseThrow(DecoratorNotFoundException::new)
+                    .put("decorator", updatedDoc);
+
+            namespaceDoc.put(DECORATORS_FIELD, decorators);
+            decoratorCollection.update(namespaceDoc);
+            LOG.debug("Updated decorator with ID {} in namespace '{}'", id, namespace);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public int supersedeDecorator(String namespace, int id, String decoratorJson)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
+        namespaceStore.requireNamespace(namespace);
+
+        Document decoratorDoc = parseJsonToNitriteDocument(decoratorJson);
+        lock.lock();
+        try {
+            Document namespaceDoc = fetchNamespaceDocument(namespace);
+            if (namespaceDoc == null) {
+                throw new DecoratorNotFoundException();
+            }
+
+            List<Document> decorators = new ArrayList<>(extractDecorators(namespaceDoc, namespace));
+            Document superseded = decorators.stream()
+                    .filter(decoratorEntry -> Integer.valueOf(id).equals(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)))
+                    .findFirst()
+                    .orElseThrow(DecoratorNotFoundException::new);
+            if (superseded.get(SUPERSEDED_BY_FIELD) != null) {
+                throw new DecoratorSupersededException();
+            }
+
+            int newId = counterStore.getNextDecoratorSequenceValue();
+            superseded.put(SUPERSEDED_BY_FIELD, newId);
+            decorators.add(Document.createDocument(DECORATOR_ID_FIELD, newId)
+                    .put("decorator", decoratorDoc)
+                    .put(SUPERSEDES_FIELD, id));
+
+            namespaceDoc.put(DECORATORS_FIELD, decorators);
+            decoratorCollection.update(namespaceDoc);
+            LOG.debug("Decorator with ID {} supersedes decorator {} in namespace '{}'", newId, id, namespace);
+            return newId;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public List<DecoratorHistoryEntry> getDecoratorHistory(String namespace, int id)
+            throws NamespaceNotFoundException, DecoratorNotFoundException {
+        namespaceStore.requireNamespace(namespace);
+
         Document namespaceDoc = fetchNamespaceDocument(namespace);
-        if (namespaceDoc == null) {
+        List<DecoratorHistoryEntry> history = namespaceDoc == null
+                ? List.of()
+                : DecoratorHistoryChain.of(historyEntries(namespaceDoc, namespace), id);
+        if (history.isEmpty()) {
             throw new DecoratorNotFoundException();
         }
+        return history;
+    }
 
-        TypeSafeNitriteDocument<Document> typeSafeDoc = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class);
-        List<Document> decorators = typeSafeDoc.getList(DECORATORS_FIELD);
-        if (decorators == null) {
-            throw new DecoratorNotFoundException();
-        }
-
-        Document updatedDoc = parseJsonToNitriteDocument(decoratorJson);
-
-        decorators.stream()
-                .filter(decoratorEntry -> Integer.valueOf(id).equals(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)))
-                .findFirst()
-                .orElseThrow(DecoratorNotFoundException::new)
-                .put("decorator", updatedDoc);
-
-        namespaceDoc.put(DECORATORS_FIELD, decorators);
-        decoratorCollection.update(namespaceDoc);
-        LOG.debug("Updated decorator with ID {} in namespace '{}'", id, namespace);
+    @Override
+    public void deleteCurrentDecoratorHistory(String namespace, int currentId)
+            throws NamespaceNotFoundException, DecoratorNotFoundException {
+        deleteDecorator(namespace, currentId, true);
     }
 
     @Override
     public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
+        deleteDecorator(namespace, id, false);
+    }
+
+    private void deleteDecorator(String namespace, int id, boolean requireCurrent)
+            throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
         lock.lock();
@@ -204,9 +280,18 @@ public class NitriteDecoratorStore implements DecoratorStore {
                 throw new DecoratorNotFoundException();
             }
 
+            if (requireCurrent && decorators.stream().noneMatch(entry ->
+                    Integer.valueOf(id).equals(entry.get(DECORATOR_ID_FIELD, Integer.class))
+                            && entry.get(SUPERSEDED_BY_FIELD) == null)) {
+                throw new DecoratorNotFoundException();
+            }
+
+            Set<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespaceDoc, namespace), id).stream()
+                    .map(DecoratorHistoryEntry::getId)
+                    .collect(Collectors.toSet());
             List<Document> mutableDecorators = new ArrayList<>(decorators);
             boolean removed = mutableDecorators.removeIf(
-                    decoratorEntry -> Integer.valueOf(id).equals(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)));
+                    decoratorEntry -> ids.contains(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)));
             if (!removed) {
                 throw new DecoratorNotFoundException();
             }
@@ -241,13 +326,28 @@ public class NitriteDecoratorStore implements DecoratorStore {
         return decorators;
     }
 
-    private Stream<Document> streamWithValidId(List<Document> decorators) {
+    private List<DecoratorHistoryEntry> historyEntries(Document namespaceDoc, String namespace) {
+        return extractDecorators(namespaceDoc, namespace).stream()
+                .filter(doc -> doc.get(DECORATOR_ID_FIELD, Integer.class) != null)
+                .map(doc -> {
+                    Document decorator = doc.get("decorator", Document.class);
+                    return new DecoratorHistoryEntry(
+                            doc.get(DECORATOR_ID_FIELD, Integer.class),
+                            doc.get(SUPERSEDES_FIELD, Integer.class),
+                            doc.get(SUPERSEDED_BY_FIELD, Integer.class),
+                            decorator == null ? null : documentToDecorator(decorator));
+                })
+                .toList();
+    }
+
+    private Stream<Document> streamCurrent(List<Document> decorators) {
         return decorators.stream()
-                .filter(doc -> doc.get(DECORATOR_ID_FIELD, Integer.class) != null);
+                .filter(doc -> doc.get(DECORATOR_ID_FIELD, Integer.class) != null)
+                .filter(doc -> doc.get(SUPERSEDED_BY_FIELD) == null);
     }
 
     private List<Integer> filterDecorators(List<Document> decorators, String target, String type) {
-        return streamWithValidId(decorators)
+        return streamCurrent(decorators)
                 .filter(doc -> {
                     Document decorator = doc.get("decorator", Document.class);
                     return decorator == null || matchesFilters(decorator, target, type);
@@ -257,7 +357,7 @@ public class NitriteDecoratorStore implements DecoratorStore {
     }
 
     private List<Decorator> filterDecoratorsToValues(List<Document> decorators, String target, String type) {
-        return streamWithValidId(decorators)
+        return streamCurrent(decorators)
                 .map(doc -> doc.get("decorator", Document.class))
                 .filter(Objects::nonNull)
                 .filter(decorator -> matchesFilters(decorator, target, type))

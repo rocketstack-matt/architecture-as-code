@@ -129,3 +129,9 @@ To restrict a namespace: delete the `* read` record. The AND rule for child name
 ## Domain-scoped access
 
 `hasDomainAccess`, `canReadByDomain`, etc. are **not** hierarchical — domain access remains flat. `UserAccess` records have either `namespace` or `domain` set, never both.
+
+---
+
+## Reserved decorator types
+
+`calm.decorators.reserved."<type>".writers` lists the principals that may create, update or delete a decorator of a reserved type. `DecoratorWriteService` checks it after the `WRITE` (or `GLOBAL_ADMIN` for delete) permission check, for REST and MCP. Any other caller gets 403, a namespace grant does not override it. No type is reserved by default.
