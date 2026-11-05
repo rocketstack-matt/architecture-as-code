@@ -124,6 +124,16 @@
             <artifactId>quarkus-hibernate-validator</artifactId>
         </dependency>
 
+        <!-- Extensions spike (I0): ADR 0010 signing and JSON Schema 2020-12 validation. -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-jwt-build</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-json-schema</artifactId>
+        </dependency>
+
         <!-- MCP Server -->
         <dependency>
             <groupId>io.quarkiverse.mcp</groupId>
