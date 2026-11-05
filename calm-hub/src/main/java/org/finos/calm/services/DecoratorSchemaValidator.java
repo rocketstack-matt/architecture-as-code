@@ -156,9 +156,13 @@ public class DecoratorSchemaValidator {
                 if (object.getValue("$ref") instanceof String ref) {
                     refs.add(ref);
                 }
-                object.forEach(entry -> nodes.add(entry.getValue()));
+                object.forEach(entry -> {
+                    if (entry.getValue() != null) nodes.add(entry.getValue());
+                });
             } else if (current instanceof JsonArray array) {
-                array.forEach(nodes::add);
+                array.forEach(value -> {
+                    if (value != null) nodes.add(value);
+                });
             }
         }
         return refs;
