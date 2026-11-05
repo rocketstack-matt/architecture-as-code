@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -60,6 +61,9 @@ public class ExtensionTools {
     private static final String RESULT = "result";
     // Values of these keywords are data, not schemas.
     private static final Set<String> DATA_KEYWORDS = Set.of("const", "enum", "default", "examples");
+    // Values of these keywords map names to schemas.
+    private static final Set<String> SCHEMA_MAPS = Set.of("properties", "patternProperties", "$defs", "definitions",
+            "dependentSchemas", "dependencies");
 
     /** One command with what its handler needs. */
     record ExtensionTool(String name, String extensionId, String extensionName, String commandName,
@@ -76,7 +80,7 @@ public class ExtensionTools {
 
         Map<String, Object> outputSchema() {
             if (!wrapsOutput()) {
-                return command.output();
+                return refsBesideIdsInAllOf(command.output());
             }
             Map<String, Object> result = new LinkedHashMap<>(command.output());
             Map<String, Object> schema = new LinkedHashMap<>();
@@ -86,10 +90,10 @@ public class ExtensionTools {
                 schema.put("$schema", draft);
             }
             // Its own $id keeps the local $refs of the output schema pointing into it.
-            result.putIfAbsent("$id", SCHEMA_BASE + extensionId + "/commands/" + commandName + "/output.json");
+            result.putIfAbsent("$id", outputSchemaId(extensionId, commandName));
             schema.put("properties", Map.of(RESULT, result));
             schema.put("required", List.of(RESULT));
-            return schema;
+            return refsBesideIdsInAllOf(schema);
         }
     }
 
@@ -145,10 +149,8 @@ public class ExtensionTools {
                 ExtensionManifest.Route route = manifest.route(command.route())
                         .orElseThrow(() -> new IllegalStateException("Extension " + manifest.id() + " command '"
                                 + name + "' names route '" + command.route() + "', which is not declared"));
-                String remoteRef = remoteRef(command.input(), inputSchemaId(manifest.id(), name));
-                if (remoteRef != null) {
-                    logger.warn("Extension {} command '{}' has no MCP tool: its input schema has the remote $ref '{}', "
-                            + "which CALM Hub does not fetch", manifest.id(), name, remoteRef);
+                if (hasRemoteRef(manifest.id(), name, "input", command.input(), inputSchemaId(manifest.id(), name))
+                        || hasRemoteRef(manifest.id(), name, "output", command.output(), outputSchemaId(manifest.id(), name))) {
                     return;
                 }
                 tools.add(new ExtensionTool(ExtensionManifestLoader.toolName(manifest.id(), name), manifest.id(),
@@ -157,6 +159,16 @@ public class ExtensionTools {
         }
         tools.sort(Comparator.comparing(ExtensionTool::name));
         return tools;
+    }
+
+    private static boolean hasRemoteRef(String extensionId, String commandName, String kind,
+                                        Map<String, Object> schema, String defaultId) {
+        String ref = schema == null ? null : remoteRef(schema, defaultId);
+        if (ref != null) {
+            logger.warn("Extension {} command '{}' has no MCP tool: its {} schema has the $ref '{}', which is remote or "
+                    + "not a valid URI. CALM Hub and MCP clients do not fetch remote schemas", extensionId, commandName, kind, ref);
+        }
+        return ref != null;
     }
 
     static ToolManager.ToolAnnotations annotations(ExtensionTool tool) {
@@ -320,18 +332,23 @@ public class ExtensionTools {
         return SCHEMA_BASE + extensionId + "/commands/" + commandName + "/input.json";
     }
 
+    static String outputSchemaId(String extensionId, String commandName) {
+        return SCHEMA_BASE + extensionId + "/commands/" + commandName + "/output.json";
+    }
+
     /**
      * The first {@code $ref} or {@code $dynamicRef} that points outside the schema, or null. Hub does
-     * not fetch remote schemas, so a tool with one would fail on every call.
+     * not fetch remote schemas, so a tool with one in its input fails on every call. The SDK clients
+     * fail to list the tools if an output schema has one.
      */
     static String remoteRef(Map<String, Object> schema, String defaultId) {
         URI fallback = URI.create(defaultId);
-        URI base = schema.get("$id") instanceof String id ? Optional.ofNullable(uri(id, fallback)).orElse(fallback) : fallback;
+        URI base = schema.get("$id") instanceof String id ? Optional.ofNullable(resolve(id, fallback)).orElse(fallback) : fallback;
         Set<URI> ids = new HashSet<>();
         List<Map.Entry<URI, String>> refs = new ArrayList<>();
         collectRefs(schema, base, ids, refs);
         for (Map.Entry<URI, String> ref : refs) {
-            URI target = uri(ref.getValue(), ref.getKey());
+            URI target = resolve(ref.getValue(), ref.getKey());
             if (target == null || !ids.contains(withoutFragment(target))) {
                 return ref.getValue();
             }
@@ -339,35 +356,95 @@ public class ExtensionTools {
         return null;
     }
 
-    private static void collectRefs(Object node, URI base, Set<URI> ids, List<Map.Entry<URI, String>> refs) {
-        if (node instanceof List<?> list) {
-            list.forEach(item -> collectRefs(item, base, ids, refs));
-            return;
-        }
-        if (!(node instanceof Map<?, ?> map)) {
-            return;
-        }
+    private static void collectRefs(Map<String, Object> schema, URI base, Set<URI> ids, List<Map.Entry<URI, String>> refs) {
         URI here = base;
-        if (map.get("$id") instanceof String id) {
-            URI resolved = uri(id, base);
+        if (schema.get("$id") instanceof String id) {
+            URI resolved = resolve(id, base);
             if (resolved != null) {
                 here = resolved;
             }
         }
         ids.add(withoutFragment(here));
-        for (Map.Entry<?, ?> entry : map.entrySet()) {
-            Object key = entry.getKey();
-            if (("$ref".equals(key) || "$dynamicRef".equals(key)) && entry.getValue() instanceof String ref) {
+        for (String keyword : List.of("$ref", "$dynamicRef")) {
+            if (schema.get(keyword) instanceof String ref) {
                 refs.add(Map.entry(here, ref));
-            } else if (!DATA_KEYWORDS.contains(key)) {
-                collectRefs(entry.getValue(), here, ids, refs);
             }
         }
+        URI scope = here;
+        mapSubschemas(schema, subschema -> {
+            collectRefs(subschema, scope, ids, refs);
+            return subschema;
+        });
     }
 
-    private static URI uri(String value, URI base) {
+    /**
+     * Ajv, which the MCP TypeScript SDK uses to compile output schemas, overflows its stack on a
+     * subschema with both {@code $id} and {@code $ref}. The same ref in {@code allOf} compiles.
+     */
+    static Map<String, Object> refsBesideIdsInAllOf(Map<String, Object> schema) {
+        Map<String, Object> copy = mapSubschemas(schema, ExtensionTools::refsBesideIdsInAllOf);
+        if (!copy.containsKey("$id")) {
+            return copy;
+        }
+        List<Object> allOf = new ArrayList<>();
+        if (copy.get("allOf") instanceof List<?> existing) {
+            allOf.addAll(existing);
+        }
+        int size = allOf.size();
+        for (String keyword : List.of("$ref", "$dynamicRef")) {
+            if (copy.get(keyword) != null) {
+                allOf.add(Map.of(keyword, copy.remove(keyword)));
+            }
+        }
+        if (allOf.size() > size) {
+            copy.put("allOf", allOf);
+        }
+        return copy;
+    }
+
+    /** A copy of a schema with {@code f} applied to each direct subschema. Keyword values that are data stay as they are. */
+    private static Map<String, Object> mapSubschemas(Map<String, Object> schema, UnaryOperator<Map<String, Object>> f) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        schema.forEach((keyword, value) -> {
+            if (DATA_KEYWORDS.contains(keyword)) {
+                copy.put(keyword, value);
+            } else if (SCHEMA_MAPS.contains(keyword) && value instanceof Map<?, ?> named) {
+                Map<String, Object> mapped = new LinkedHashMap<>();
+                named.forEach((name, subschema) -> mapped.put(String.valueOf(name), mapSubschema(subschema, f)));
+                copy.put(keyword, mapped);
+            } else {
+                copy.put(keyword, mapSubschema(value, f));
+            }
+        });
+        return copy;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object mapSubschema(Object value, UnaryOperator<Map<String, Object>> f) {
+        if (value instanceof Map<?, ?> map) {
+            return f.apply((Map<String, Object>) map);
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(item -> mapSubschema(item, f)).toList();
+        }
+        return value;
+    }
+
+    /**
+     * {@link URI#resolve} returns a ref unchanged against an opaque base such as {@code urn:} or
+     * {@code tag:}, and drops the last path segment for an empty ref. A ref that is only a fragment
+     * points into the base document, whatever its scheme.
+     */
+    private static URI resolve(String value, URI base) {
         try {
-            return base.resolve(new URI(value));
+            URI ref = new URI(value);
+            if (ref.getScheme() == null && ref.getRawSchemeSpecificPart().isEmpty()) {
+                return new URI(base.getScheme(), base.getSchemeSpecificPart(), ref.getFragment());
+            }
+            if (ref.isAbsolute() || !base.isOpaque()) {
+                return base.resolve(ref);
+            }
+            return null;
         } catch (URISyntaxException | IllegalArgumentException e) {
             return null;
         }

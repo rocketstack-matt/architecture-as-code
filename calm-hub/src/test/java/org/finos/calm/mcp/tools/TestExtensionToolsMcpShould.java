@@ -93,7 +93,9 @@ class TestExtensionToolsMcpShould {
         assertThat(remove.getJsonObject("outputSchema"), nullValue());
         JsonObject wrapped = find(tools, "ext_mcp-test_service-names").getJsonObject("outputSchema");
         assertThat(wrapped.getString("type"), is("object"));
-        assertThat(wrapped.getJsonObject("properties").getJsonObject("result").getString("type"), is("array"));
+        JsonObject result = wrapped.getJsonObject("properties").getJsonObject("result");
+        assertThat(result.containsKey("$ref"), is(false));
+        assertThat(result.getJsonArray("allOf"), is(new JsonArray().add(new JsonObject().put("$ref", "#/$defs/names"))));
     }
 
     @Test

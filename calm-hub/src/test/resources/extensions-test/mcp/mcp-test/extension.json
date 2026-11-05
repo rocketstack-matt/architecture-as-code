@@ -67,10 +67,18 @@
         "required": ["namespace"]
       },
       "output": {
-        "type": "array",
-        "items": { "$ref": "#/$defs/name" },
-        "$defs": { "name": { "type": "string" } }
+        "$ref": "#/$defs/names",
+        "$defs": {
+          "names": { "type": "array", "items": { "$ref": "#/$defs/name" } },
+          "name": { "type": "string" }
+        }
       }
+    },
+    "remote-output": {
+      "route": "search",
+      "description": "Search with a result from a remote schema",
+      "input": { "type": "object" },
+      "output": { "type": "object", "properties": { "hits": { "$ref": "https://example.com/hits.json" } } }
     },
     "remote-search": {
       "route": "search",

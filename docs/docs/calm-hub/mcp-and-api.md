@@ -218,7 +218,8 @@ CALM Hub makes one tool for each command of an enabled [extension](index.md#exte
 
 - The input and output schemas come from the manifest. CALM Hub checks the arguments against the input schema before it calls the extension.
 - MCP requires an output schema of type `object`. CALM Hub wraps any other output schema as `{"type": "object", "properties": {"result": <schema>}, "required": ["result"]}`, and returns the reply as `{"result": <reply>}`.
-- CALM Hub does not fetch a remote `$ref`. A command whose input schema has one gets no tool, and CALM Hub logs a warning.
+- CALM Hub and MCP clients do not fetch a remote `$ref`. A command whose input or output schema has one gets no tool, and CALM Hub logs a warning. A `$ref` that starts with `#` is local, also in a schema with a `urn:` or `tag:` `$id`.
+- The TypeScript MCP SDK cannot compile a subschema that has both `$id` and `$ref`. In output schemas, CALM Hub moves such a `$ref` into `allOf`, which has the same meaning.
 - `readOnlyHint` is true for a `GET` or `readOnly` route. `destructiveHint` and `idempotentHint` come from the command. With no hint, a write is destructive and not idempotent.
 - Each call goes through the extension proxy, with the same scope, read-only, audit and size rules as a REST call. CALM Hub checks the scope when the tool is called. A user sees every tool, also one that they cannot call.
 - A read-only CALM Hub makes no tool for a command whose route it cannot run.

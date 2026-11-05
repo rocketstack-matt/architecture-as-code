@@ -144,9 +144,28 @@ class TestExtensionToolsShould {
         assertThat(schema.get("type"), is("object"));
         assertThat(schema.get("required"), is(List.of("result")));
         Map<?, ?> result = (Map<?, ?>) ((Map<?, ?>) schema.get("properties")).get("result");
-        assertThat(result.get("type"), is("array"));
         assertThat(result.get("$id"), is("https://calm.finos.org/calm-hub/extensions/mcp-test/commands/service-names/output.json"));
-        assertThat(result.get("$defs"), is(Map.of("name", Map.of("type", "string"))));
+        assertThat(result.get("allOf"), is(List.of(Map.of("$ref", "#/$defs/names"))));
+        assertThat(result.containsKey("$ref"), is(false));
+        assertThat(((Map<?, ?>) result.get("$defs")).keySet(), contains("names", "name"));
+    }
+
+    @Test
+    void move_a_ref_beside_an_id_into_all_of() {
+        Map<String, Object> schema = Map.of(
+                "type", "object",
+                "$ref", "#/$defs/top",
+                "properties", Map.of("$id", Map.of("$id", "a.json", "$ref", "#/$defs/b", "allOf", List.of(Map.of("type", "object")))),
+                "$defs", Map.of("d", Map.of("$id", "urn:d", "$dynamicRef", "#m")),
+                "default", Map.of("$id", "data", "$ref", "data"));
+
+        Map<String, Object> moved = ExtensionTools.refsBesideIdsInAllOf(schema);
+
+        assertThat(moved.get("$ref"), is("#/$defs/top"));
+        assertThat(((Map<?, ?>) moved.get("properties")).get("$id"),
+                is(Map.of("$id", "a.json", "allOf", List.of(Map.of("type", "object"), Map.of("$ref", "#/$defs/b")))));
+        assertThat(((Map<?, ?>) moved.get("$defs")).get("d"), is(Map.of("$id", "urn:d", "allOf", List.of(Map.of("$dynamicRef", "#m")))));
+        assertThat(moved.get("default"), is(Map.of("$id", "data", "$ref", "data")));
     }
 
     @Test
@@ -163,16 +182,17 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void skip_a_command_whose_input_schema_has_a_remote_ref() {
-        assertThat(TOOLS.stream().noneMatch(t -> t.commandName().equals("remote-search")), is(true));
+    void skip_a_command_whose_input_or_output_schema_has_a_remote_ref() {
+        assertThat(TOOLS.stream().noneMatch(t -> t.commandName().startsWith("remote-")), is(true));
     }
 
     @Test
-    void find_the_remote_refs_of_an_input_schema() {
+    void find_the_remote_refs_of_a_schema() {
         String id = ExtensionTools.inputSchemaId("x", "c");
 
         assertThat(ExtensionTools.remoteRef(Map.of("$ref", "#/$defs/a", "$defs", Map.of("a", Map.of())), id), nullValue());
         assertThat(ExtensionTools.remoteRef(Map.of("$ref", id + "#/$defs/a"), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$ref", ""), id), nullValue());
         assertThat(ExtensionTools.remoteRef(Map.of("$defs", Map.of("a", Map.of("$id", "a.json"))), id), nullValue());
         assertThat(ExtensionTools.remoteRef(Map.of("$ref", "a.json", "$defs", Map.of("a", Map.of("$id", "a.json"))), id), nullValue());
         assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:in", "$ref", "urn:in#/x"), id), nullValue());
@@ -182,6 +202,38 @@ class TestExtensionToolsShould {
         assertThat(ExtensionTools.remoteRef(Map.of("$ref", "other.json"), id), is("other.json"));
         assertThat(ExtensionTools.remoteRef(Map.of("$dynamicRef", "urn:other#x"), id), is("urn:other#x"));
         assertThat(ExtensionTools.remoteRef(Map.of("$ref", "a b:c"), id), is("a b:c"));
+    }
+
+    @Test
+    void resolve_local_refs_against_an_id_that_is_not_hierarchical() {
+        String id = ExtensionTools.inputSchemaId("x", "c");
+        Map<String, Object> defs = Map.of("a", Map.of("type", "string"));
+
+        assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:example:in", "properties", Map.of("p", Map.of("$ref", "#/$defs/a")),
+                "$defs", defs), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$id", "tag:example.com,2026:in", "$ref", "#/$defs/a", "$defs", defs), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$id", "https://example.com/in.json", "$ref", "#/$defs/a", "$defs", defs), id),
+                nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$defs", Map.of("e", Map.of("$id", "urn:example:e", "$ref", "#/$defs/a",
+                "$defs", defs))), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "urn:example:e#/$defs/a", "$defs", Map.of("e", Map.of("$id", "urn:example:e",
+                "$defs", defs))), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:example:in", "$ref", "other.json"), id), is("other.json"));
+        assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:example:in", "$ref", "urn:example:other#/a"), id), is("urn:example:other#/a"));
+        assertThat(ExtensionTools.remoteRef(Map.of("$id", "https://example.com/in.json", "$ref", "https://example.com/other.json"), id),
+                is("https://example.com/other.json"));
+    }
+
+    @Test
+    void check_the_refs_of_properties_named_like_data_keywords() {
+        String id = ExtensionTools.inputSchemaId("x", "c");
+
+        assertThat(ExtensionTools.remoteRef(Map.of("properties", Map.of("default", Map.of("$ref", "https://example.com/a.json"))), id),
+                is("https://example.com/a.json"));
+        assertThat(ExtensionTools.remoteRef(Map.of("$defs", Map.of("enum", Map.of("$ref", "https://example.com/b.json"))), id),
+                is("https://example.com/b.json"));
+        assertThat(ExtensionTools.remoteRef(Map.of("properties", Map.of("examples", Map.of("type", "array")),
+                "examples", List.of(Map.of("$ref", "https://example.com/c.json"))), id), nullValue());
     }
 
     @Test
@@ -420,6 +472,22 @@ class TestExtensionToolsShould {
         assertThat(response.isError(), is(true));
         assertThat(text(response), containsString("/service/name"));
         verifyNoInteractions(proxyService);
+    }
+
+    @Test
+    void keep_and_check_an_input_schema_with_a_urn_id_and_local_refs() {
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        Map<String, Object> input = Map.of("$id", "urn:example:in", "type", "object",
+                "properties", Map.of("p", Map.of("$ref", "#/$defs/a")), "$defs", Map.of("a", Map.of("type", "string")));
+        ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
+                Map.of("c", new ExtensionManifest.Command("r", "C", input, null, null, null)), null);
+
+        ExtensionTools.ExtensionTool urnTool = ExtensionTools.tools(List.of(manifest)).getFirst();
+        ToolResponse response = extensionTools.call(urnTool, Map.of("p", 3));
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("/p"));
+        assertThat(Boolean.TRUE.equals(urnTool.inputSchema().validate(new JsonObject().put("p", "s")).getValid()), is(true));
     }
 
     @Test
