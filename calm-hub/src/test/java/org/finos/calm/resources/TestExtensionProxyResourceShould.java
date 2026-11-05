@@ -103,6 +103,18 @@ class TestExtensionProxyResourceShould {
 
     @Test
     @TestSecurity(user = "alice")
+    void refuse_encoded_protected_literals_before_forwarding() {
+        given().when().get(BASE + "/services/admin").then().statusCode(403);
+        for (String path : new String[]{"/services/%61dmin", "/services/%61%64%6Din",
+                "/%73ervices/admin", "/services/%2561dmin"}) {
+            backend.reset();
+            given().urlEncodingEnabled(false).when().get(BASE + path).then().statusCode(400);
+            assertThat(backend.received(), nullValue());
+        }
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
     void preserve_an_encoded_slash_in_a_path_parameter() throws Exception {
         for (String value : new String[]{"team%2Fservice", "team%2fservice"}) {
             backend.reset();
