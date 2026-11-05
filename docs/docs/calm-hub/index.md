@@ -193,13 +193,14 @@ The JSON Schema is `META-INF/calm-extensions/schema/0/extension.schema.json` in 
 CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route path>`. For each call, CALM Hub:
 
 - preserves encoded slashes (`%2F`) within path parameters, without decoding them into route separators
+- decodes percent-encoded unreserved characters and uppercases other escapes before matching and forwarding. Percent-encoding in a matched literal segment gets `400`
 - matches the path against the declared routes only, and refuses `..`, `%2e`, `\`, `//`, `@` and their encoded forms
 - checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path
 - on a read-only CALM Hub, allows a method other than `GET` only on a `readOnly` route
 - sends only `Content-Type`, `Accept`, `Accept-Language` and its own `X-Calm-Hub-Identity` assertion. The caller's token and cookies never go to the extension
 - returns only `Content-Type` (`application/json`, `text/plain` or `text/event-stream`), `Cache-Control` and `ETag`, and adds `Content-Security-Policy: sandbox; default-src 'none'`. It does not follow redirects
 - returns `502` or `504`, with a generic body, when the backend fails, is slow, replies with `5xx`, `3xx` or `401`, or sends another content type
-- audits each call to a route that is not `GET` or `readOnly`, as entity type `EXTENSION` with the extension id, the route id and the assertion `jti`
+- audits every non-`readOnly` call, including `GET`, as entity type `EXTENSION` with the extension id, route id and assertion `jti`. Outcomes are `SUCCESS`, `DENIED`, `FAILURE` (other returned client errors), or `UNKNOWN` (an upstream failure or unusable reply; the backend may have completed the call)
 
 Replies are buffered. Streaming is not supported yet.
 

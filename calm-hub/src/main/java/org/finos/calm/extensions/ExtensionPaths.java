@@ -39,7 +39,27 @@ final class ExtensionPaths {
         } catch (IllegalArgumentException e) {
             throw badRequest();
         }
-        return rawPath;
+        return normalise(rawPath);
+    }
+
+    private static String normalise(String path) {
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == '%') {
+                char decoded = (char) Integer.parseInt(path.substring(i + 1, i + 3), 16);
+                if ((decoded >= 'a' && decoded <= 'z') || (decoded >= 'A' && decoded <= 'Z')
+                        || (decoded >= '0' && decoded <= '9') || "-._~".indexOf(decoded) >= 0) {
+                    result.append(decoded);
+                } else {
+                    result.append(path.substring(i, i + 3).toUpperCase(Locale.ROOT));
+                }
+                i += 2;
+            } else {
+                result.append(c);
+            }
+        }
+        return result.toString();
     }
 
     /**

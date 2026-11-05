@@ -111,12 +111,12 @@ class TestExtensionProxyResourceShould {
                     .then().statusCode(200);
 
             FixtureBackend.Received received = backend.received();
-            assertThat(received.pathAndQuery(), is("/base/services/" + value));
+            assertThat(received.pathAndQuery(), is("/base/services/" + value.replace("%2f", "%2F")));
             String payload = received.header("X-Calm-Hub-Identity").split("\\.")[1];
             JsonNode claims = new ObjectMapper()
                     .readTree(Base64.getUrlDecoder().decode(payload));
             assertThat(claims.get("route").asText(), is("service"));
-            assertThat(claims.get("htp").asText(), is("/services/" + value));
+            assertThat(claims.get("htp").asText(), is("/services/" + value.replace("%2f", "%2F")));
         }
     }
 
