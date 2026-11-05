@@ -144,7 +144,7 @@ CALM_UI_ITEMS_1__VALUE=2026.10.1
 
 An extension adds features to CALM Hub without a fork. It is an HTTP service that CALM Hub calls. The operator installs it with a manifest. CALM Hub reads the manifests at start up. No API adds an extension.
 
-> Work in progress: CALM Hub reads, checks and lists manifests. It does not call extension services yet.
+> Work in progress: CALM Hub proxies extension routes. The UI, the CLI and MCP do not use them yet.
 
 Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`.
 
@@ -160,6 +160,15 @@ Put one folder for each extension in `calm.extensions.dir`, with an `extension.j
 | `calm.extensions."<id>".enabled` | `true` | Set `false` to turn off an extension |
 | `calm.extensions."<id>".order` | `0` | Lower values come first in the list. Equal values sort by id |
 | `calm.extensions."<id>".backend-url` | not set | The base URL of the extension service. Required for an enabled extension with routes |
+| `calm.extensions."<id>".allow-http` | `false` | Allows a plain `http` backend that is not on loopback, such as a cluster-internal host. Otherwise the backend must use `https`, or `http` on `localhost`, `127.x.x.x` or `[::1]` |
+| `calm.extensions."<id>".connect-timeout-seconds` | `calm.extensions.http.connect-timeout-seconds` (`5`) | The connect timeout for each call |
+| `calm.extensions."<id>".request-timeout-seconds` | `calm.extensions.http.request-timeout-seconds` (`10`) | The limit for the whole call. A slow backend gets `504` |
+| `calm.extensions."<id>".max-request-bytes` | `calm.extensions.http.max-request-bytes` (`1048576`) | A larger request body gets `413` |
+| `calm.extensions."<id>".max-response-bytes` | `calm.extensions.http.max-response-bytes` (`1048576`) | A larger reply gets `502` |
+| `calm.extensions.identity.private-key-location` | not set | The PKCS#8 PEM key that signs the identity assertion: RSA (2048 bits or more, RS256) or P-256 (ES256). Required when an enabled extension has routes. A shared secret (HS256) is refused |
+| `calm.extensions.identity.public-key-locations` | not set | Comma-separated PEM public keys for the JWKS. The first is the public key of the signing key |
+| `calm.extensions.identity.ttl-seconds` | `60` | The lifetime of an assertion, at most `300` |
+| `calm.extensions.allow-without-auth` | `false` | Allows enabled extensions with routes when `calm.auth.enabled=false`. Only for local development: every caller is then a global admin |
 
 ```bash
 CALM_EXTENSIONS_DIR=/etc/calm-hub/extensions
@@ -178,6 +187,55 @@ The JSON Schema is `META-INF/calm-extensions/schema/0/extension.schema.json` in 
 
 - CALM Hub does not start if a manifest or a setting is not valid. The error names the file or the setting.
 - `GET /api/calm/extensions` lists the enabled extensions, for any signed-in user. It never shows the backend URL. On a read-only CALM Hub it leaves out write routes that are not `readOnly`, and the commands and contributions that use them.
+
+### Calling an extension
+
+CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route path>`. For each call, CALM Hub:
+
+- matches the path against the declared routes only, and refuses `..`, `%2e`, `%2f`, `\`, `//`, `@` and their encoded forms
+- checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path
+- on a read-only CALM Hub, allows a method other than `GET` only on a `readOnly` route
+- sends only `Content-Type`, `Accept`, `Accept-Language` and its own `X-Calm-Hub-Identity` assertion. The caller's token and cookies never go to the extension
+- returns only `Content-Type` (`application/json`, `text/plain` or `text/event-stream`), `Cache-Control` and `ETag`, and adds `Content-Security-Policy: sandbox; default-src 'none'`. It does not follow redirects
+- returns `502` or `504`, with a generic body, when the backend fails, is slow, replies with `5xx`, `3xx` or `401`, or sends another content type
+- audits each call to a route that is not `GET` or `readOnly`, as entity type `EXTENSION` with the extension id, the route id and the assertion `jti`
+
+Replies are buffered. Streaming is not supported yet.
+
+CALM Hub does not start with an enabled extension that has routes when `calm.auth.enabled=false`, because every caller is then a global admin. Set `calm.extensions.allow-without-auth=true` only for local development.
+
+### Identity keys
+
+CALM Hub signs a short-lived JWT for each call, and publishes the public keys at `GET /api/calm/auth/jwks`. This endpoint is public. Create a key pair:
+
+```bash
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out hub-private.pem
+openssl pkey -in hub-private.pem -pubout -out hub-public.pem
+```
+
+To change the key with no outage, put the new key first and keep the old public key in the list for at least `ttl-seconds`:
+
+```bash
+CALM_EXTENSIONS_IDENTITY_PRIVATE_KEY_LOCATION=/keys/new-private.pem
+CALM_EXTENSIONS_IDENTITY_PUBLIC_KEY_LOCATIONS=/keys/new-public.pem,/keys/old-public.pem
+```
+
+CALM Hub refuses its own assertion as a credential. An extension that calls CALM Hub uses its own service account, with the fewest grants that it needs.
+
+In `proxy-auth` mode, any client that reaches CALM Hub directly can set `Remote-User`. Make CALM Hub listen only on loopback or behind the proxy.
+
+### For extension authors
+
+Verify `X-Calm-Hub-Identity` on each request, with the JWKS only:
+
+- the header `typ` is `calm-ext+jwt`, and `alg` is `RS256` or `ES256` and equals the `alg` of the key with that `kid`. Load the JWKS again for an unknown `kid`
+- `iss` is the CALM Hub base URL, `aud` is your extension id, and `exp` is not past
+- `htm` is the request method, and `htp` is the path and query that you received, relative to your backend URL. CALM Hub sorts the query by name
+- each `jti` is used once
+
+The other claims are `sub` (the user), `auth` (`none`, `oidc` or `proxy`), `hubApi`, `route`, `scope` and `ns` (the namespace that CALM Hub checked). When `auth` is `none`, `sub` is one shared principal.
+
+CALM Hub checked the route scope for `ns`, not for other data. If your extension reads data with a service account, return only what `sub` may see in `ns`. See [the example backend](https://github.com/finos/architecture-as-code/blob/main/calm-hub/local-dev/extensions/example-services/).
 
 ---
 
