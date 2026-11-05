@@ -1,3 +1,4 @@
+import { it, expect, vi, afterEach } from 'vitest';
 import axios from 'axios';
 import AxiosMockAdapter from 'axios-mock-adapter';
 import { ExtensionService } from './extension-service.js';

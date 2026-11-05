@@ -1,6 +1,6 @@
 import { BUILTIN_DECORATOR_VIEWS } from '../../../test-support/decorator-views.js';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ControlEvaluationsPanel } from './ControlEvaluationsPanel.js';
 import { THEME } from './theme.js';
 import type { ControlEvaluationDecorator } from '../../contracts/contracts.js';
