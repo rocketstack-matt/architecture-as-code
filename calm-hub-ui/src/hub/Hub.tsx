@@ -1,3 +1,4 @@
+import { ExtensionResourceContext } from '../extensions/ExtensionResourceContext.js';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { IoCompassOutline } from 'react-icons/io5';
@@ -62,6 +63,7 @@ export default function Hub() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(true);
     const [selectedItem, setSelectedItem] = useState<SelectedItem>(null);
+    const [showsDroppedFile, setShowsDroppedFile] = useState(false);
     // Reported by DiagramSection, which fetches them, for the details drawer.
     const [decorators, setDecorators] = useState<Decorator[]>([]);
     // A detail-route load rejected (missing resource, dangling reference). Cleared
@@ -409,9 +411,11 @@ export default function Hub() {
             data={data}
             onItemSelect={handleItemSelect}
             hasDetailsPanel={!!selectedItem}
+            selectedElement={selectedItem?.data['unique-id']}
             breadcrumbs={breadcrumbs}
             onDisplayNameChange={handleDisplayNameChange}
             onDecoratorsChange={setDecorators}
+            onDroppedFileChange={setShowsDroppedFile}
         />
     ) : (
         <DocumentDetailSection data={data} />
@@ -456,6 +460,7 @@ export default function Hub() {
 
     return (
         <DiagramActionsContext.Provider value={diagramActions}>
+        <ExtensionResourceContext.Provider value={isDiagramView && !showsDroppedFile ? { namespace: data.name, resource: `${data.calmType.toLowerCase()}/${data.id}`, version: data.version } : null}>
         <DecoratorsContext.Provider value={decorators}>
         <div className="flex flex-col h-screen overflow-hidden">
             <Navbar />
@@ -531,6 +536,7 @@ export default function Hub() {
             </div>
         </div>
         </DecoratorsContext.Provider>
+        </ExtensionResourceContext.Provider>
         </DiagramActionsContext.Provider>
     );
 }

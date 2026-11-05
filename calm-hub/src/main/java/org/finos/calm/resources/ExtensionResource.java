@@ -24,6 +24,21 @@ public class ExtensionResource {
     }
 
     @GET
+    @Path("schema/0/blocks.schema.json")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Authenticated
+    @Operation(summary = "Get the hubApi 0 blocks reply schema")
+    public Response blocksSchema() throws java.io.IOException {
+        try (var stream = ExtensionResource.class.getResourceAsStream(
+                "/META-INF/calm-extensions/schema/0/blocks.schema.json")) {
+            if (stream == null) {
+                return Response.serverError().build();
+            }
+            return Response.ok(new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).build();
+        }
+    }
+
+    @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Authenticated
     @Operation(

@@ -338,3 +338,6 @@ sketch
 **/*.pem
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij,react,node,java,maven
+
+# Published extension blocks contract
+!src/main/resources/META-INF/calm-extensions/schema/0/blocks.schema.json

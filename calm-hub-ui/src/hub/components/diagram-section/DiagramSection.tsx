@@ -1,3 +1,6 @@
+import { ExtensionPoints } from '../../../extensions/ExtensionPoints.js';
+import { useExtensions } from '../../../components/extensions/ExtensionsContext.js';
+import { extensionTabs } from '../../../extensions/extension-tabs.js';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -48,6 +51,7 @@ interface DiagramSectionProps {
     data: Data & { calmType: 'Architectures' | 'Patterns' };
     onItemSelect?: (item: SelectedItem) => void;
     hasDetailsPanel?: boolean;
+    selectedElement?: string;
     breadcrumbs?: BreadcrumbItem[];
     /**
      * Mirrors the resolved display name up to Hub, which snapshots it into the
@@ -61,6 +65,7 @@ interface DiagramSectionProps {
      * Called with an empty list on unmount. Must be identity-stable.
      */
     onDecoratorsChange?: (decorators: Decorator[]) => void;
+    onDroppedFileChange?: (dropped: boolean) => void;
 }
 
 const iconMap = {
@@ -75,7 +80,7 @@ const subscribeToNothing = () => () => {};
 const getNavbarSlot = () => document.getElementById('navbar-actions');
 const getNoNavbarSlot = () => null;
 
-export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumbs, onDisplayNameChange, onDecoratorsChange }: DiagramSectionProps) {
+export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumbs, onDisplayNameChange, onDecoratorsChange, onDroppedFileChange, selectedElement }: DiagramSectionProps) {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -152,6 +157,8 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     );
     // A dropped file is not the loaded architecture, so the details drawer must not show its decorators.
     const [showsDroppedFile, setShowsDroppedFile] = useState(false);
+    useEffect(() => { onDroppedFileChange?.(showsDroppedFile); }, [onDroppedFileChange, showsDroppedFile]);
+    useEffect(() => () => onDroppedFileChange?.(false), [onDroppedFileChange]);
     const [compareFrom, setCompareFrom] = useState<string | null>(null);
     const [compareTo, setCompareTo] = useState<string | null>(null);
     const comparing = compareFrom !== null && compareTo !== null;
@@ -208,9 +215,11 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     const typeLabel = isArchitecture ? 'Architecture' : 'Pattern';
 
     const implementationService = useMemo(() => new PatternImplementationService(), []);
+    const extensions = useExtensions();
+    const registeredTabs = [...DIAGRAM_TABS, ...extensionTabs(extensions)];
     const tabScope = { isArchitecture, patternName };
-    const visibleTabs = visibleDiagramTabs(DIAGRAM_TABS, tabScope);
-    const activeTab = resolveDiagramTab(DIAGRAM_TABS, searchParams.get('tab'), tabScope);
+    const visibleTabs = visibleDiagramTabs(registeredTabs, tabScope);
+    const activeTab = resolveDiagramTab(registeredTabs, searchParams.get('tab'), tabScope);
     const tabQuery = diagramTabQuery(activeTab, searchParams);
     const usedByOpen = activeTab.id === 'used-by' && !comparing;
     const usedBy = usePatternImplementations(implementationService, data.name, patternName, data.version, usedByOpen);
@@ -440,10 +449,14 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     ]);
 
     const Icon = iconMap[data.calmType];
+    const extensionActions = !showsDroppedFile && <ExtensionPoints point="action" context={{
+        namespace: data.name, resource: `${data.calmType.toLowerCase()}/${data.id}`, version: data.version, selectedElement,
+    }} />;
 
     const tabContext: DiagramTabContext = {
         ...tabScope,
         data,
+        selectedElement,
         searchParams,
         setTabParams,
         diagram: (
@@ -763,6 +776,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
                         rightContent={
                             <div className="flex items-center gap-2">
                                 {tabs}
+                                {extensionActions}
                                 {layoutActions}
                             </div>
                         }
@@ -784,7 +798,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     return (
         <NodeSearchProvider value={nodeSearch}>
         <div className="w-full h-full">
-            {navbarSlot ? createPortal(viewMenu, navbarSlot) : viewMenu}
+            {navbarSlot ? createPortal(<>{viewMenu}{extensionActions}</>, navbarSlot) : <>{viewMenu}{extensionActions}</>}
             <div className="h-full bg-base-100 overflow-hidden flex flex-col">
                 {/* Mobile has no SectionHeader (full-bleed canvas), so after a
                     detailed-architecture hop the trail would be unreachable.
