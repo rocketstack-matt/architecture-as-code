@@ -4,6 +4,7 @@ import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 import io.smallrye.config.WithParentName;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -12,6 +13,13 @@ import java.util.Optional;
  */
 @ConfigMapping(prefix = "calm.extensions")
 public interface ExtensionsConfig {
+
+    /**
+     * Allows enabled extensions with routes when {@code calm.auth.enabled} is false. Only for local
+     * development: every caller is then a global admin.
+     */
+    @WithDefault("false")
+    boolean allowWithoutAuth();
 
     /** Holds one folder for each extension, with an {@code extension.json} in it. */
     Optional<String> dir();
@@ -24,10 +32,10 @@ public interface ExtensionsConfig {
     @WithParentName
     Map<String, Extension> extensions();
 
-    /** For the proxy (not built yet): the key that signs the identity that Hub sends to an extension. */
+    /** The keys that sign the identity assertion that Hub sends to an extension (ADR 0010). */
     Identity identity();
 
-    /** For the proxy (not built yet): limits on each call to an extension backend. */
+    /** The default limits on each call to an extension backend. Each extension can override them. */
     Http http();
 
     /** Strings, so that {@code ExtensionRegistry} does the checks and names the bad setting. */
@@ -37,11 +45,33 @@ public interface ExtensionsConfig {
         Optional<String> order();
 
         Optional<String> backendUrl();
+
+        /** Allows a plain http backend that is not on loopback, such as a cluster-internal host. */
+        Optional<String> allowHttp();
+
+        Optional<String> connectTimeoutSeconds();
+
+        Optional<String> requestTimeoutSeconds();
+
+        Optional<String> maxRequestBytes();
+
+        Optional<String> maxResponseBytes();
     }
 
     interface Identity {
-        /** A PKCS#8 PEM file with the RSA private key. */
+        /** A PKCS#8 PEM file with an RSA (RS256) or P-256 (ES256) private key. */
         Optional<String> privateKeyLocation();
+
+        /**
+         * PEM files with the public keys that {@code GET /api/calm/auth/jwks} lists. The first is the
+         * public key of {@link #privateKeyLocation()}. The others only verify, so that a key can change
+         * with no outage.
+         */
+        Optional<List<String>> publicKeyLocations();
+
+        /** The lifetime of an assertion, at most 300. */
+        @WithDefault("60")
+        int ttlSeconds();
     }
 
     interface Http {
@@ -50,6 +80,9 @@ public interface ExtensionsConfig {
 
         @WithDefault("10")
         int requestTimeoutSeconds();
+
+        @WithDefault("1048576")
+        int maxRequestBytes();
 
         @WithDefault("1048576")
         int maxResponseBytes();

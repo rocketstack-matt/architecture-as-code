@@ -12,7 +12,11 @@ import org.eclipse.microprofile.config.ConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * When {@code calm.readonly=true} this filter rejects any mutating HTTP method
@@ -24,6 +28,10 @@ import java.util.Set;
  * method alone is both sufficient today and future-proof: adding a new API
  * surface no longer requires a matching filter update (as was the case when
  * {@code /api/calm} was introduced alongside the original {@code /calm} prefix).
+ *
+ * <p>The one exception is the extension proxy, {@code /api/calm/extensions/<id>/api/...}. It
+ * enforces read-only mode itself, because a {@code readOnly} extension route (a search or a chat)
+ * changes nothing and must work on a read-only Hub (ADR 0011).
  *
  * <p>This filter runs at priority 0 (before {@link AccessControlFilter} at
  * priority 1) so read-only violations are rejected before auth checks.
@@ -46,6 +54,8 @@ public class ReadOnlyRequestFilter implements ContainerRequestFilter {
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "DELETE", "PATCH");
     private static final String ALLOW_HEADER = "Allow";
     private static final String ALLOWED_METHODS = "GET, HEAD, OPTIONS";
+    private static final Pattern EXTENSION_PROXY_PATH = Pattern.compile("^/?api/calm/extensions/[^/]+/api/");
+    private static final List<String> UNSAFE_PATH_PARTS = List.of("..", "%2e", "%2f", "%5c", "\\", "//");
 
     // Resolved once at runtime startup via @PostConstruct (see init()).  We deliberately
     // avoid @ConfigProperty here: in native image, @ConfigProperty values on CDI beans
@@ -71,6 +81,10 @@ public class ReadOnlyRequestFilter implements ContainerRequestFilter {
         String method = requestContext.getMethod();
         if (MUTATING_METHODS.contains(method)) {
             String path = requestContext.getUriInfo().getPath();
+            if (isExtensionProxyPath(requestContext, path)) {
+                // The proxy allows a non-GET method only on a readOnly route (ADR 0011).
+                return;
+            }
             LOG.warn("Read-only mode: rejected {} {}", method, path);
             requestContext.abortWith(
                     Response.status(Response.Status.METHOD_NOT_ALLOWED)
@@ -78,5 +92,23 @@ public class ReadOnlyRequestFilter implements ContainerRequestFilter {
                             .entity("This CALM Hub instance is read-only.")
                             .build());
         }
+    }
+
+    /**
+     * Exempts only the extension proxy, and only a path in normal form, decoded and raw, so that a
+     * dot segment cannot exempt a request that routing then sends to another resource.
+     */
+    private static boolean isExtensionProxyPath(ContainerRequestContext requestContext, String path) {
+        if (path == null || !EXTENSION_PROXY_PATH.matcher(path).find()) {
+            return false;
+        }
+        URI requestUri = requestContext.getUriInfo().getRequestUri();
+        String rawPath = requestUri == null ? null : requestUri.getRawPath();
+        return rawPath != null && isSafe(path) && isSafe(rawPath) && rawPath.contains("/api/calm/extensions/");
+    }
+
+    private static boolean isSafe(String path) {
+        String lower = path.toLowerCase(Locale.ROOT);
+        return UNSAFE_PATH_PARTS.stream().noneMatch(lower::contains);
     }
 }

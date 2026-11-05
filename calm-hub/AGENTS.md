@@ -410,13 +410,21 @@ All four workflows:
   `calm.extensions.dir` and from the classpath index `META-INF/calm-extensions/builtin/index.txt`.
   `ExtensionManifestLoader` validates them with the schema in `META-INF/calm-extensions/schema/<hubApi>/`
   (vertx-json-schema) and then does the cross-reference checks. A bad manifest or setting stops start up
-- `ExtensionsConfig` declares the per-id keys (`calm.extensions."<id>".enabled|order|backend-url`) only
+- `ExtensionsConfig` declares the per-id keys (`calm.extensions."<id>".enabled|order|backend-url|allow-http|...`) only
   so that SmallRye accepts them. The registry reads them by full name, because a map key with a dash
   does not bind from an environment variable
 - A field change in `domain/extensions/ExtensionManifest` needs the same change in the schema: the
   schema rejects unknown fields
-- Try it: `../mvnw quarkus:dev -Pstandalone,server-only -Dcalm.extensions.dir=local-dev/extensions
-  -Dcalm.extensions.example-services.backend-url=http://localhost:8091`, then `GET /api/calm/extensions`
+- `ExtensionProxyService` holds every rule of a proxied call: route match, path checks, scope, read-only,
+  identity assertion, header allow-lists, limits and audit. `ExtensionProxyResource` and the MCP tools
+  must both call it, because MCP does not pass through the JAX-RS filters (ADR 0011)
+- `ReadOnlyRequestFilter` exempts only `^/api/calm/extensions/[^/]+/api/`, in normal form. The proxy
+  then allows a non-GET method only on a `readOnly` route
+- `ExtensionIdentitySigner` signs with the JDK, not a JWT library. `ExtensionAssertionRejectingMechanism`
+  refuses a bearer token with `typ: calm-ext+jwt` in every auth mode
+- Tests generate key pairs at run time (`ExtensionTestKeys`); `*.pem` is git-ignored. `FixtureBackend` is a
+  loopback backend for proxy tests
+- Try it: see `local-dev/extensions/example-services/README.md`
 
 ### Read-Only Deployment Mode
 - `calm.readonly=true` opens Nitrite with `readOnly(true)` and installs
