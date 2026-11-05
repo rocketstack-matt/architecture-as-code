@@ -92,6 +92,13 @@ export {
     type CalmHubOptions,
     type NarrativeDocumentRequest,
     type NarrativeDocumentVersion,
+    type HubExtension,
+    type HubExtensionCommand,
+    type HubExtensionRoute,
+    type HubExtensionRequest,
+    type HubExtensionResponse,
+    buildExtensionRequest,
+    extensionProxyPath,
     type ResourceType,
     type ResourceChangeType,
     isValidResourceType
