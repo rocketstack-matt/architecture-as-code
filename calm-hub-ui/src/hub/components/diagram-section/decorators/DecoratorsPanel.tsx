@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { DecoratorCard } from '../../../../decorator-renderer/index.js';
+import { DecoratorCard, decoratorTypeLabel } from '../../../../decorator-renderer/index.js';
 import type { ArchitectureDecoratorsState } from './useArchitectureDecorators.js';
 
 interface DecoratorsPanelProps {
@@ -17,12 +17,15 @@ export function DecoratorsPanel({ state, typeFilter, onTypeFilterChange }: Decor
     const decorators = useMemo(() => (state.status === 'loaded' ? state.decorators : []), [state]);
     const typeCounts = useMemo(() => {
         const counts = new Map<string, number>();
-        for (const decorator of decorators) counts.set(decorator.type, (counts.get(decorator.type) ?? 0) + 1);
+        for (const decorator of decorators) {
+            const type = decoratorTypeLabel(decorator.type);
+            counts.set(type, (counts.get(type) ?? 0) + 1);
+        }
         // A type from a link stays selectable, so the filter shows what it hides.
         if (typeFilter !== null && !counts.has(typeFilter)) counts.set(typeFilter, 0);
         return [...counts].sort(([a], [b]) => a.localeCompare(b));
     }, [decorators, typeFilter]);
-    const shown = typeFilter === null ? decorators : decorators.filter((decorator) => decorator.type === typeFilter);
+    const shown = typeFilter === null ? decorators : decorators.filter((decorator) => decoratorTypeLabel(decorator.type) === typeFilter);
 
     let body;
     if (state.status === 'loading') {

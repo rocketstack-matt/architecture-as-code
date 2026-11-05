@@ -222,6 +222,22 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
         setSearchParams({ tab: activeTab.id, ...params }, { replace: true, state: location.state });
     };
 
+    // A tab id no entry registers is dropped from the URL, so a copied link does not keep it. A hidden tab such as
+    // used-by is kept, because it can become visible when the pattern summary loads.
+    const requestedTab = searchParams.get('tab');
+    const unknownTab = requestedTab !== null && !DIAGRAM_TABS.some((tab) => tab.id === requestedTab);
+    useEffect(() => {
+        if (!unknownTab) return;
+        setSearchParams(
+            (current) => {
+                const next = new URLSearchParams(current);
+                next.delete('tab');
+                return next;
+            },
+            { replace: true, state: location.state }
+        );
+    }, [unknownTab, setSearchParams, location.state]);
+
     // Save/reset the shared default layout — supported for both architectures
     // and patterns (backed by separate resources/collections server-side, see
     // PatternLayoutStore's class javadoc). Cosmetic gating only — see

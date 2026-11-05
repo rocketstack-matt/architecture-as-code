@@ -74,4 +74,29 @@ describe('DecoratorsPanel', () => {
         expect(screen.getByText('No decorators for this architecture version.')).toBeInTheDocument();
         expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     });
+
+    describe('a decorator with no type', () => {
+        // The API does not require a type. The order matters: the sort used to throw only when the typed one came first.
+        const untyped = { ...decorator('raw-1', 'unused'), type: undefined };
+        const nullType = { ...decorator('raw-2', 'unused'), type: null as unknown as string };
+        const mixed = { status: 'loaded' as const, decorators: [decorator('dep-1', 'deployment'), untyped, nullType] };
+
+        it('groups it under "(no type)" in the filter', () => {
+            render(<DecoratorsPanel state={mixed} typeFilter={null} onTypeFilterChange={vi.fn()} />);
+            expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+                'All types (3)',
+                '(no type) (2)',
+                'deployment (1)',
+            ]);
+            expect(screen.getAllByRole('article')).toHaveLength(3);
+        });
+
+        it('filters to the decorators with no type', () => {
+            render(<DecoratorsPanel state={mixed} typeFilter="(no type)" onTypeFilterChange={vi.fn()} />);
+            expect(screen.getAllByRole('article').map((card) => card.getAttribute('aria-label'))).toEqual([
+                '(no type) decorator raw-1',
+                '(no type) decorator raw-2',
+            ]);
+        });
+    });
 });
