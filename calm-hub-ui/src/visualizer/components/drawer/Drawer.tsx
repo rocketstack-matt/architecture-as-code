@@ -45,6 +45,7 @@ export function Drawer({
     defaultLayout,
     layoutEpoch,
     onPositionsChange,
+    onDroppedFileChange,
 }: DrawerProps) {
     const calmService = useMemo(() => new CalmService(), []);
     const [fileInstance, setFileInstance] = useState<Record<string, unknown> | undefined>(undefined);
@@ -116,9 +117,15 @@ export function Drawer({
         return () => { cancelled = true; };
     }, [architectureData, decoratorsProp, calmService]);
 
-    const decorators =
-        decoratorsProp ??
-        (architectureData && loadedDecorators?.source === architectureData ? loadedDecorators.values : NO_DECORATORS);
+    const decorators = !architectureData
+        ? NO_DECORATORS
+        : (decoratorsProp ?? (loadedDecorators?.source === architectureData ? loadedDecorators.values : NO_DECORATORS));
+
+    const showsDroppedFile = !!fileInstance;
+    useEffect(() => {
+        onDroppedFileChange?.(showsDroppedFile);
+    }, [showsDroppedFile, onDroppedFileChange]);
+    useEffect(() => () => onDroppedFileChange?.(false), [onDroppedFileChange]);
 
     const [loadedEvaluations, setLoadedEvaluations] = useState<{
         source: Data;
