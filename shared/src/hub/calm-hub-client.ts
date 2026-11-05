@@ -4,8 +4,18 @@ import { AuthPlugin } from '../auth/auth-plugin';
 import { initLogger, Logger } from '../logger';
 import { DocumentMetadata, extractDocumentMetadata, validateDocumentId } from './document-id-utils';
 import { ResourceType } from './resource-types.js';
+import { buildExtensionRequest, extensionProxyPath, HubExtension, HubExtensionRequest, HubExtensionRoute } from './extensions.js';
 
 export { ResourceType, RESOURCE_TYPES, isValidResourceType } from './resource-types.js';
+export type { HubExtension, HubExtensionCommand, HubExtensionRoute, HubExtensionRequest } from './extensions.js';
+export { buildExtensionRequest, extensionProxyPath } from './extensions.js';
+
+export interface HubExtensionResponse {
+    status: number;
+    contentType?: string;
+    /** Parsed JSON for a JSON reply, else the text as sent. */
+    data: unknown;
+}
 
 export interface CalmHubOptions {
     calmHubUrl?: string;
@@ -59,11 +69,13 @@ export class HubClientError extends Error {
      * @param status HTTP status code or 0 for non-HTTP failures.
      * @param error Error message.
      * @param request Request label that failed.
+     * @param body Response body, when the caller must show it as Hub sent it.
      */
     constructor(
         public readonly status: number,
         public readonly error: string,
-        public readonly request: string
+        public readonly request: string,
+        public readonly body?: unknown
     ) {
         super(`Hub error ${status} on ${request}: ${error}`);
         this.name = 'HubClientError';
@@ -223,6 +235,59 @@ export class CalmHubClient {
             const response = await this.ax.get('/api/calm/namespaces');
             return this.extractValues<HubNamespaceSummary>(response.data, endpoint);
         } catch (err) {
+            throw this.wrapError(err, endpoint);
+        }
+    }
+
+    // ── Extensions ───────────────────────────────────────────────────────────
+
+    /**
+     * Lists the extensions that this CALM Hub enabled, in order.
+     * @returns The extensions, with only the routes and commands that this Hub can run.
+     */
+    async listExtensions(): Promise<HubExtension[]> {
+        const endpoint = 'GET /api/calm/extensions';
+        try {
+            const response = await this.ax.get('/api/calm/extensions');
+            return this.extractValues<HubExtension>(response.data, endpoint);
+        } catch (err) {
+            throw this.wrapError(err, endpoint);
+        }
+    }
+
+    /**
+     * Calls a route of an extension through the Hub proxy. On an error reply, the thrown
+     * HubClientError carries the reply body as Hub sent it.
+     * @param extensionId Extension id.
+     * @param route The route that the command names.
+     * @param input The command input object.
+     * @returns The reply status, content type and body.
+     */
+    async callExtension(extensionId: string, route: HubExtensionRoute, input: Record<string, unknown>): Promise<HubExtensionResponse> {
+        let request: HubExtensionRequest;
+        try {
+            request = buildExtensionRequest(extensionId, route, input);
+        } catch (err) {
+            throw new HubClientError(0, (err as Error).message, `${route.method.toUpperCase()} ${extensionProxyPath(extensionId, route.path)}`);
+        }
+        const endpoint = `${request.method} ${request.path}`;
+        try {
+            const response = await this.ax.request({
+                method: request.method,
+                url: request.path,
+                params: request.query.length > 0 ? new URLSearchParams(request.query) : undefined,
+                data: request.body,
+                responseType: 'text',
+                transformResponse: (data: unknown) => data,
+                headers: { Accept: 'application/json, text/plain' },
+            });
+            const contentType = contentTypeOf(response.headers);
+            return { status: response.status, contentType, data: parseReply(response.data, contentType) };
+        } catch (err) {
+            if (axios.isAxiosError(err) && err.response) {
+                const body = parseReply(err.response.data, contentTypeOf(err.response.headers));
+                throw new HubClientError(err.response.status, replyMessage(body, err.message), endpoint, body);
+            }
             throw this.wrapError(err, endpoint);
         }
     }
@@ -543,4 +608,28 @@ export class CalmHubClient {
         }
         return new HubClientError(0, err instanceof Error ? err.message : String(err), endpoint);
     }
+}
+
+function contentTypeOf(headers: unknown): string | undefined {
+    const value = (headers as Record<string, unknown> | undefined)?.['content-type'];
+    return typeof value === 'string' ? value : undefined;
+}
+
+function parseReply(data: unknown, contentType: string | undefined): unknown {
+    if (typeof data !== 'string' || !contentType || !/[/+]json\b/i.test(contentType)) {
+        return data;
+    }
+    try {
+        return JSON.parse(data);
+    } catch {
+        return data;
+    }
+}
+
+function replyMessage(body: unknown, fallback: string): string {
+    if (typeof body === 'string' && body.trim() !== '') return body;
+    if (body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string') {
+        return (body as { error: string }).error;
+    }
+    return fallback;
 }

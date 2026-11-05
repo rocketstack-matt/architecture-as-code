@@ -232,6 +232,122 @@ describe('CalmHubClient', () => {
         });
     });
 
+    // ── extensions ───────────────────────────────────────────────────────────
+
+    describe('listExtensions', () => {
+        it('returns the extensions from the values array', async () => {
+            mock.onGet('/api/calm/extensions').reply(200, { values: [{ id: 'example', hubApi: 0 }] });
+
+            await expect(client.listExtensions()).resolves.toEqual([{ id: 'example', hubApi: 0 }]);
+        });
+
+        it('throws HubClientError on 401', async () => {
+            mock.onGet('/api/calm/extensions').reply(401, { error: 'Not signed in' });
+
+            await expect(client.listExtensions()).rejects.toMatchObject({
+                status: 401, error: 'Not signed in', request: 'GET /api/calm/extensions'
+            });
+        });
+
+        it('throws HubClientError when the body is not an object', async () => {
+            mock.onGet('/api/calm/extensions').reply(200, '<html>please log in</html>');
+
+            await expect(client.listExtensions()).rejects.toBeInstanceOf(HubClientError);
+        });
+    });
+
+    describe('callExtension', () => {
+        const getRoute = { id: 'list', method: 'GET', path: '/namespaces/{namespace}/services', scope: 'read' };
+        const postRoute = { id: 'add', method: 'POST', path: '/namespaces/{namespace}/services', scope: 'write' };
+        const json = { 'content-type': 'application/json' };
+
+        it('sends a GET with the path filled and the rest in the query', async () => {
+            mock.onGet('/api/calm/extensions/example/api/namespaces/finos/services').reply((config) => {
+                expect(config.params.toString()).toBe('limit=5&tag=a&tag=b');
+                expect(config.data).toBeUndefined();
+                return [200, '{"services":["a"]}', json];
+            });
+
+            await expect(client.callExtension('example', getRoute, { namespace: 'finos', limit: 5, tag: ['a', 'b'] }))
+                .resolves.toEqual({ status: 200, contentType: 'application/json', data: { services: ['a'] } });
+        });
+
+        it('sends no query string when only path parameters are given', async () => {
+            mock.onGet('/api/calm/extensions/example/api/namespaces/finos/services').reply((config) => {
+                expect(config.params).toBeUndefined();
+                return [204, ''];
+            });
+
+            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }))
+                .resolves.toEqual({ status: 204, contentType: undefined, data: '' });
+        });
+
+        it('sends the rest of the input as the JSON body for POST', async () => {
+            mock.onPost('/api/calm/extensions/example/api/namespaces/finos/services').reply((config) => {
+                expect(JSON.parse(config.data)).toEqual({ name: 'payments' });
+                return [201, '{"name":"payments"}', { 'content-type': 'application/problem+json' }];
+            });
+
+            const result = await client.callExtension('example', postRoute, { namespace: 'finos', name: 'payments' });
+
+            expect(result.data).toEqual({ name: 'payments' });
+        });
+
+        it('returns a text reply as text, even when it looks like JSON', async () => {
+            mock.onGet().reply(200, '42', { 'content-type': 'text/plain' });
+
+            const result = await client.callExtension('example', getRoute, { namespace: 'finos' });
+
+            expect(result.data).toBe('42');
+        });
+
+        it('returns malformed JSON as text', async () => {
+            mock.onGet().reply(200, '{oops', json);
+
+            const result = await client.callExtension('example', getRoute, { namespace: 'finos' });
+
+            expect(result.data).toBe('{oops');
+        });
+
+        it('keeps the JSON error body that Hub sent', async () => {
+            const body = { error: 'Input is not valid', details: [{ path: '/name', message: 'required' }] };
+            mock.onPost().reply(400, JSON.stringify(body), json);
+
+            await expect(client.callExtension('example', postRoute, { namespace: 'finos' })).rejects.toMatchObject({
+                status: 400,
+                error: 'Input is not valid',
+                request: 'POST /api/calm/extensions/example/api/namespaces/finos/services',
+                body,
+            });
+        });
+
+        it('uses a text error body as the message', async () => {
+            mock.onGet().reply(502, 'Bad gateway', { 'content-type': 'text/plain' });
+
+            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }))
+                .rejects.toMatchObject({ status: 502, error: 'Bad gateway', body: 'Bad gateway' });
+        });
+
+        it('uses the transport message when the error body has no error field', async () => {
+            mock.onGet().reply(404, '{"missing":true}', json);
+
+            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }))
+                .rejects.toMatchObject({ status: 404, error: 'Request failed with status code 404', body: { missing: true } });
+        });
+
+        it('throws HubClientError with status 0 on a network error', async () => {
+            mock.onGet().networkError();
+
+            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }))
+                .rejects.toMatchObject({ status: 0, error: 'Network Error' });
+        });
+
+        it('throws before any call when a path parameter is missing', async () => {
+            await expect(client.callExtension('example', getRoute, {})).rejects.toThrow('Input property \'namespace\'');
+            expect(mock.history.get).toHaveLength(0);
+        });
+    });
+
     // ── auth plugin ──────────────────────────────────────────────────────────
 
     describe('auth plugin', () => {
