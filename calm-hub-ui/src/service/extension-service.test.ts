@@ -37,6 +37,7 @@ it('keeps registry outages out of the global error page', async () => {
     const create = vi.spyOn(axios, 'create').mockReturnValue(ax);
     mock.onGet('/api/calm/extensions').reply(503);
     await expect(new ExtensionService().fetchDecoratorViews()).rejects.toThrow();
+    expect(create).toHaveBeenCalledOnce();
     expect(migrationStore.getMigrationError()).toBeNull();
     expect(authStore.getAuthError()).toBeNull();
     create.mockRestore();
