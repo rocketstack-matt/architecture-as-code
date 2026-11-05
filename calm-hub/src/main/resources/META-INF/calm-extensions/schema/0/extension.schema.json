@@ -102,9 +102,7 @@
     "id",
     "version",
     "hubApi",
-    "name",
-    "description",
-    "provider"
+    "name"
   ],
   "additionalProperties": false,
   "$defs": {
