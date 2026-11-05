@@ -33,7 +33,7 @@ Markdown ignores raw HTML. Links accept an external HTTP(S) `href`, or a `hub` o
 `namespace`, `type`, `id`, and `version`. An unknown block shows a placeholder.
 
 The same contract supports `designer-tab`, `landing-card`, and node `detail-panel` contributions.
-Block routes must be read-only GET routes. Hub calls `/api/calm/extensions/{id}/api/...` and
+Block routes must use GET. Hub calls `/api/calm/extensions/{id}/api/...` and
 passes available `namespace`, `resource` (`type/id`), `version`, and `selectedElement` (element ID)
 as request parameters. Route placeholders can use these names. Global screens and landing cards
 have no selected resource. No token contains this UI context.

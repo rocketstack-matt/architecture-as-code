@@ -37,7 +37,7 @@ describe('ExtensionSlot', () => {
                 contribution={contribution}
             />
         );
-        expect(screen.getByRole('alert')).toHaveTextContent('read-only GET');
+        expect(screen.getByRole('alert')).toHaveTextContent('must use GET');
         expect(spy).not.toHaveBeenCalled();
     });
     it('confirms a non-read-only action before calling it', async () => {
@@ -93,4 +93,12 @@ it('aborts an action when its host slot unmounts', async () => {
     fireEvent.click(screen.getByRole('button'));
     view.unmount();
     expect(spy.mock.calls[0][3]?.aborted).toBe(true);
+});
+
+it('loads a GET block route without the optional readOnly flag', async () => {
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+    render(
+        <ExtensionSlot extension={{ ...extension, routes: [{ ...extension.routes[0], readOnly: false }] }} contribution={contribution} />
+    );
+    expect(await screen.findByRole('heading', { name: 'Summary' })).toBeInTheDocument();
 });

@@ -22,7 +22,7 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
     const { namespace, resource, version, selectedElement } = context;
     useEffect(() => {
         if (action || !route) return;
-        if (route.method !== 'GET' || !route.readOnly) return;
+        if (route.method !== 'GET') return;
         const controller = new AbortController();
         service
             .call(extension.id, route, { namespace, resource, version, selectedElement }, controller.signal)
@@ -66,7 +66,7 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
             </div>
         );
     if (error) return <p role="alert">Extension request failed.</p>;
-    if (route.method !== 'GET' || !route.readOnly) return <p role="alert">Block routes must be read-only GET routes.</p>;
+    if (route.method !== 'GET') return <p role="alert">Block routes must use GET.</p>;
     if (!result) return <p role="status">Loading extension…</p>;
     return (
         <section className="flex flex-col gap-4 min-w-0 overflow-auto" aria-label={contribution.title}>

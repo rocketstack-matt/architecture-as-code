@@ -85,3 +85,16 @@ it('shows actions only when their route context is available', () => {
     );
     expect(screen.getByRole('button', { name: 'Summary' })).toBeInTheDocument();
 });
+
+it('passes the resource and selected element from a registered designer tab', async () => {
+    const call = vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+    const tab = extensionTabs([extension])[0];
+    render(
+        tab.render({
+            data: { name: 'test', id: '1', version: '1.0.0', calmType: 'Architectures', data: { nodes: [], relationships: [] } },
+            selectedElement: 'node',
+        } as Parameters<typeof tab.render>[0])
+    );
+    expect(await screen.findByRole('heading', { name: 'Summary' })).toBeInTheDocument();
+    expect(call.mock.calls[0][2]).toEqual({ namespace: 'test', resource: 'architectures/1', version: '1.0.0', selectedElement: 'node' });
+});
