@@ -417,6 +417,8 @@
                         <exclude>**/*ArchitectureRequest.*</exclude>
                         <exclude>**/config/**/*</exclude>
                         <exclude>**/domain/**/*</exclude>
+                        <!-- I0 spike code, not for merge: its tests check the findings, not every error path. -->
+                        <exclude>**/spike/**/*</exclude>
                     </excludes>
                 </configuration>
                 <executions>
