@@ -157,7 +157,7 @@ describe('MetadataPanel', () => {
             <MetadataPanel
                 {...defaultProps}
                 controls={{}}
-               
+
                 adrs={['https://example.com/adr/0001.md']}
             />
         );
@@ -168,7 +168,7 @@ describe('MetadataPanel', () => {
         const { rerender } = render(
             <MetadataPanel
                 {...defaultProps}
-               
+
                 adrs={['https://example.com/adr/0001.md']}
             />
         );

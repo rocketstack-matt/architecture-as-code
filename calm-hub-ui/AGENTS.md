@@ -179,11 +179,15 @@ field, so guard each read. A missing type shows as "(no type)".
 
 One engine (`visualizer/overlay/`) draws decorators on the diagram from `decorator-views` entries that have an
 `overlay` (types in `visualizer/contracts/decorator-view-contracts.ts`). Status values map to the fixed scale
-`ok`, `warn`, `error`, `info`. The built-in views for `control-evaluation` and `deployment` are constants in
-`overlay/decoratorViews.ts`; `useDecoratorViews()` is the one place to swap them for the registry. `Drawer` polls
+`ok`, `warn`, `error`, `info`. The built-in views for `control-evaluation` and `deployment` come from classpath manifests through
+`GET /api/calm/extensions`. `useDecoratorViews()` returns no views if the registry is unavailable. `Drawer` polls
 each view's decorator type every 5 s and gives the result to the diagram through `DecoratorOverlayContext`. Nodes and
 edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
 Evaluations panel read control-evaluation fields, so they stay tied to that view id.
+
+`ExtensionService` uses its own axios instance, not `apiClient`, so a registry or extension call failure does not
+open the global auth or outage page. The shared `extensionService` loads the registry one time for
+`ExtensionsProvider` and `useDecoratorViews()`. After a failed load, the next call tries again.
 
 ### Operator UI config
 

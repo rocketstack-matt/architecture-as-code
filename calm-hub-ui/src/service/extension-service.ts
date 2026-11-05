@@ -1,7 +1,9 @@
-import { AxiosInstance } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { getAuthHeaders } from '../authService.js';
 import { ExtensionContext, ExtensionRoute, ExtensionSummary } from '../model/extensions.js';
-import { apiClient } from './utils/api-client.js';
+import type { DecoratorView } from '../visualizer/contracts/contracts.js';
+
+type RegistryEntry = ExtensionSummary & { contributes?: { 'decorator-views'?: DecoratorView[] } };
 
 export function extensionRequest(id: string, route: ExtensionRoute, context: ExtensionContext) {
     const values: Record<string, string | undefined> = { ...context };
@@ -18,19 +20,38 @@ export function extensionRequest(id: string, route: ExtensionRoute, context: Ext
 
 export class ExtensionService {
     private readonly ax: AxiosInstance;
+    private registry?: Promise<RegistryEntry[]>;
 
     constructor(axiosInstance?: AxiosInstance) {
-        this.ax = axiosInstance ?? apiClient;
+        // Not apiClient: an extension failure stays in its slot and must not open the global auth or outage page.
+        this.ax = axiosInstance ?? axios.create();
+    }
+
+    private loadRegistry(): Promise<RegistryEntry[]> {
+        this.registry ??= getAuthHeaders()
+            .then((headers) => this.ax.get<{ values?: RegistryEntry[] }>('/api/calm/extensions', { headers }))
+            .then((res) => (Array.isArray(res.data?.values) ? res.data.values : []))
+            .catch((error) => {
+                this.registry = undefined;
+                return Promise.reject(error);
+            });
+        return this.registry;
     }
 
     public async fetchExtensions(): Promise<ExtensionSummary[]> {
-        const headers = await getAuthHeaders();
-        return this.ax
-            .get('/api/calm/extensions', { headers })
-            .then((res) => (Array.isArray(res.data?.values) ? res.data.values : []))
+        return this.loadRegistry().catch((error) => {
+            console.error('%s', 'Error fetching extensions:', error);
+            return Promise.reject(new Error('Error fetching extensions'));
+        });
+    }
+
+    public async fetchDecoratorViews(): Promise<DecoratorView[]> {
+        return this.loadRegistry()
+            .then((values) => values.flatMap((extension) => extension.contributes?.['decorator-views'] ?? []))
             .catch((error) => {
-                console.error('%s', 'Error fetching extensions:', error);
-                return Promise.reject(new Error('Error fetching extensions'));
+                const errorMessage = 'Error fetching decorator views:';
+                console.error('%s', errorMessage, error);
+                return Promise.reject(new Error(errorMessage));
             });
     }
 
@@ -52,3 +73,5 @@ export class ExtensionService {
             });
     }
 }
+
+export const extensionService = new ExtensionService();

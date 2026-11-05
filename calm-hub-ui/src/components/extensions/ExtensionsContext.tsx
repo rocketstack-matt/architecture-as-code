@@ -1,12 +1,12 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { ExtensionSummary } from '../../model/extensions.js';
-import { ExtensionService } from '../../service/extension-service.js';
+import { ExtensionService, extensionService } from '../../service/extension-service.js';
 
 export const ExtensionsContext = createContext<ExtensionSummary[]>([]);
 
 export function ExtensionsProvider({ children, service }: { children: ReactNode; service?: ExtensionService }) {
     const [extensions, setExtensions] = useState<ExtensionSummary[]>([]);
-    const svc = useMemo(() => service ?? new ExtensionService(), [service]);
+    const svc = service ?? extensionService;
     const request = useRef<{ service: ExtensionService; promise: Promise<ExtensionSummary[]> } | null>(null);
     useEffect(() => {
         let cancelled = false;

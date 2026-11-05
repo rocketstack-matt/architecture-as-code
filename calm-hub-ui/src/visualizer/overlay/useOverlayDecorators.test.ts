@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { overlayRequestTypes } from './useOverlayDecorators.js';
-import { BUILTIN_DECORATOR_VIEWS } from './decoratorViews.js';
+import { BUILTIN_DECORATOR_VIEWS } from '../../test-support/decorator-views.js';
 import type { DecoratorView } from '../contracts/contracts.js';
 
 const overlay = { status: '/status', map: {} };
