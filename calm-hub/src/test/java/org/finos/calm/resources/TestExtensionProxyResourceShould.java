@@ -1,5 +1,7 @@
 package org.finos.calm.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -96,6 +99,36 @@ class TestExtensionProxyResourceShould {
         assertThat(received.header("Remote-User"), nullValue());
         assertThat(received.header("X-Forwarded-For"), nullValue());
         assertThat(received.header("Authorization"), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void preserve_an_encoded_slash_in_a_path_parameter() throws Exception {
+        for (String value : new String[]{"team%2Fservice", "team%2fservice"}) {
+            backend.reset();
+            given().urlEncodingEnabled(false)
+                    .when().get(BASE + "/services/" + value)
+                    .then().statusCode(200);
+
+            FixtureBackend.Received received = backend.received();
+            assertThat(received.pathAndQuery(), is("/base/services/" + value));
+            String payload = received.header("X-Calm-Hub-Identity").split("\\.")[1];
+            JsonNode claims = new ObjectMapper()
+                    .readTree(Base64.getUrlDecoder().decode(payload));
+            assertThat(claims.get("route").asText(), is("service"));
+            assertThat(claims.get("htp").asText(), is("/services/" + value));
+        }
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void refuse_dot_segments_in_a_path_parameter_with_encoded_slashes() {
+        for (String value : new String[]{"team%2F..%2Fadmin", "team%2f..%2fadmin", "team%2F%2E%2E%2Fadmin"}) {
+            given().urlEncodingEnabled(false)
+                    .when().get(BASE + "/services/" + value)
+                    .then().statusCode(400);
+        }
+        assertThat(backend.received(), nullValue());
     }
 
     @Test

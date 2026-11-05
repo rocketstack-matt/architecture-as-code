@@ -192,7 +192,8 @@ The JSON Schema is `META-INF/calm-extensions/schema/0/extension.schema.json` in 
 
 CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route path>`. For each call, CALM Hub:
 
-- matches the path against the declared routes only, and refuses `..`, `%2e`, `%2f`, `\`, `//`, `@` and their encoded forms
+- preserves encoded slashes (`%2F`) within path parameters, without decoding them into route separators
+- matches the path against the declared routes only, and refuses `..`, `%2e`, `\`, `//`, `@` and their encoded forms
 - checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path
 - on a read-only CALM Hub, allows a method other than `GET` only on a `readOnly` route
 - sends only `Content-Type`, `Accept`, `Accept-Language` and its own `X-Calm-Hub-Identity` assertion. The caller's token and cookies never go to the extension

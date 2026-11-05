@@ -15,7 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class TestExtensionPathsShould {
 
     @ParameterizedTest
-    @ValueSource(strings = {"/screen", "/namespaces/finos.payments/services", "/a:b", "/a%20b", "/a-b_c~d"})
+    @ValueSource(strings = {"/screen", "/namespaces/finos.payments/services", "/a:b", "/a%20b", "/a-b_c~d",
+            "/services/a%2Fb", "/services/a%2fb"})
     void accept_a_normal_path(String path) {
         assertThat(ExtensionPaths.checkPath(path), is(path));
     }
@@ -24,7 +25,7 @@ class TestExtensionPathsShould {
     @NullSource
     @ValueSource(strings = {
             "screen", "/../admin", "/a/..", "/a/../b", "/..;/admin", "/%2e%2e/admin", "/%2E%2E/admin", "/.%2e/admin",
-            "/%252e%252e/admin", "/%25252e/admin", "/a%2fb", "/a%2Fb", "/a%5cb", "/a\\b", "//evil.example.com/x",
+            "/%252e%252e/admin", "/%25252e/admin", "/a%5cb", "/a\\b", "//evil.example.com/x",
             "/a//b", "/@evil.example.com", "/a@b", "/a%40b", "/./a", "/a/.", "/a%00b", "/a%0d%0ab", "/a%7fb",
             "/a b", "/a\tb", "/a?b", "/a#b", "/ä", "/a{b}"
     })

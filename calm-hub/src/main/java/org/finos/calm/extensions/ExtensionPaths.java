@@ -9,11 +9,11 @@ import java.util.Locale;
 /**
  * Checks a caller-supplied path and query and builds the backend URI from them (ADR 0011). Each
  * check works on the raw, percent-encoded form, so that an encoded or double-encoded form cannot
- * hide a dot segment, a slash or user info.
+ * hide a dot segment or user info. Encoded slashes stay encoded within a route parameter.
  */
 final class ExtensionPaths {
 
-    private static final List<String> FORBIDDEN = List.of("..", "%2e", "%2f", "%5c", "%25", "%40", "\\", "//", "@");
+    private static final List<String> FORBIDDEN = List.of("..", "%2e", "%5c", "%25", "%40", "\\", "//", "@");
 
     private ExtensionPaths() {
     }
