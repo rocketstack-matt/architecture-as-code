@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -214,6 +215,67 @@ class TestExtensionRegistryShould {
         assertThat(manifest.contributes().chat(), equalTo(null));
         // The proxy (ADR 0011) still sees every route, and refuses the write routes itself.
         assertThat(registry.enabled().getFirst().manifest().routes().size(), equalTo(6));
+    }
+
+    @Test
+    void use_the_default_limits_unless_the_extension_sets_its_own() throws IOException {
+        write("team-services", valid());
+        properties.put("calm.extensions.\"team-services\".backend-url", "https://services.internal");
+        properties.put("calm.extensions.http.connect-timeout-seconds", "7");
+        properties.put("calm.extensions.\"team-services\".request-timeout-seconds", "30");
+        properties.put("calm.extensions.\"team-services\".max-response-bytes", "2048");
+
+        ExtensionLimits limits = registry(dir(), NO_BUILTINS).find("team-services").orElseThrow().limits();
+
+        assertThat(limits, equalTo(new ExtensionLimits(Duration.ofSeconds(7), Duration.ofSeconds(30), 1048576, 2048)));
+    }
+
+    @Test
+    void reject_a_limit_under_1() throws IOException {
+        write("alpha", decoratorViewsOnly("alpha"));
+        properties.put("calm.extensions.\"alpha\".max-request-bytes", "0");
+        properties.put("calm.extensions.\"alpha\".connect-timeout-seconds", "soon");
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> registry(dir(), NO_BUILTINS));
+
+        assertThat(e.getMessage(), containsString("calm.extensions.\"alpha\".max-request-bytes must be at least 1, but was 0"));
+        assertThat(e.getMessage(), containsString("calm.extensions.\"alpha\".connect-timeout-seconds must be an integer"));
+    }
+
+    @Test
+    void need_https_for_a_backend_that_is_not_on_loopback() throws IOException {
+        write("team-services", valid());
+        properties.put("calm.extensions.\"team-services\".backend-url", "http://services.internal:8080");
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> registry(dir(), NO_BUILTINS));
+
+        assertThat(e.getMessage(), containsString("calm.extensions.\"team-services\".backend-url must use https. "
+                + "Plain http is allowed only for a loopback host, or with calm.extensions.\"team-services\".allow-http=true"));
+    }
+
+    @Test
+    void allow_http_on_loopback_or_with_the_operator_setting() throws IOException {
+        write("team-services", valid());
+        for (String url : List.of("http://localhost:8091", "http://127.0.0.1:8091", "http://[::1]:8091", "HTTP://LOCALHOST")) {
+            properties.put("calm.extensions.\"team-services\".backend-url", url);
+
+            assertThat(url, ids(registry(dir(), NO_BUILTINS)), contains("team-services"));
+        }
+
+        properties.put("calm.extensions.\"team-services\".backend-url", "http://services.internal:8080");
+        properties.put("calm.extensions.\"team-services\".allow-http", "true");
+
+        assertThat(ids(registry(dir(), NO_BUILTINS)), contains("team-services"));
+    }
+
+    @Test
+    void not_count_a_name_that_starts_like_loopback_as_loopback() throws IOException {
+        write("team-services", valid());
+        for (String url : List.of("http://localhost.evil.example.com", "http://127.0.0.1.evil.example.com")) {
+            properties.put("calm.extensions.\"team-services\".backend-url", url);
+
+            assertThrows(IllegalStateException.class, () -> registry(dir(), NO_BUILTINS), url);
+        }
     }
 
     private static JsonObject withReadOnlySearch() {
