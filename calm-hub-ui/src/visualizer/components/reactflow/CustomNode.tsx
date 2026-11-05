@@ -234,7 +234,7 @@ function CustomNodeComponent({ id, data, presentationStore }: CustomNodeProps) {
           )}
         </div>
         {(riskCount > 0 || mitigationCount > 0 || controlCount > 0 || overlays.length > 0) && (
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '4px', alignItems: 'center' }}>
             {overlays.map((shown) => <OverlayBadge key={shown.view.id} shown={shown} presenting={presenting} />)}
             {riskCount > 0 && (
               <div
