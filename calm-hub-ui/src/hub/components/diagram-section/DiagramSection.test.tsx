@@ -600,13 +600,13 @@ describe('DiagramSection', () => {
                 return <div data-testid="search">{useLocation().search}</div>;
             }
             render(
-                <MemoryRouter initialEntries={['/?tab=deployments']}>
+                <MemoryRouter initialEntries={['/?tab=decorators']}>
                     <DiagramSection data={patternData} />
                     <SearchProbe />
                 </MemoryRouter>
             );
 
-            expect(screen.getByTestId('search').textContent).toBe('?tab=deployments');
+            expect(screen.getByTestId('search').textContent).toBe('?tab=decorators');
         });
     });
 
