@@ -446,7 +446,11 @@ export class CalmService {
         const query = params.toString() ? `?${params.toString()}` : '';
         return this.ax
             .get(`/api/calm/namespaces/${encodeURIComponent(namespace)}/decorators/values${query}`, { headers })
-            .then((res) => res.data.values ?? []);
+            .then((res) => {
+                const values: unknown = res.data.values;
+                // An entry that is not an object cannot be a decorator, and would break the views that read its fields.
+                return Array.isArray(values) ? values.filter((value): value is Decorator => typeof value === 'object' && value !== null) : [];
+            });
     }
 
     /**
@@ -468,28 +472,32 @@ export class CalmService {
     }
 
     /**
-     * Fetches the deployment decorators recorded against one architecture version.
+     * Fetches the decorators of every type recorded against one architecture version.
      *
-     * Resolves a slug id to its numeric id first. Returns an empty array when the slug cannot be resolved or the
-     * fetch fails.
+     * Resolves a slug id to its numeric id first, and returns an empty array when the slug cannot be resolved. Unlike
+     * `fetchDecoratorValues` this rejects when the request fails, so the caller can tell a failure from no decorators.
      */
-    public async fetchDeploymentDecoratorsForArchitecture(namespace: string, id: string, version: string): Promise<Decorator[]> {
+    public async fetchArchitectureDecorators(namespace: string, id: string, version: string): Promise<Decorator[]> {
         const target = await this.resolveArchitectureVersionTarget(namespace, id, version);
-        if (!target) return []; // cannot resolve slug — skip decorator fetch
-        return this.fetchDecoratorValues(namespace, target, 'deployment');
+        if (!target) return [];
+        return this.requestDecoratorValues(namespace, target).catch((error) => {
+            const errorMessage = `Error fetching decorators for namespace ${namespace}:`;
+            console.error('%s', errorMessage, error);
+            return Promise.reject(new Error(errorMessage));
+        });
     }
 
     /**
-     * Fetches the control-evaluation decorators recorded against one architecture version, given the target from
-     * `resolveArchitectureVersionTarget`.
+     * Fetches the decorators recorded against one architecture version, of one type or of all types, given the target
+     * from `resolveArchitectureVersionTarget`.
      *
      * Unlike `fetchDecoratorValues` this rejects when the request fails, so a caller that refreshes can tell a failed
-     * refresh from a version with no evaluations and keep what it last showed. It does not log: a caller polling an
+     * refresh from a version with no decorators and keep what it last showed. It does not log: a caller polling an
      * unreachable hub would otherwise log every few seconds, so logging is left to the caller.
      */
-    public async fetchControlEvaluationDecorators(namespace: string, target: string): Promise<Decorator[]> {
-        return this.requestDecoratorValues(namespace, target, 'control-evaluation').catch(() =>
-            Promise.reject(new Error(`Error fetching control-evaluation decorators for namespace ${namespace}`))
+    public async fetchDecoratorsForTarget(namespace: string, target: string, type?: string): Promise<Decorator[]> {
+        return this.requestDecoratorValues(namespace, target, type).catch(() =>
+            Promise.reject(new Error(`Error fetching ${type ?? 'all'} decorators for namespace ${namespace}`))
         );
     }
 

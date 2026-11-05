@@ -43,6 +43,16 @@ final class ExtensionRouteMatcher {
                 : new ExtensionProxyException(404, "The extension has no such route");
     }
 
+    static void rejectEncodedLiterals(RouteMatch match, String rawPath) {
+        String[] template = match.route().path().split("/", -1);
+        String[] raw = rawPath.split("/", -1);
+        for (int i = 0; i < template.length; i++) {
+            if (!template[i].startsWith("{") && raw[i].contains("%")) {
+                throw new ExtensionProxyException(400, "Percent-encoding is not allowed in route literals");
+            }
+        }
+    }
+
     static Optional<Map<String, String>> parameters(String template, String path) {
         String[] templateSegments = template.split("/", -1);
         String[] pathSegments = path.split("/", -1);

@@ -1,3 +1,6 @@
+import { useContext } from 'react';
+import { ExtensionResourceContext } from '../../../extensions/ExtensionResourceContext.js';
+import { ExtensionPoints } from '../../../extensions/ExtensionPoints.js';
 import { CalmNodeSchema } from '@finos/calm-models/types';
 import { ZoomIn } from 'lucide-react';
 import { extractNodeType, isNavigableArch, resolveDetailedArchitecture } from '../reactflow/utils/calmHelpers.js';
@@ -9,6 +12,7 @@ import {
     PropertiesSection, ControlsSection, RisksSection, MitigationsSection, InterfacesSection,
     getNodeIcon, extractAigf, getExtraProperties,
 } from './detail-components.js';
+import { DecoratorsSection } from './DecoratorsSection.js';
 
 const KNOWN_FIELDS = new Set([
     'unique-id', 'name', 'node-type', 'description', 'details',
@@ -16,6 +20,8 @@ const KNOWN_FIELDS = new Set([
 ]);
 
 export function NodeDetails({ data }: { data: CalmNodeSchema }) {
+    const resourceContext = useContext(ExtensionResourceContext);
+    const extensionContext = { ...resourceContext, selectedElement: data['unique-id'] };
     const { onNavigateToDetailedArch } = useDiagramActions();
     const nodeType = extractNodeType(data) || 'Unknown';
     const Icon = getNodeIcon(nodeType);
@@ -80,6 +86,8 @@ export function NodeDetails({ data }: { data: CalmNodeSchema }) {
             <ControlsSection controls={controls} />
             <RisksSection risks={risks} riskLevel={riskLevel} />
             <MitigationsSection mitigations={mitigations} />
+            {resourceContext && <ExtensionPoints point="detail-panel" context={extensionContext} />}
+            <DecoratorsSection elementId={data['unique-id']} />
         </div>
     );
 }

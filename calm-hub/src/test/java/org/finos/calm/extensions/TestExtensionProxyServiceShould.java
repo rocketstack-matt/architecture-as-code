@@ -18,6 +18,8 @@ import org.finos.calm.security.CalmHubPermissionChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
@@ -317,11 +319,10 @@ class TestExtensionProxyServiceShould {
     }
 
     @Test
-    void audit_a_denied_write_and_not_a_read_or_a_read_only_route() {
+    void audit_a_denied_write_and_not_a_read_only_route() {
         when(permissions.canWrite(any(), any())).thenReturn(false);
 
         assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(403));
-        service.call(alice, request("GET", "/screen", null, null));
         service.call(alice, request("POST", "/search", null, "{}"));
 
         ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
@@ -332,11 +333,93 @@ class TestExtensionProxyServiceShould {
     }
 
     @Test
-    void not_audit_a_write_that_the_backend_failed() {
+    void audit_an_uncertain_write_when_the_backend_failed() {
         backend.reply(FixtureBackend.Reply.json(500, "{}"));
 
         assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(502));
-        verify(auditService, never()).record(any());
+        assert_audit(AuditOutcome.UNKNOWN, "add-service");
+    }
+
+    @Test
+    void audit_a_non_read_only_get() {
+        service.call(alice, request("GET", "/screen", null, null));
+        assert_audit(AuditOutcome.SUCCESS, "screen");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {400, 404, 403})
+    void audit_backend_client_errors(int status) {
+        backend.reply(FixtureBackend.Reply.json(status, "{}"));
+        assertThat(service.call(alice, request("POST", "/namespaces/finos/services", null, "{}")).status(), is(status));
+        assert_audit(status == 403 ? AuditOutcome.DENIED : AuditOutcome.FAILURE, "add-service");
+    }
+
+    @Test
+    void audit_an_uncertain_write_on_timeout() {
+        register(backend.url("/base"), limits(1024, 1024, Duration.ofMillis(100)));
+        backend.reply(new FixtureBackend.Reply(200, Map.of(), new byte[0], 500));
+        assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(504));
+        assert_audit(AuditOutcome.UNKNOWN, "add-service");
+    }
+
+    @Test
+    void audit_an_uncertain_write_on_connection_error() {
+        register(URI.create("http://localhost:" + FixtureBackend.freePort()), limits(1024, 1024, Duration.ofSeconds(1)));
+        assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(502));
+        assert_audit(AuditOutcome.UNKNOWN, "add-service");
+    }
+
+    @Test
+    void audit_an_uncertain_write_on_oversized_response() {
+        backend.reply(FixtureBackend.Reply.json(200, "x".repeat(2048)));
+        assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(502));
+        assert_audit(AuditOutcome.UNKNOWN, "add-service");
+    }
+
+    private void assert_audit(AuditOutcome outcome, String route) {
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getOutcome(), is(outcome));
+        assertThat(captor.getValue().getEntityId(), is("team-services"));
+        assertThat(captor.getValue().getRoute(), is(route));
+        assertThat(captor.getValue().getJti() != null, is(true));
+        if ("screen".equals(route)) {
+            assertThat(captor.getValue().getAction(), is(AuditAction.READ));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/services/%61dmin", "/services/%61%64%6Din",
+            "/%73ervices/admin", "/services/%2561dmin", "/services/admin%252Fsecret"})
+    void reject_encoded_literals_without_calling_the_backend(String path) {
+        register_service_routes();
+        assertThat(status(request("GET", path, null, null)), is(400));
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    void preserve_the_protected_literal_scope() {
+        register_service_routes();
+        assertThat(status(request("GET", "/services/admin", null, null)), is(403));
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    void forward_the_normalised_parameter_and_bind_it_in_the_assertion() throws IOException {
+        register_service_routes();
+        service.call(alice, request("GET", "/services/%62ob%3a%2fteam", null, null));
+        assertThat(backend.received().pathAndQuery(), is("/base/services/bob%3A%2Fteam"));
+        JsonNode assertion = claims(backend.received().header("X-Calm-Hub-Identity"));
+        assertThat(assertion.get("route").asText(), is("service"));
+        assertThat(assertion.get("htp").asText(), is("/services/bob%3A%2Fteam"));
+    }
+
+    private void register_service_routes() {
+        ExtensionManifest manifest = new ExtensionManifest("team-services", "1.0.0", 0, "Team services", null, null,
+                List.of(new Route("service", "GET", "/services/{service}", "authenticated", false),
+                        new Route("admin", "GET", "/services/admin", "global_admin", false)), null, null);
+        when(registry.find("team-services")).thenReturn(Optional.of(new RegisteredExtension(manifest, 0,
+                Optional.of(backend.url("/base")), limits(1024, 1024, Duration.ofSeconds(5)))));
     }
 
     @Test

@@ -1,3 +1,4 @@
+import { ExtensionResourceContext } from '../extensions/ExtensionResourceContext.js';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { IoCompassOutline } from 'react-icons/io5';
@@ -25,9 +26,10 @@ import { DiagramSection } from './components/diagram-section/DiagramSection.js';
 import { Sidebar } from '../visualizer/components/sidebar/Sidebar.js';
 import { NodeSheet } from '../visualizer/components/sidebar/NodeSheet.js';
 import { DiagramActionsContext } from '../visualizer/context/DiagramActionsContext.js';
+import { DecoratorsContext } from '../visualizer/context/DecoratorsContext.js';
 import { ResourceNotFound } from './components/resource-not-found/ResourceNotFound.js';
 import { parseCALMHubPath } from '../visualizer/components/reactflow/utils/calmHelpers.js';
-import type { SelectedItem } from '../visualizer/contracts/contracts.js';
+import type { Decorator, SelectedItem } from '../visualizer/contracts/contracts.js';
 import type { CalmNodeSchema } from '@finos/calm-models/types';
 import { authStore } from '../service/utils/auth-store.js';
 import './Hub.css';
@@ -61,6 +63,9 @@ export default function Hub() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(true);
     const [selectedItem, setSelectedItem] = useState<SelectedItem>(null);
+    const [showsDroppedFile, setShowsDroppedFile] = useState(false);
+    // Reported by DiagramSection, which fetches them, for the details drawer.
+    const [decorators, setDecorators] = useState<Decorator[]>([]);
     // A detail-route load rejected (missing resource, dangling reference). Cleared
     // on every navigation; renders ResourceNotFound instead of an empty pane.
     const [resourceLoadFailed, setResourceLoadFailed] = useState(false);
@@ -406,8 +411,11 @@ export default function Hub() {
             data={data}
             onItemSelect={handleItemSelect}
             hasDetailsPanel={!!selectedItem}
+            selectedElement={selectedItem?.data['unique-id']}
             breadcrumbs={breadcrumbs}
             onDisplayNameChange={handleDisplayNameChange}
+            onDecoratorsChange={setDecorators}
+            onDroppedFileChange={setShowsDroppedFile}
         />
     ) : (
         <DocumentDetailSection data={data} />
@@ -452,6 +460,8 @@ export default function Hub() {
 
     return (
         <DiagramActionsContext.Provider value={diagramActions}>
+        <ExtensionResourceContext.Provider value={isDiagramView && !showsDroppedFile ? { namespace: data.name, resource: `${data.calmType.toLowerCase()}/${data.id}`, version: data.version } : null}>
+        <DecoratorsContext.Provider value={decorators}>
         <div className="flex flex-col h-screen overflow-hidden">
             <Navbar />
             {isMobile && !isMobileNavOpen && (
@@ -525,6 +535,8 @@ export default function Hub() {
 
             </div>
         </div>
+        </DecoratorsContext.Provider>
+        </ExtensionResourceContext.Provider>
         </DiagramActionsContext.Provider>
     );
 }

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.finos.calm.extensions.TestExtensionManifestLoaderShould.captureWarnings;
 import static org.finos.calm.extensions.TestExtensionManifestLoaderShould.route;
 import static org.finos.calm.extensions.TestExtensionManifestLoaderShould.valid;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -28,6 +29,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -41,6 +43,27 @@ class TestExtensionRegistryShould {
 
     private final Map<String, String> properties = new HashMap<>();
     private final Map<String, String> environment = new HashMap<>();
+
+    @Test
+    void warn_about_settings_for_unknown_extensions() {
+        properties.put("calm.extensions.\"missing\".enabled", "false");
+        properties.put("calm.extensions.other.order", "2");
+
+        List<String> warnings = captureWarnings(ExtensionRegistry.class, () -> registry(Optional.empty(), NO_BUILTINS));
+
+        assertThat(warnings, hasItem(containsString("unknown extension id 'missing'")));
+        assertThat(warnings, hasItem(containsString("unknown extension id 'other'")));
+    }
+
+    @Test
+    void not_warn_about_known_extensions_or_shared_settings() {
+        properties.put("calm.extensions.\"builtin-views\".enabled", "false");
+        properties.put("calm.extensions.http.connect-timeout-seconds", "5");
+
+        List<String> warnings = captureWarnings(ExtensionRegistry.class, () -> registry(Optional.empty(), BUILTIN_BASE));
+
+        assertThat(warnings, empty());
+    }
 
     @Test
     void have_no_extensions_with_no_dir_and_no_built_ins() {

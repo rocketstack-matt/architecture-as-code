@@ -146,7 +146,7 @@ An extension adds features to CALM Hub without a fork. It is an HTTP service tha
 
 > Work in progress: CALM Hub proxies extension routes, and makes an MCP tool for each command (see [MCP & API](mcp-and-api.md#extension-tools)). The UI and the CLI do not use them yet.
 
-Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`.
+Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`. Hub skips hidden folders and warns about folders without a manifest. Settings for unknown extension ids also produce a warning.
 
 ```text
 /etc/calm-hub/extensions/
@@ -192,13 +192,15 @@ The JSON Schema is `META-INF/calm-extensions/schema/0/extension.schema.json` in 
 
 CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route path>`. For each call, CALM Hub:
 
-- matches the path against the declared routes only, and refuses `..`, `%2e`, `%2f`, `\`, `//`, `@` and their encoded forms
+- preserves encoded slashes (`%2F`) within path parameters, without decoding them into route separators
+- decodes percent-encoded unreserved characters and uppercases other escapes before matching and forwarding. Percent-encoding in a matched literal segment gets `400`
+- matches the path against the declared routes only, and refuses `..`, `%2e`, `\`, `//`, `@` and their encoded forms
 - checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path
 - on a read-only CALM Hub, allows a method other than `GET` only on a `readOnly` route
 - sends only `Content-Type`, `Accept`, `Accept-Language` and its own `X-Calm-Hub-Identity` assertion. The caller's token and cookies never go to the extension
 - returns only `Content-Type` (`application/json`, `text/plain` or `text/event-stream`), `Cache-Control` and `ETag`, and adds `Content-Security-Policy: sandbox; default-src 'none'`. It does not follow redirects
 - returns `502` or `504`, with a generic body, when the backend fails, is slow, replies with `5xx`, `3xx` or `401`, or sends another content type
-- audits each call to a route that is not `GET` or `readOnly`, as entity type `EXTENSION` with the extension id, the route id and the assertion `jti`
+- audits every non-`readOnly` call, including `GET`, as entity type `EXTENSION` with the extension id, route id and assertion `jti`. Outcomes are `SUCCESS`, `DENIED`, `FAILURE` (other returned client errors), or `UNKNOWN` (an upstream failure or unusable reply; the backend may have completed the call)
 
 Replies are buffered. Streaming is not supported yet.
 
@@ -295,6 +297,53 @@ cd calm-hub && ../mvnw quarkus:dev
 ```
 
 ---
+
+### Show your decorators in Hub
+
+An external service can write decorators with its own service account and ship a
+views-only manifest. Hub draws the results; the service supplies no browser code.
+
+1. Give the service account write access to the target namespace. Use that account's
+   credentials with the decorator API, not a user's token. If the decorator type is
+   reserved, the operator must also allow this principal to write that type.
+2. Write decorators with a stable `type`, architecture version URLs in `target`,
+   element ids in `applies-to`, and results in `data`. A known `$schema` is validated on write. For reserved types, append a new
+   result and use Hub's `supersedes` field to replace an old result.
+3. Put this manifest at `<calm.extensions.dir>/scanner/extension.json`, then restart Hub:
+
+```json
+{
+  "id": "scanner",
+  "version": "1.0.0",
+  "hubApi": 0,
+  "name": "Security scan",
+  "contributes": {
+    "decorator-views": [{
+      "id": "security-scan",
+      "match": { "type": "security-scan" },
+      "label": "Security scan",
+      "overlay": {
+        "status": "/result",
+        "map": { "safe": "ok", "unsafe": "error" },
+        "default": "info"
+      }
+    }]
+  }
+}
+```
+
+No routes or backend URL are needed. `match` selects a decorator `type` or `schema`
+URL. Overlay pointers read fields in `data`. Status targets are `ok`, `warn`,
+`error` and `info`. An omitted `default` hides unmapped statuses. Optional `label`,
+`key` and `time` are JSON Pointers; `time` selects the newest result, per `key` when
+set. `hide` lists statuses that suppress an older result without drawing a badge.
+
+The registry returns enabled manifests in operator order, then by id. Set
+`calm.extensions."scanner".order` to change the order, or `.enabled=false` to hide
+its views. The built-in `control-evaluation` and `deployment` views use the same
+mechanism. If the registry cannot load in the browser, overlays stay off and the
+Decorators tab still renders the stored data.
+
 
 ## Further Reading
 

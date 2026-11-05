@@ -1,32 +1,17 @@
 export type DecoratorData = Record<string, unknown>;
 
-export type DeploymentStatus = 'pending' | 'in-progress' | 'completed' | 'failed' | 'rolled-back';
-
-export interface DeploymentDecoratorData extends DecoratorData {
-    'start-time': string;
-    'end-time'?: string;
-    status: DeploymentStatus;
-    'deployment-details'?: string;
-    notes?: string;
-}
-
 export interface Decorator {
     schema?: string;
     uniqueId: string;
-    type: string;
+    /** The API does not require a type. */
+    type?: string;
     target: string[];
     targetType?: string[];
     appliesTo: string[];
     data: DecoratorData;
-}
-
-export interface DeploymentDecorator extends Decorator {
-    type: 'deployment';
-    data: DeploymentDecoratorData;
-}
-
-export interface DeploymentPanelProps {
-    decorators: DeploymentDecorator[];
+    /** Hub-owned timestamps. The API does not return them yet, so each is optional. */
+    creationDateTime?: string;
+    updateDateTime?: string;
 }
 
 export type ControlEvaluationStatus = 'met' | 'not-met' | 'not-applicable';

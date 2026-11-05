@@ -1,3 +1,5 @@
+import { ExtensionsProvider } from './components/extensions/ExtensionsContext.js';
+import { ExtensionScreenPage } from './extensions/ExtensionScreenPage.js';
 import { HashRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import Hub from './hub/Hub.js';
 import { AdminPage } from './admin/AdminPage.js';
@@ -14,26 +16,29 @@ function App() {
     return (
         <UserAccessProvider>
             <UiConfigProvider>
-                <Router>
-                    <Routes>
-                        <Route path="/" element={<Hub />} />
-                        <Route path="/search" element={<Hub />} />
-                        {/* The standalone /visualizer page was removed; redirect old links to the hub. */}
-                        <Route path="/visualizer" element={<Navigate to="/" replace />} />
-                        <Route path="/namespace/:ns" element={<Hub />} />
-                        <Route path="/domain/:domain" element={<Hub />} />
-                        {/* Landing page for malformed detailed-architecture refs; the
+                <ExtensionsProvider>
+                    <Router>
+                        <Routes>
+                            <Route path="/extensions/:extensionId/:contributionId" element={<ExtensionScreenPage />} />
+                            <Route path="/" element={<Hub />} />
+                            <Route path="/search" element={<Hub />} />
+                            {/* The standalone /visualizer page was removed; redirect old links to the hub. */}
+                            <Route path="/visualizer" element={<Navigate to="/" replace />} />
+                            <Route path="/namespace/:ns" element={<Hub />} />
+                            <Route path="/domain/:domain" element={<Hub />} />
+                            {/* Landing page for malformed detailed-architecture refs; the
                             broken ref itself travels in history state (brokenRef). */}
-                        <Route path="/broken-reference" element={<Hub />} />
-                        <Route path="/:namespace/:type/:id/:version" element={<Hub />} />
-                        <Route path="/admin" element={<AdminPage />}>
-                            <Route index element={<Navigate to="entitlements" replace />} />
-                            <Route path="namespaces" element={<NamespacesPanel />} />
-                            <Route path="domains" element={<DomainsPanel />} />
-                            <Route path="entitlements" element={<EntitlementsPanel />} />
-                        </Route>
-                    </Routes>
-                </Router>
+                            <Route path="/broken-reference" element={<Hub />} />
+                            <Route path="/:namespace/:type/:id/:version" element={<Hub />} />
+                            <Route path="/admin" element={<AdminPage />}>
+                                <Route index element={<Navigate to="entitlements" replace />} />
+                                <Route path="namespaces" element={<NamespacesPanel />} />
+                                <Route path="domains" element={<DomainsPanel />} />
+                                <Route path="entitlements" element={<EntitlementsPanel />} />
+                            </Route>
+                        </Routes>
+                    </Router>
+                </ExtensionsProvider>
             </UiConfigProvider>
         </UserAccessProvider>
     );

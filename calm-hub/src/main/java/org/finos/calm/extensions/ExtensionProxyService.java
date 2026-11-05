@@ -99,6 +99,7 @@ public class ExtensionProxyService {
         String method = request.method().toUpperCase(Locale.ROOT);
         String path = ExtensionPaths.checkPath(request.path());
         ExtensionRouteMatcher.RouteMatch match = ExtensionRouteMatcher.match(extension.manifest(), method, path);
+        ExtensionRouteMatcher.rejectEncodedLiterals(match, request.path());
         ExtensionManifest.Route route = match.route();
         if (registry.isReadOnly() && !"GET".equals(method) && !route.readOnly()) {
             throw new ExtensionProxyException(405, "This CALM Hub instance is read-only");
@@ -110,7 +111,7 @@ public class ExtensionProxyService {
                 || (domain != null && !DOMAIN.matcher(domain).matches())) {
             throw new ExtensionProxyException(400, "The namespace or domain in the path is not valid");
         }
-        boolean audited = !"GET".equals(method) && !route.readOnly();
+        boolean audited = !route.readOnly();
         if (!isAuthorised(identity, route.scope(), namespace, domain)) {
             if (audited) {
                 audit(identity, method, extension, route, namespace, domain, null, AuditOutcome.DENIED);
@@ -131,15 +132,17 @@ public class ExtensionProxyService {
         String assertion = signer.sign(new ExtensionAssertion(identity.getPrincipal().getName(), extension.id(), jti,
                 authMode, extension.manifest().hubApi(), route.id(), route.scope(), namespace, method, pathAndQuery));
         HttpRequest outbound = outboundRequest(request, method, target, body, limits, assertion);
-        ExtensionProxyResponse reply = send(extension, route, outbound);
-        if (audited) {
-            AuditOutcome outcome = reply.status() < 300 ? AuditOutcome.SUCCESS
-                    : reply.status() == 403 ? AuditOutcome.DENIED : null;
-            if (outcome != null) {
+        AuditOutcome outcome = AuditOutcome.UNKNOWN;
+        try {
+            ExtensionProxyResponse reply = send(extension, route, outbound);
+            outcome = reply.status() < 300 ? AuditOutcome.SUCCESS
+                    : reply.status() == 401 || reply.status() == 403 ? AuditOutcome.DENIED : AuditOutcome.FAILURE;
+            return reply;
+        } finally {
+            if (audited) {
                 audit(identity, method, extension, route, namespace, domain, jti, outcome);
             }
         }
-        return reply;
     }
 
     /**
@@ -171,6 +174,7 @@ public class ExtensionProxyService {
                 .setTimestamp(LocalDateTime.now(ZoneOffset.UTC))
                 .setActor(identity == null || identity.isAnonymous() ? "anonymous" : identity.getPrincipal().getName())
                 .setAction(switch (method) {
+                    case "GET" -> AuditAction.READ;
                     case "POST" -> AuditAction.CREATE;
                     case "DELETE" -> AuditAction.DELETE;
                     default -> AuditAction.UPDATE;
