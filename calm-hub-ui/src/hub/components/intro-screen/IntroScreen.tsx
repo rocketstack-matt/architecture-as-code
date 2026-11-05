@@ -1,3 +1,4 @@
+import { ExtensionPoints, ExtensionScreenLinks } from '../../../extensions/ExtensionPoints.js';
 import { NamespaceCounts, DomainControlCount } from '../../../model/counts.js';
 import { useTheme } from '../../../theme/useTheme.js';
 import { ThemeToggle } from '../../../components/navbar/ThemeToggle.js';
@@ -46,11 +47,7 @@ export function IntroScreen({ namespaceCounts, domainCounts, storage }: IntroScr
                 {/* No `logo` navbar helper class here: its global `max-width: 100%`
                     rule loads after Tailwind and would override the cap below,
                     letting the lockup span the whole column. */}
-                <img
-                    src={LOGO_SRC[theme]}
-                    alt="CALM"
-                    className="h-auto w-[420px] sm:w-[520px] max-w-full"
-                />
+                <img src={LOGO_SRC[theme]} alt="CALM" className="h-auto w-[420px] sm:w-[520px] max-w-full" />
 
                 <div className="w-full flex justify-center mt-10 sm:mt-12">
                     <IntroSearchBar />
@@ -60,6 +57,9 @@ export function IntroScreen({ namespaceCounts, domainCounts, storage }: IntroScr
                     <IntroBrowse namespaceCounts={namespaceCounts} domainCounts={domainCounts} />
                 </div>
             </div>
+            <ExtensionScreenLinks />
+            <ExtensionPoints point="landing-card" />
+            <ExtensionPoints point="action" />
         </div>
     );
 }

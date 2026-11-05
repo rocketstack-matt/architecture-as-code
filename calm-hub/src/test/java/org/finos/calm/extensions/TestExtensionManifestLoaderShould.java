@@ -8,13 +8,19 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -22,6 +28,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -259,12 +266,23 @@ class TestExtensionManifestLoaderShould {
     }
 
     @Test
-    void reject_a_folder_with_no_manifest() throws IOException {
-        Files.createDirectories(tempDir.resolve("empty"));
+    void skip_a_folder_with_no_manifest() throws IOException {
+        Files.createDirectories(tempDir.resolve("lost+found"));
+        write(ID, valid());
 
-        IllegalStateException e = assertThrows(IllegalStateException.class, () -> loader.loadDirectory(tempDir));
+        List<String> warnings = captureWarnings(ExtensionManifestLoader.class, () ->
+                assertThat(loader.loadDirectory(tempDir).stream().map(ExtensionManifest::id).toList(), contains(ID)));
 
-        assertThat(e.getMessage(), containsString("has no extension.json"));
+        assertThat(warnings, hasItem(containsString(tempDir.resolve("lost+found").toString())));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"authenticated", "read", "write", "admin", "domain_read", "domain_write", "domain_admin", "global_admin"})
+    void accept_each_allowed_scope(String scope) {
+        JsonObject manifest = valid();
+        routes(manifest).put("scope", scope).put("path", "/namespaces/{namespace}/domains/{domain}/screen");
+
+        assertThat(loader.parse(manifest.encode(), ID, "test").routes().getFirst().scope(), equalTo(scope));
     }
 
     @Test
@@ -317,6 +335,34 @@ class TestExtensionManifestLoaderShould {
         var manifests = loader.loadClasspath(getClass().getClassLoader(), ExtensionManifestLoader.BUILTIN_BASE);
         assertThat(manifests.stream().map(ExtensionManifest::id).toList(), contains("control-evaluation", "deployment"));
         assertThat(manifests.getFirst().contributes().decoratorViews().getFirst().overlay().hide(), contains("not-applicable"));
+    }
+
+    static List<String> captureWarnings(Class<?> source, Runnable action) {
+        Logger logger = Logger.getLogger(source.getName());
+        List<String> warnings = new ArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                if (record.getLevel().intValue() >= Level.WARNING.intValue()) {
+                    warnings.add(record.getMessage());
+                }
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        logger.addHandler(handler);
+        try {
+            action.run();
+        } finally {
+            logger.removeHandler(handler);
+        }
+        return warnings;
     }
 
     private void write(String folder, JsonObject manifest) throws IOException {

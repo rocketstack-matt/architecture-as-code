@@ -45,4 +45,12 @@ describe('DecoratorsSection', () => {
         const { container } = renderSection('api', [broken]);
         expect(container).toBeEmptyDOMElement();
     });
+
+    it('lists a decorator with no type, and shows its timestamps when present', () => {
+        const untyped: Decorator = { ...decorator('d1', ['api']), type: undefined, updateDateTime: '2026-03-02T08:00:00Z' };
+        renderSection('api', [untyped]);
+        expect(screen.getByRole('article', { name: '(no type) decorator d1' })).toBeInTheDocument();
+        expect(screen.getByText('Updated')).toBeInTheDocument();
+        expect(screen.queryByText('Created')).not.toBeInTheDocument();
+    });
 });

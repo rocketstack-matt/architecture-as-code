@@ -146,7 +146,7 @@ An extension adds features to CALM Hub without a fork. It is an HTTP service tha
 
 > Work in progress: CALM Hub reads, checks and lists manifests. It does not call extension services yet.
 
-Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`.
+Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`. Hub skips hidden folders and warns about folders without a manifest. Settings for unknown extension ids also produce a warning.
 
 ```text
 /etc/calm-hub/extensions/

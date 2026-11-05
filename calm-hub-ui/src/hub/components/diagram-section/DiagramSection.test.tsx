@@ -580,6 +580,34 @@ describe('DiagramSection', () => {
 
             expect(screen.getByTestId('drawer')).toBeInTheDocument();
         });
+
+        it('drops an unknown tab from the URL, and keeps the other parameters', async () => {
+            function SearchProbe() {
+                return <div data-testid="search">{useLocation().search}</div>;
+            }
+            render(
+                <MemoryRouter initialEntries={['/?tab=no-such-tab&type=deployment']}>
+                    <DiagramSection data={architectureData} />
+                    <SearchProbe />
+                </MemoryRouter>
+            );
+
+            await waitFor(() => expect(screen.getByTestId('search').textContent).toBe('?type=deployment'));
+        });
+
+        it('keeps a known tab that is hidden for now in the URL', () => {
+            function SearchProbe() {
+                return <div data-testid="search">{useLocation().search}</div>;
+            }
+            render(
+                <MemoryRouter initialEntries={['/?tab=decorators']}>
+                    <DiagramSection data={patternData} />
+                    <SearchProbe />
+                </MemoryRouter>
+            );
+
+            expect(screen.getByTestId('search').textContent).toBe('?tab=decorators');
+        });
     });
 
     describe('with architecture data', () => {

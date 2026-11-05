@@ -11,6 +11,8 @@ import io.vertx.json.schema.OutputFormat;
 import io.vertx.json.schema.OutputUnit;
 import io.vertx.json.schema.Validator;
 import org.finos.calm.domain.extensions.ExtensionManifest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,6 +48,7 @@ public class ExtensionManifestLoader {
     /** Ids that would clash with the static {@code calm.extensions.*} settings. */
     static final Set<String> RESERVED_IDS = Set.of("dir", "identity", "http");
 
+    private static final Logger LOG = LoggerFactory.getLogger(ExtensionManifestLoader.class);
     private static final String SCHEMA_PATH = "META-INF/calm-extensions/schema/%d/extension.schema.json";
     private static final Pattern PATH_PARAM = Pattern.compile("\\{([^}]+)}");
     private static final Set<String> NAMESPACE_SCOPES = Set.of("read", "write", "admin");
@@ -60,7 +63,7 @@ public class ExtensionManifestLoader {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
     private final Map<Integer, Validator> validators = new HashMap<>();
 
-    /** Loads {@code <dir>/<id>/extension.json} for each folder in {@code dir}. Folders that start with a dot are skipped. */
+    /** Loads {@code <dir>/<id>/extension.json} for each folder in {@code dir}. Hidden folders and folders without a manifest are skipped. */
     public List<ExtensionManifest> loadDirectory(Path dir) {
         if (!Files.isDirectory(dir)) {
             throw new IllegalStateException("calm.extensions.dir " + dir + " is not a directory");
@@ -78,7 +81,8 @@ public class ExtensionManifestLoader {
         for (Path folder : folders) {
             Path file = folder.resolve(MANIFEST_FILE);
             if (!Files.isRegularFile(file)) {
-                throw new IllegalStateException("Extension folder " + folder + " has no " + MANIFEST_FILE);
+                LOG.warn("Skipping extension folder {}: no {}", folder, MANIFEST_FILE);
+                continue;
             }
             String json;
             try {

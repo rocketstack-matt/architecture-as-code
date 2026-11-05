@@ -19,6 +19,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Loads the extension manifests and their operator settings at start up (ADR 0012). A bad manifest
@@ -29,6 +31,8 @@ import java.util.Set;
 public class ExtensionRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExtensionRegistry.class);
+    private static final Pattern PER_ID_SETTING = Pattern.compile(
+            "^calm\\.extensions\\.(?:\"([a-z][a-z0-9-]*)\"|([a-z][a-z0-9-]*))\\.(?:enabled|order|backend-url)$");
     private static final Set<String> URL_SCHEMES = Set.of("http", "https");
 
     private final ExtensionsConfig config;
@@ -82,6 +86,16 @@ public class ExtensionRegistry {
                 errors.add(key(id, "backend-url") + " must be set, because extension '" + id + "' is enabled and has routes");
             }
             enabled.add(new RegisteredExtension(manifest, order.orElse(0), backendUrl));
+        }
+        Set<String> unknownIds = new HashSet<>();
+        for (String property : properties.getPropertyNames()) {
+            Matcher match = PER_ID_SETTING.matcher(property);
+            if (match.matches()) {
+                String id = match.group(1) == null ? match.group(2) : match.group(1);
+                if (!ids.contains(id) && unknownIds.add(id)) {
+                    LOG.warn("Extension settings name unknown extension id '{}'", id);
+                }
+            }
         }
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Invalid calm.extensions configuration: " + String.join("; ", errors));

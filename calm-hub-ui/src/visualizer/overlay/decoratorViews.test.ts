@@ -7,7 +7,7 @@ import { useDecoratorViews } from './decoratorViews.js';
 
 const fetchViews = vi.hoisted(() => vi.fn());
 vi.mock('../../service/extension-service.js', () => ({
-    ExtensionService: class { fetchDecoratorViews = fetchViews; },
+    extensionService: { fetchDecoratorViews: fetchViews },
 }));
 
 it('loads a new decorator type without a UI mapping', async () => {

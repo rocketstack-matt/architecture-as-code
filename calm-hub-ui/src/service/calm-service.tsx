@@ -446,7 +446,11 @@ export class CalmService {
         const query = params.toString() ? `?${params.toString()}` : '';
         return this.ax
             .get(`/api/calm/namespaces/${encodeURIComponent(namespace)}/decorators/values${query}`, { headers })
-            .then((res) => res.data.values ?? []);
+            .then((res) => {
+                const values: unknown = res.data.values;
+                // An entry that is not an object cannot be a decorator, and would break the views that read its fields.
+                return Array.isArray(values) ? values.filter((value): value is Decorator => typeof value === 'object' && value !== null) : [];
+            });
     }
 
     /**

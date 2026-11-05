@@ -54,4 +54,32 @@ describe('DecoratorCard', () => {
         expect(screen.queryByText('Applies to')).not.toBeInTheDocument();
         expect(screen.getByText('null')).toBeInTheDocument();
     });
+
+    it('labels a decorator with no type, and copes with missing fields', () => {
+        render(<DecoratorCard decorator={{ data: { note: 'no type' } }} />);
+        expect(screen.getByRole('article', { name: '(no type) decorator' })).toBeInTheDocument();
+        expect(screen.getByText('(no type)')).toBeInTheDocument();
+        expect(screen.getByText('no type')).toBeInTheDocument();
+    });
+
+    it('shows the timestamps when they are present', () => {
+        render(<DecoratorCard decorator={{ ...decorator, creationDateTime: '2026-03-01T10:15:00Z', updateDateTime: '2026-03-02T08:00:00Z' }} />);
+        expect(screen.getByText('Created')).toBeInTheDocument();
+        expect(screen.getByText('Updated')).toBeInTheDocument();
+        const times = screen.getAllByRole('time');
+        expect(times.map((time) => time.getAttribute('datetime'))).toEqual(['2026-03-01T10:15:00Z', '2026-03-02T08:00:00Z']);
+    });
+
+    it('shows only the timestamp that is present', () => {
+        render(<DecoratorCard decorator={{ ...decorator, updateDateTime: '2026-03-02T08:00:00Z' }} />);
+        expect(screen.queryByText('Created')).not.toBeInTheDocument();
+        expect(screen.getByText('Updated')).toBeInTheDocument();
+    });
+
+    it('shows no timestamps when they are absent', () => {
+        render(<DecoratorCard decorator={decorator} />);
+        expect(screen.queryByText('Created')).not.toBeInTheDocument();
+        expect(screen.queryByText('Updated')).not.toBeInTheDocument();
+        expect(screen.queryByRole('time')).not.toBeInTheDocument();
+    });
 });

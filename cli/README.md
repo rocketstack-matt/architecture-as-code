@@ -697,11 +697,13 @@ Usage: calm hub [command]
 Interact with CALM Hub
 
 Commands:
-  push [command]     Push a CALM document to CALM Hub
-  pull [command]     Pull a CALM document from CALM Hub
-  list [command]     List CALM Hub resources
-  create [command]   Create CALM Hub resources
-  help [command]     display help for command
+  push [command]                Push a CALM document to CALM Hub
+  pull [command]                Pull a CALM document from CALM Hub
+  list [command]                List CALM Hub resources
+  create [command]              Create CALM Hub resources
+  extensions [command]          List and describe the extensions that CALM Hub enabled
+  ext [options] <id> <command>  Run an extension command through CALM Hub and print the reply
+  help [command]                display help for command
 ```
 
 Every subcommand accepts `-c, --calm-hub-url <url>` (falls back to `calmHubUrl` in `~/.calm.json` if omitted).
@@ -808,6 +810,32 @@ calm hub create <namespace|domain> [options]
 ```shell
 calm hub create namespace --name com.example --description "Example org namespace"
 calm hub create domain --name security
+```
+
+### `calm hub extensions` and `calm hub ext`
+
+Run the commands of the extensions that a CalmHub operator enabled. The commands are fixed, so `--help` works without a CalmHub. An extension command runs only under `calm hub ext <id>`, so it cannot replace a built-in command.
+
+```
+calm hub extensions list [options]
+calm hub extensions describe <id> [command] [options]
+calm hub ext <id> <command> [--input <file|->] [--arg key=value]... [options]
+```
+
+| Option | Applies to | Description |
+|--------|------------|-------------|
+| `--input <file>` | `ext` | JSON file with the command input object, or `-` for stdin. |
+| `--arg <key=value>` | `ext` | Sets a top-level input property. Repeatable, and overrides `--input`. The value gets the type that the input schema declares for the property. |
+| `-c, --calm-hub-url <url>` | all | CalmHub instance. |
+| `-f, --format <format>` | all | Output format: `json` (default) or `pretty`. For `ext`, it changes only the error format. |
+
+`ext` reads the command's route from CalmHub. Input properties that match a `{param}` in the route path fill the path. The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. CalmHub validates the input. An error from CalmHub is printed with its body as CalmHub sent it.
+
+```shell
+calm hub extensions list -f pretty
+calm hub extensions describe example-services list-services
+calm hub ext example-services list-services --arg namespace=finos
+echo '{"namespace":"finos","name":"payments"}' | calm hub ext example-services add-service --input -
 ```
 
 ## CALM Workspace

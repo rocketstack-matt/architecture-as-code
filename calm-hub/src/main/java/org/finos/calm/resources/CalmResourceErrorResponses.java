@@ -1,7 +1,11 @@
 package org.finos.calm.resources;
 
 import jakarta.ws.rs.core.Response;
+import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.ResourceType;
+
+import java.util.List;
+import java.util.Map;
 
 public class CalmResourceErrorResponses {
     public static Response invalidNamespaceResponse(String namespace) {
@@ -32,6 +36,32 @@ public class CalmResourceErrorResponses {
 
     public static Response invalidDecoratorJsonResponse(String message) {
         return Response.status(Response.Status.BAD_REQUEST).entity("Invalid decorator JSON: " + message).build();
+    }
+
+    public static Response decoratorSupersededResponse(String namespace, int id) {
+        return Response.status(Response.Status.CONFLICT)
+                .entity("Decorator with ID " + id + " in namespace " + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(namespace)
+                        + " has been superseded. Update the current decorator in its history")
+                .build();
+    }
+
+    public static Response reservedDecoratorTypeResponse(String type) {
+        return Response.status(Response.Status.FORBIDDEN)
+                .entity("Decorator type is reserved and the caller may not write it: "
+                        + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(type))
+                .build();
+    }
+
+    // The errors can quote decorator values, so each one is sanitized.
+    public static Response decoratorSchemaValidationResponse(List<DecoratorSchemaError> errors) {
+        List<Map<String, String>> body = errors.stream()
+                .map(error -> Map.of(
+                        "location", ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(error.location()),
+                        "error", ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(error.error())))
+                .toList();
+        return Response.status(Response.Status.BAD_REQUEST)
+                .entity(Map.of("error", "Decorator does not match its $schema", "errors", body))
+                .build();
     }
 
     /**

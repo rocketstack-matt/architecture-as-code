@@ -697,6 +697,19 @@ describe('CalmService', () => {
             expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual([]);
         });
 
+        it('drops entries that are not objects', async () => {
+            const decorator = { uniqueId: 'dec-1', target: [target], appliesTo: ['node-a'], data: {} };
+            mock.onGet(url).reply(200, { values: [decorator, null, 'text', 3] });
+
+            expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual([decorator]);
+        });
+
+        it('returns an empty array when values is not an array', async () => {
+            mock.onGet(url).reply(200, { values: { uniqueId: 'dec-1' } });
+
+            expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual([]);
+        });
+
         it('returns an empty array without a decorator request when the slug cannot be resolved', async () => {
             mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(200, { values: [] });
 

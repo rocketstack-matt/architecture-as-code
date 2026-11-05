@@ -1,28 +1,48 @@
 import { useState } from 'react';
 import { DecoratorValue } from './DecoratorValue.js';
-import { isWebUrl } from './value-shape.js';
+import { decoratorTypeLabel, isWebUrl } from './value-shape.js';
 
-/** The decorator fields the renderer reads. Kept structural so the renderer does not depend on Hub types. */
+/**
+ * The decorator fields the renderer reads. Kept structural so the renderer does not depend on Hub types. The API does
+ * not require every field, so the card copes with any of them missing.
+ */
 export interface RenderableDecorator {
-    uniqueId: string;
-    type: string;
+    uniqueId?: string;
+    type?: string;
     schema?: string;
     target?: string[];
     appliesTo?: string[];
-    data: unknown;
+    creationDateTime?: string;
+    updateDateTime?: string;
+    data?: unknown;
+}
+
+const isText = (value: unknown): value is string => typeof value === 'string' && value !== '';
+
+function Timestamp({ label, value }: { label: string; value: unknown }) {
+    if (!isText(value)) return null;
+    return (
+        <span>
+            <span className="text-base-content/50">{label}</span> <DecoratorValue value={value} />
+        </span>
+    );
 }
 
 export function DecoratorCard({ decorator }: { decorator: RenderableDecorator }) {
     const [view, setView] = useState<'data' | 'json'>('data');
-    const appliesTo = Array.isArray(decorator.appliesTo) ? decorator.appliesTo : [];
+    const appliesTo = Array.isArray(decorator.appliesTo) ? decorator.appliesTo.filter((id): id is string => typeof id === 'string') : [];
+    const type = decoratorTypeLabel(decorator.type);
+    const uniqueId = isText(decorator.uniqueId) ? decorator.uniqueId : '';
+    const schema = isText(decorator.schema) ? decorator.schema : '';
+    const hasTimestamps = [decorator.creationDateTime, decorator.updateDateTime].some(isText);
     const toggleClass = (active: boolean) => `join-item btn btn-xs ${active ? 'btn-active' : ''}`;
 
     return (
-        <article className="card card-border bg-base-100 text-sm" aria-label={`${decorator.type} decorator ${decorator.uniqueId}`}>
+        <article className="card card-border bg-base-100 text-sm" aria-label={`${type} decorator ${uniqueId}`.trim()}>
             <div className="card-body p-3 gap-2">
                 <header className="flex flex-wrap items-center gap-2">
-                    <span className="badge badge-primary badge-soft badge-sm font-semibold">{decorator.type}</span>
-                    <span className="font-mono text-xs text-base-content/60 break-all flex-1 min-w-0">{decorator.uniqueId}</span>
+                    <span className="badge badge-primary badge-soft badge-sm font-semibold">{type}</span>
+                    <span className="font-mono text-xs text-base-content/60 break-all flex-1 min-w-0">{uniqueId}</span>
                     <div className="join" role="group" aria-label="Decorator view">
                         <button type="button" aria-pressed={view === 'data'} className={toggleClass(view === 'data')} onClick={() => setView('data')}>
                             Data
@@ -32,15 +52,15 @@ export function DecoratorCard({ decorator }: { decorator: RenderableDecorator })
                         </button>
                     </div>
                 </header>
-                {decorator.schema && (
+                {schema && (
                     <div className="text-xs text-base-content/60 break-all">
                         Schema:{' '}
-                        {isWebUrl(decorator.schema) ? (
-                            <a href={decorator.schema} target="_blank" rel="noopener noreferrer" className="link">
-                                {decorator.schema}
+                        {isWebUrl(schema) ? (
+                            <a href={schema} target="_blank" rel="noopener noreferrer" className="link">
+                                {schema}
                             </a>
                         ) : (
-                            decorator.schema
+                            schema
                         )}
                     </div>
                 )}
@@ -52,6 +72,12 @@ export function DecoratorCard({ decorator }: { decorator: RenderableDecorator })
                                 {id}
                             </span>
                         ))}
+                    </div>
+                )}
+                {hasTimestamps && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                        <Timestamp label="Created" value={decorator.creationDateTime} />
+                        <Timestamp label="Updated" value={decorator.updateDateTime} />
                     </div>
                 )}
                 {view === 'data' ? (

@@ -40,13 +40,30 @@ export function isWebUrl(value: string): boolean {
     }
 }
 
+// Date.parse rolls an impossible day over (2024-02-30 becomes 1 March), so check the calendar date as written.
+function isRealCalendarDate(value: string): boolean {
+    const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+/** Whether a string is an ISO 8601 date or date-time that names a real day. */
+export function isIsoDate(value: string): boolean {
+    return (ISO_DATE.test(value) || ISO_DATE_TIME.test(value)) && !Number.isNaN(Date.parse(value)) && isRealCalendarDate(value);
+}
+
 function classifyString(value: string): ValueShape {
     if (isWebUrl(value)) return { kind: 'url', value };
-    const dateOnly = ISO_DATE.test(value);
-    if ((dateOnly || ISO_DATE_TIME.test(value)) && !Number.isNaN(Date.parse(value))) {
-        return { kind: 'date', value, dateOnly };
-    }
+    if (isIsoDate(value)) return { kind: 'date', value, dateOnly: ISO_DATE.test(value) };
     return { kind: 'text', value };
+}
+
+export const NO_TYPE_LABEL = '(no type)';
+
+/** The type to show and group by. The API does not require a type, so a decorator can come without one. */
+export function decoratorTypeLabel(type: unknown): string {
+    if (type === undefined || type === null || type === '') return NO_TYPE_LABEL;
+    return typeof type === 'string' ? type : JSON.stringify(type);
 }
 
 export function classifyValue(value: unknown): ValueShape {

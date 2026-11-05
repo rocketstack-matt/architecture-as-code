@@ -164,7 +164,7 @@ Instead, place `HeaderSection` and `BodySection` in their own files and import t
 
 `DiagramSection` draws its tabs from `DIAGRAM_TABS` (`diagram-section/tabs/`). A tab has an id (the
 `?tab=` value), a label, an icon, an optional visibility rule and a render function. An unknown or
-hidden tab falls back to `diagram`. A tab that keeps state in the URL lists its parameters in
+hidden tab falls back to `diagram`. An unknown tab id is also dropped from the URL. A tab that keeps state in the URL lists its parameters in
 `searchParams`, so a version change keeps them. Add a tab there, not as a new branch in
 `DiagramSection`.
 
@@ -172,7 +172,8 @@ hidden tab falls back to `diagram`. A tab that keeps state in the URL lists its 
 code, so that it can move to a package that the VS Code extension shares. The UI calls them
 "Decorators", never "Metadata", which is the CALM `metadata` field (`MetadataPanel` is the panel
 under the diagram). Hub gets the decorators from `DiagramSection` (`onDecoratorsChange`) and gives
-them to the details drawer through `DecoratorsContext`.
+them to the details drawer through `DecoratorsContext`. The API does not require any decorator
+field, so guard each read. A missing type shows as "(no type)".
 
 ### Decorator overlays
 
@@ -183,6 +184,10 @@ One engine (`visualizer/overlay/`) draws decorators on the diagram from `decorat
 each view's decorator type every 5 s and gives the result to the diagram through `DecoratorOverlayContext`. Nodes and
 edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
 Evaluations panel read control-evaluation fields, so they stay tied to that view id.
+
+`ExtensionService` uses its own axios instance, not `apiClient`, so a registry or extension call failure does not
+open the global auth or outage page. The shared `extensionService` loads the registry one time for
+`ExtensionsProvider` and `useDecoratorViews()`. After a failed load, the next call tries again.
 
 ### Operator UI config
 

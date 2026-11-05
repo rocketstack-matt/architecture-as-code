@@ -10,7 +10,7 @@ sidebar_label: hub
 The `hub` command group is under active development.  Functionality may change without notice.
 :::
 
-The `hub` command group allows you to interact with a running `CALM Hub` instance directly from the CLI. You can use it to manage Namespaces, Architectures, Standards, Patterns, Domains and Controls stored in CALM Hub.
+The `hub` command group allows you to interact with a running `CALM Hub` instance directly from the CLI. You can use it to manage Namespaces, Architectures, Standards, Patterns, Domains and Controls stored in CALM Hub, and to run the commands of CALM Hub extensions.
 
 ## Connecting to CALM Hub
 
@@ -420,9 +420,52 @@ calm hub pull control-configuration \
 - **`-o, --output <file>`**: Write the configuration JSON to a file instead of stdout.
 - **`-c, --calm-hub-url <url>`**: URL to the CALM Hub instance.
 
+## Running Extension Commands
+
+A CALM Hub operator can enable extensions. An extension can declare commands, and the CLI runs them through CALM Hub. The CLI does not add a subcommand for each extension command, so `--help` works without a CALM Hub. An extension command runs only under `calm hub ext <id>`, so it cannot replace a built-in command.
+
+### List extensions
+
+```shell
+calm hub extensions list -c http://localhost:8080
+```
+
+The `pretty` format shows the columns **ID**, **VERSION**, **NAME** and **COMMANDS**. CALM Hub leaves out the commands that it cannot run, for example write commands on a read-only CALM Hub.
+
+### Describe an extension or a command
+
+```shell
+calm hub extensions describe example-services
+calm hub extensions describe example-services list-services
+```
+
+With a command name, the output shows the method, path and scope of the command's route, and the input and output JSON Schemas.
+
+### Run a command
+
+```shell
+calm hub ext example-services list-services --arg namespace=finos
+echo '{"namespace":"finos","name":"payments"}' | calm hub ext example-services add-service --input -
+```
+
+**Options:**
+
+- **`--input <file>`**: A JSON file with the command input object, or `-` to read it from stdin.
+- **`--arg <key=value>`**: Sets a top-level input property. You can use it more than once, and it overrides `--input`. The value gets the type that the input schema declares for the property, so `--arg limit=5` sends a number.
+- **`-c, --calm-hub-url <url>`**: URL to the CALM Hub instance.
+- **`-f, --format <format>`**: Error format, `json` (default) or `pretty`.
+
+Input properties that match a `{param}` in the route path fill the path. The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. A JSON reply is printed as JSON, and a text reply as text.
+
+CALM Hub validates the input. If it rejects the call, the CLI exits with code 1 and prints the error with the body as CALM Hub sent it:
+
+```json
+{"status":400,"error":"Input is not valid","request":"POST /api/calm/extensions/example-services/api/namespaces/finos/services","body":{"error":"Input is not valid"}}
+```
+
 ## Output Formats
 
 All `hub` subcommands support a `-f, --format <format>` option with two choices:
 
 - **`json`** _(default)_ — outputs the raw JSON response from CALM Hub. Suitable for piping into other tools or scripts.
-- **`pretty`** — renders the output as a human-readable ASCII table. Available for `list` commands; for `push` and `pull` commands it formats the response in a more readable way.
+- **`pretty`** — renders the output as a human-readable ASCII table. Available for `list` commands; for `push` and `pull` commands it formats the response in a more readable way. For `ext`, it changes only the error format.
