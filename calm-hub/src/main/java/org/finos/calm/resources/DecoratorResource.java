@@ -148,7 +148,7 @@ public class DecoratorResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(
             summary = "Retrieve the history of a decorator in a given namespace",
-            description = "The current decorator first, then each one it supersedes. Only reserved-type decorators have more than one entry"
+            description = "The current decorator first, then each one it supersedes. Updates involving reserved types create history entries"
     )
     @PermissionsAllowed(CalmHubScopes.READ)
     public Response getDecoratorHistory(

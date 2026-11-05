@@ -131,7 +131,7 @@ A reserved type is also append-only. An update of a reserved-type decorator does
 | `GET .../decorators/{id}` | Returns the decorator, current or superseded |
 | `GET .../decorators/{id}/history` | Returns the history that contains `{id}`, current first. Each entry has `id`, `supersedes`, `supersededBy` and `decorator` |
 | `PUT .../decorators/{id}` on a superseded decorator | `409 Conflict`. Update the current decorator |
-| `DELETE .../decorators/{id}` | Deletes the decorator with its whole history |
+| `DELETE .../decorators/{id}` | Deletes the whole history. The caller must be a writer for every reserved type in it |
 
 The MCP tool `getDecoratorHistory` returns the same history.
 

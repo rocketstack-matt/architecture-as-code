@@ -195,7 +195,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.READ)
-    @Tool(description = "Get the history of a decorator: the current decorator first, then each older decorator it supersedes. Only reserved (append-only) decorator types have more than one entry.")
+    @Tool(description = "Get the history of a decorator: the current decorator first, then each older decorator it supersedes. Updates involving reserved types create history entries.")
     public ToolResponse getDecoratorHistory(
             @ToolArg(description = "The namespace containing the decorator") String namespace,
             @ToolArg(description = "The numeric ID of any decorator in the history (positive integer)") int decoratorId) {

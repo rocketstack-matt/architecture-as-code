@@ -1,5 +1,7 @@
 package org.finos.calm.domain;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
 import java.util.Objects;
 
 /**
@@ -8,6 +10,7 @@ import java.util.Objects;
  *
  * <p>Immutable</p>
  */
+@RegisterForReflection
 public class DecoratorHistoryEntry {
     private final int id;
     private final Integer supersedes;
