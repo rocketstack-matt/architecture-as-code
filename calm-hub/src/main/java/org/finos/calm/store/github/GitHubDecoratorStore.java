@@ -73,6 +73,11 @@ public class GitHubDecoratorStore extends AbstractGitHubStore implements Decorat
     }
 
     @Override
+    public void deleteCurrentDecoratorHistory(String namespace, int currentId) throws NamespaceNotFoundException, DecoratorNotFoundException {
+        throw new GitHubWriteNotSupportedException(WRITE_UNSUPPORTED);
+    }
+
+    @Override
     public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
         throw new GitHubWriteNotSupportedException(WRITE_UNSUPPORTED);
     }

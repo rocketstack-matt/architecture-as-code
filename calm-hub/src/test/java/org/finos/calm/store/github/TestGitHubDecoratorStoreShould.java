@@ -113,6 +113,12 @@ class TestGitHubDecoratorStoreShould {
                 () -> store.deleteDecorator("finos", 1));
     }
     @Test
+    void throw_unsupported_on_delete_current_decorator_history() {
+        assertThrows(UnsupportedOperationException.class,
+                () -> store.deleteCurrentDecoratorHistory("finos", 1));
+    }
+
+    @Test
     void throw_unsupported_on_supersede_decorator() {
         assertThrows(UnsupportedOperationException.class,
                 () -> store.supersedeDecorator("finos", 1, "{}"));

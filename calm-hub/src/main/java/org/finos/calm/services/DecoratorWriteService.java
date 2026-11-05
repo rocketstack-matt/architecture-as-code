@@ -88,9 +88,12 @@ public class DecoratorWriteService {
         Optional<Decorator> existing = decoratorStore.getDecoratorById(namespace, id);
         if (existing.isPresent()) {
             requireWriter(principal, existing.get().getType());
-            for (var entry : decoratorStore.getDecoratorHistory(namespace, id)) {
+            var history = decoratorStore.getDecoratorHistory(namespace, id);
+            for (var entry : history) {
                 requireWriter(principal, entry.getDecorator().getType());
             }
+            decoratorStore.deleteCurrentDecoratorHistory(namespace, history.getFirst().getId());
+            return;
         }
         decoratorStore.deleteDecorator(namespace, id);
     }

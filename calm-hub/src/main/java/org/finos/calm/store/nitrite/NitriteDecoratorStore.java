@@ -253,7 +253,18 @@ public class NitriteDecoratorStore implements DecoratorStore {
     }
 
     @Override
+    public void deleteCurrentDecoratorHistory(String namespace, int currentId)
+            throws NamespaceNotFoundException, DecoratorNotFoundException {
+        deleteDecorator(namespace, currentId, true);
+    }
+
+    @Override
     public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
+        deleteDecorator(namespace, id, false);
+    }
+
+    private void deleteDecorator(String namespace, int id, boolean requireCurrent)
+            throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
         lock.lock();
@@ -266,6 +277,12 @@ public class NitriteDecoratorStore implements DecoratorStore {
             TypeSafeNitriteDocument<Document> typeSafeDoc = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class);
             List<Document> decorators = typeSafeDoc.getList(DECORATORS_FIELD);
             if (decorators == null) {
+                throw new DecoratorNotFoundException();
+            }
+
+            if (requireCurrent && decorators.stream().noneMatch(entry ->
+                    Integer.valueOf(id).equals(entry.get(DECORATOR_ID_FIELD, Integer.class))
+                            && entry.get(SUPERSEDED_BY_FIELD) == null)) {
                 throw new DecoratorNotFoundException();
             }
 

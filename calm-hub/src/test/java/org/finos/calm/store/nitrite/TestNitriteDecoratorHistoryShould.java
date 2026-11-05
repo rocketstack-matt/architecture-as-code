@@ -120,6 +120,18 @@ class TestNitriteDecoratorHistoryShould {
     }
 
     @Test
+    void refuse_deleting_a_history_that_has_a_new_successor() throws Exception {
+        store.createDecorator(NAMESPACE, decorator("first"));
+        store.supersedeDecorator(NAMESPACE, 1, decorator("second"));
+
+        assertThrows(DecoratorNotFoundException.class, () -> store.deleteCurrentDecoratorHistory(NAMESPACE, 1));
+
+        assertThat(store.getDecoratorsForNamespace(NAMESPACE, null, null), contains(2));
+        store.deleteCurrentDecoratorHistory(NAMESPACE, 2);
+        assertThat(store.getDecoratorsForNamespace(NAMESPACE, null, null), is(empty()));
+    }
+
+    @Test
     void delete_the_whole_history_and_leave_other_decorators() throws Exception {
         store.createDecorator(NAMESPACE, decorator("first"));
         store.supersedeDecorator(NAMESPACE, 1, decorator("second"));

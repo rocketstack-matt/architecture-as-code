@@ -205,9 +205,25 @@ class TestDecoratorWriteServiceShould {
     void delete_a_reserved_decorator_for_a_configured_writer() throws Exception {
         when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
 
+        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(1, null, null, decorator("control-evaluation"))));
+
         service.deleteDecorator(WRITER, NAMESPACE, 1);
 
-        verify(mockDecoratorStore).deleteDecorator(NAMESPACE, 1);
+        verify(mockDecoratorStore).deleteCurrentDecoratorHistory(NAMESPACE, 1);
+    }
+
+    @Test
+    void delete_only_the_history_that_was_authorized() throws Exception {
+        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
+        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(2, 1, null, decorator("control-evaluation")),
+                new DecoratorHistoryEntry(1, null, 2, decorator("control-evaluation"))));
+
+        service.deleteDecorator(WRITER, NAMESPACE, 1);
+
+        verify(mockDecoratorStore).deleteCurrentDecoratorHistory(NAMESPACE, 2);
+        verify(mockDecoratorStore, never()).deleteDecorator(anyString(), anyInt());
     }
 
     @Test

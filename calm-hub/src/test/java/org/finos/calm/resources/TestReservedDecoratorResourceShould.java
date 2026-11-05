@@ -7,6 +7,8 @@ import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.finos.calm.domain.Decorator;
+import org.finos.calm.domain.DecoratorHistoryEntry;
+import java.util.List;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.store.DecoratorStore;
 import org.junit.jupiter.api.Test;
@@ -145,13 +147,16 @@ class TestReservedDecoratorResourceShould {
     void delete_a_reserved_decorator_for_a_configured_writer() throws Exception {
         when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("control-evaluation")));
 
+        when(mockDecoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(1, null, null, decorator("control-evaluation"))));
+
         given()
                 .when()
                 .delete("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(204);
 
-        verify(mockDecoratorStore).deleteDecorator("finos", 1);
+        verify(mockDecoratorStore).deleteCurrentDecoratorHistory("finos", 1);
     }
 
     @Test

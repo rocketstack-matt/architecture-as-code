@@ -204,7 +204,18 @@ public class MongoDecoratorStore implements DecoratorStore {
     }
 
     @Override
+    public void deleteCurrentDecoratorHistory(String namespace, int currentId)
+            throws NamespaceNotFoundException, DecoratorNotFoundException {
+        deleteDecorator(namespace, currentId, true);
+    }
+
+    @Override
     public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
+        deleteDecorator(namespace, id, false);
+    }
+
+    private void deleteDecorator(String namespace, int id, boolean requireCurrent)
+            throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
         List<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespace), id).stream()
@@ -215,7 +226,10 @@ public class MongoDecoratorStore implements DecoratorStore {
         }
 
         long modified = decoratorCollection.updateOne(
-                Filters.eq("namespace", namespace),
+                requireCurrent
+                        ? Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
+                                Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false))))
+                        : Filters.eq("namespace", namespace),
                 Updates.pull("decorators", Filters.in(DECORATOR_ID_FIELD, ids))
         ).getModifiedCount();
 

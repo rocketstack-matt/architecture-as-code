@@ -818,6 +818,23 @@ class TestMongoDecoratorStoreShould {
     }
 
     @Test
+    void should_require_the_authorized_head_to_still_be_current_when_deleting() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1));
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(0L);
+        ArgumentCaptor<Bson> filter = ArgumentCaptor.forClass(Bson.class);
+        when(decoratorCollection.updateOne(filter.capture(), any(Bson.class))).thenReturn(updateResult);
+
+        assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.deleteCurrentDecoratorHistory("finos", 1));
+
+        BsonDocument current = filter.getValue().toBsonDocument().getArray("$and").get(1)
+                .asDocument().getDocument("decorators").getDocument("$elemMatch");
+        assertEquals(1, current.getInt32("decoratorId").getValue());
+        assertEquals(false, current.getDocument("supersededBy").getBoolean("$exists").getValue());
+    }
+
+    @Test
     void should_leave_superseded_decorators_out_of_lists() throws NamespaceNotFoundException {
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
         mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1));
