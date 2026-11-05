@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { OverlayLegend } from './OverlayLegend.js';
 import { DecoratorOverlayContext, type DecoratorOverlayState } from '../../../context/DecoratorOverlayContext.js';
-import { BUILTIN_DECORATOR_VIEWS } from '../../../overlay/decoratorViews.js';
+import { BUILTIN_DECORATOR_VIEWS } from '../../../../test-support/decorator-views.js';
 import type { ElementOverlay, OverlayDecoratorView, OverlayStatus } from '../../../contracts/contracts.js';
 
 const [evaluationView, deploymentView] = BUILTIN_DECORATOR_VIEWS as OverlayDecoratorView[];

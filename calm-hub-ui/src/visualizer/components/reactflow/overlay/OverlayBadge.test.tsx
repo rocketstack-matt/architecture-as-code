@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { OverlayBadge, OverlayEdgeBadge } from './OverlayBadge.js';
 import { OVERLAY_STYLES, overlayOutline } from './overlayStyle.js';
-import { BUILTIN_DECORATOR_VIEWS } from '../../../overlay/decoratorViews.js';
+import { BUILTIN_DECORATOR_VIEWS } from '../../../../test-support/decorator-views.js';
 import type { OverlayDecoratorView, OverlayStatus } from '../../../contracts/contracts.js';
 
 const deploymentView = BUILTIN_DECORATOR_VIEWS.find((v) => v.id === 'deployment') as OverlayDecoratorView;

@@ -1,5 +1,5 @@
 import type { DecoratorOverlayState } from '../visualizer/context/DecoratorOverlayContext.js';
-import { BUILTIN_DECORATOR_VIEWS } from '../visualizer/overlay/decoratorViews.js';
+import { BUILTIN_DECORATOR_VIEWS } from './decorator-views.js';
 import type { ElementEvaluation, ElementOverlay, OverlayDecoratorView } from '../visualizer/contracts/contracts.js';
 
 const evaluationView = BUILTIN_DECORATOR_VIEWS.find((v) => v.id === 'control-evaluation') as OverlayDecoratorView;

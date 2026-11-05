@@ -1,8 +1,11 @@
+import { BUILTIN_DECORATOR_VIEWS } from '../../../test-support/decorator-views.js';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { ControlEvaluationsPanel } from './ControlEvaluationsPanel.js';
 import { THEME } from './theme.js';
 import type { ControlEvaluationDecorator } from '../../contracts/contracts.js';
+
+vi.mock('../../overlay/decoratorViews.js', () => ({ useDecoratorViews: () => BUILTIN_DECORATOR_VIEWS }));
 
 const make = (id: string, status: 'met' | 'not-met' | 'not-applicable', at: string, extra = {}): ControlEvaluationDecorator => ({
     schema: 's', uniqueId: id, type: 'control-evaluation', target: ['t'], appliesTo: ['trade-api', 'trade-api-to-client-ledger'],

@@ -238,6 +238,53 @@ cd calm-hub && ../mvnw quarkus:dev
 
 ---
 
+### Show your decorators in Hub
+
+An external service can write decorators with its own service account and ship a
+views-only manifest. Hub draws the results; the service supplies no browser code.
+
+1. Give the service account write access to the target namespace. Use that account's
+   credentials with the decorator API, not a user's token. If the decorator type is
+   reserved, the operator must also allow this principal to write that type.
+2. Write decorators with a stable `type`, architecture or element targets, and results
+   in `data`. A known `$schema` is validated on write. For reserved types, append a new
+   result and use Hub's `supersedes` field to replace an old result.
+3. Put this manifest at `<calm.extensions.dir>/scanner/extension.json`, then restart Hub:
+
+```json
+{
+  "id": "scanner",
+  "version": "1.0.0",
+  "hubApi": 0,
+  "name": "Security scan",
+  "contributes": {
+    "decorator-views": [{
+      "id": "security-scan",
+      "match": { "type": "security-scan" },
+      "label": "Security scan",
+      "overlay": {
+        "status": "/result",
+        "map": { "safe": "ok", "unsafe": "error" },
+        "default": "info"
+      }
+    }]
+  }
+}
+```
+
+No routes or backend URL are needed. `match` selects a decorator `type` or `schema`
+URL. Overlay pointers read fields in `data`. Status targets are `ok`, `warn`,
+`error` and `info`. An omitted `default` hides unmapped statuses. Optional `label`,
+`key` and `time` are JSON Pointers; `time` selects the newest result, per `key` when
+set. `hide` lists statuses that suppress an older result without drawing a badge.
+
+The registry returns enabled manifests in operator order, then by id. Set
+`calm.extensions."scanner".order` to change the order, or `.enabled=false` to hide
+its views. The built-in `control-evaluation` and `deployment` views use the same
+mechanism. If the registry cannot load in the browser, overlays stay off and the
+Decorators tab still renders the stored data.
+
+
 ## Further Reading
 
 - [UI Walkthrough](../working-with-calm/calm-hub.md) - visual interface guide (namespace explorer, diagram canvas, timeline, compare mode)

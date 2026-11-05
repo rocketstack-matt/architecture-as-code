@@ -7,7 +7,7 @@ import {
     statusText,
     worstStatus,
 } from './overlayEngine.js';
-import { BUILTIN_DECORATOR_VIEWS } from './decoratorViews.js';
+import { BUILTIN_DECORATOR_VIEWS } from '../../test-support/decorator-views.js';
 import type { Decorator, OverlayDecoratorView } from '../contracts/contracts.js';
 
 const viewById = (id: string) => BUILTIN_DECORATOR_VIEWS.find((v) => v.id === id) as OverlayDecoratorView;

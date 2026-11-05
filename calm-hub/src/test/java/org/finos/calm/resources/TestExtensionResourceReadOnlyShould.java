@@ -33,7 +33,7 @@ class TestExtensionResourceReadOnlyShould {
                 .get("/api/calm/extensions")
                 .then()
                 .statusCode(200)
-                .body("values[0].routes.id", contains("screen", "namespace-services", "search"))
-                .body("values[0].commands.keySet()", contains("list-services"));
+                .body("values.find { it.id == 'example-services' }.routes.id", contains("screen", "namespace-services", "search"))
+                .body("values.find { it.id == 'example-services' }.commands.keySet()", contains("list-services"));
     }
 }
