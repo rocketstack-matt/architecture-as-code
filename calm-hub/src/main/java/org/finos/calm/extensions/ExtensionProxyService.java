@@ -242,8 +242,9 @@ public class ExtensionProxyService {
         String contentType = response.headers().firstValue("Content-Type").orElse(null);
         boolean typeAllowed = contentType == null ? response.body().length == 0 : REPLY_TYPES.contains(mediaType(contentType));
         if (!passOn || !typeAllowed) {
-            LOG.warn("Extension {} route {} returned status {} with a content type that is {}allowed", extension.id(),
-                    route.id(), status, typeAllowed ? "" : "not ");
+            LOG.warn("Extension {} route {} returned status {} and content type {}, which Hub does not pass on",
+                    extension.id(), route.id(), status,
+                    contentType == null ? "none" : ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(mediaType(contentType)));
             throw badGateway();
         }
         Map<String, String> headers = new LinkedHashMap<>();
@@ -268,7 +269,8 @@ public class ExtensionProxyService {
             return new byte[0];
         }
         try {
-            byte[] bytes = body.readNBytes(maxBytes + 1);
+            // One byte over the cap shows that the body is too large, without reading the rest.
+            byte[] bytes = body.readNBytes((int) Math.min(Integer.MAX_VALUE - 8L, maxBytes + 1L));
             if (bytes.length > maxBytes) {
                 throw new ExtensionProxyException(413, "The request body is too large for this extension");
             }
