@@ -9,9 +9,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TestExtensionBlocksSchemaShould {
@@ -49,5 +54,28 @@ class TestExtensionBlocksSchemaShould {
     })
     void reject_invalid_replies(String reply) throws Exception {
         assertFalse(validator().validate(new JsonObject(reply)).getValid());
+    }
+
+    @Test
+    void return_a_server_error_if_the_packaged_schema_is_missing() throws Exception {
+        assertEquals(500, ExtensionResource.schemaResponse(null).getStatus());
+    }
+
+    @Test
+    void close_the_schema_stream_when_reading_fails() {
+        AtomicBoolean closed = new AtomicBoolean();
+        InputStream stream = new InputStream() {
+            @Override
+            public int read() throws IOException {
+                throw new IOException("Cannot read schema");
+            }
+
+            @Override
+            public void close() {
+                closed.set(true);
+            }
+        };
+        assertThrows(IOException.class, () -> ExtensionResource.schemaResponse(stream));
+        assertTrue(closed.get());
     }
 }
