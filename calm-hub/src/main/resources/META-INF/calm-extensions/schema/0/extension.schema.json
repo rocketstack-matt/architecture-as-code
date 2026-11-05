@@ -134,6 +134,7 @@
             "admin",
             "domain_read",
             "domain_write",
+            "domain_admin",
             "global_admin"
           ]
         },
