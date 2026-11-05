@@ -4,6 +4,7 @@ import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 import io.smallrye.config.WithParentName;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -24,7 +25,7 @@ public interface ExtensionsConfig {
     @WithParentName
     Map<String, Extension> extensions();
 
-    /** For the proxy (not built yet): the key that signs the identity that Hub sends to an extension. */
+    /** The keys that sign the identity assertion that Hub sends to an extension (ADR 0010). */
     Identity identity();
 
     /** For the proxy (not built yet): limits on each call to an extension backend. */
@@ -40,8 +41,19 @@ public interface ExtensionsConfig {
     }
 
     interface Identity {
-        /** A PKCS#8 PEM file with the RSA private key. */
+        /** A PKCS#8 PEM file with an RSA (RS256) or P-256 (ES256) private key. */
         Optional<String> privateKeyLocation();
+
+        /**
+         * PEM files with the public keys that {@code GET /api/calm/auth/jwks} lists. The first is the
+         * public key of {@link #privateKeyLocation()}. The others only verify, so that a key can change
+         * with no outage.
+         */
+        Optional<List<String>> publicKeyLocations();
+
+        /** The lifetime of an assertion, at most 300. */
+        @WithDefault("60")
+        int ttlSeconds();
     }
 
     interface Http {
