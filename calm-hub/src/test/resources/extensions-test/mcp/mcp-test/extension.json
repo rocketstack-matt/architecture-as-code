@@ -9,9 +9,20 @@
     { "id": "services", "method": "GET", "path": "/namespaces/{namespace}/services", "scope": "read" },
     { "id": "add-service", "method": "POST", "path": "/namespaces/{namespace}/services", "scope": "write" },
     { "id": "remove-service", "method": "DELETE", "path": "/namespaces/{namespace}/services/{name}", "scope": "write" },
+    { "id": "service", "method": "GET", "path": "/services/{service}", "scope": "authenticated" },
+    { "id": "service-admin", "method": "GET", "path": "/services/admin", "scope": "global_admin" },
     { "id": "search", "method": "POST", "path": "/search", "scope": "authenticated", "readOnly": true }
   ],
   "commands": {
+    "get-service": {
+      "route": "service",
+      "description": "Get one service",
+      "input": {
+        "type": "object",
+        "properties": { "service": { "type": "string" } },
+        "required": ["service"]
+      }
+    },
     "search": {
       "route": "search",
       "description": "Search the services",

@@ -223,7 +223,7 @@ CALM Hub makes one tool for each command of an enabled [extension](index.md#exte
 - `readOnlyHint` is true for a `GET` or `readOnly` route. `destructiveHint` and `idempotentHint` come from the command. With no hint, a write is destructive and not idempotent.
 - Each call goes through the extension proxy, with the same scope, read-only, audit and size rules as a REST call. CALM Hub checks the scope when the tool is called. A user sees every tool, also one that they cannot call.
 - A read-only CALM Hub makes no tool for a command whose route it cannot run.
-- Arguments that fill a `{param}` go in the path. The rest go to the query for `GET` and `DELETE`, and to the JSON body for other methods.
+- Arguments that fill a `{param}` go in the path, percent-encoded, with the same path checks as a REST call. A value such as `%61dmin` or `a/../b` is refused. The rest go to the query for `GET` and `DELETE`, and to the JSON body for other methods.
 - A `2xx` reply is the result: structured content and the same JSON as text if the command has an output schema, otherwise text. Any other reply is a tool error.
 
 ### Example Tool Call

@@ -10,13 +10,17 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.finos.calm.domain.UserAccess;
+import org.finos.calm.domain.audit.AuditLogEntry;
+import org.finos.calm.domain.audit.AuditOutcome;
 import org.finos.calm.extensions.ExtensionTestKeys;
 import org.finos.calm.extensions.FixtureBackend;
+import org.finos.calm.security.AuditService;
 import org.finos.calm.store.UserAccessStore;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.net.URI;
 import java.util.List;
@@ -29,6 +33,8 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Extension commands as MCP tools, called over the streamable HTTP transport and the real proxy. */
@@ -41,6 +47,9 @@ class TestExtensionToolsMcpShould {
 
     @InjectMock
     UserAccessStore mockUserAccessStore;
+
+    @InjectMock
+    AuditService mockAuditService;
 
     public static class McpProfile implements QuarkusTestProfile {
         private static final ExtensionTestKeys.KeyFiles KEYS = ExtensionTestKeys.rsaInTempDir();
@@ -79,7 +88,7 @@ class TestExtensionToolsMcpShould {
         List<String> names = tools.stream().map(t -> ((JsonObject) t).getString("name"))
                 .filter(name -> name.startsWith("ext_")).toList();
 
-        assertThat(names, is(List.of("ext_mcp-test_add-service", "ext_mcp-test_list-services",
+        assertThat(names, is(List.of("ext_mcp-test_add-service", "ext_mcp-test_get-service", "ext_mcp-test_list-services",
                 "ext_mcp-test_remove-service", "ext_mcp-test_search", "ext_mcp-test_service-names")));
         JsonObject list = find(tools, "ext_mcp-test_list-services");
         assertThat(list.getString("description"), is("List the services that a namespace owns"));
@@ -176,6 +185,70 @@ class TestExtensionToolsMcpShould {
         assertThat(result.getBoolean("isError"), is(true));
         assertThat(text(result), containsString("does not match the schema"));
         assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void refuse_encoded_and_dot_segment_parameter_values_as_the_rest_proxy_does() {
+        for (String value : new String[]{"%61dmin", "a/../b", "%2e%2e"}) {
+            JsonObject result = callTool("ext_mcp-test_get-service", new JsonObject().put("service", value));
+
+            assertThat(value, result.getBoolean("isError"), is(true));
+            assertThat(value, text(result), is("Error: The extension path or query is not allowed"));
+            given().urlEncodingEnabled(false)
+                    .when().get("/api/calm/extensions/mcp-test/api/services/" + ExtensionTools.encode(value))
+                    .then().statusCode(400).body("error", is("The extension path or query is not allowed"));
+        }
+        JsonObject dots = callTool("ext_mcp-test_get-service", new JsonObject().put("service", ".."));
+        assertThat(dots.getBoolean("isError"), is(true));
+        assertThat(text(dots), containsString("must not be . or .."));
+        given().urlEncodingEnabled(false).when().get("/api/calm/extensions/mcp-test/api/services/..").then().statusCode(400);
+        assertThat(backend.received(), nullValue());
+        verifyNoInteractions(mockAuditService);
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void match_a_parameter_value_against_a_protected_literal_route_as_the_rest_proxy_does() {
+        JsonObject result = callTool("ext_mcp-test_get-service", new JsonObject().put("service", "admin"));
+
+        assertThat(result.getBoolean("isError"), is(true));
+        assertThat(text(result), is("Error: You do not have the scope that this extension route needs"));
+        given().when().get("/api/calm/extensions/mcp-test/api/services/admin")
+                .then().statusCode(403).body("error", is("You do not have the scope that this extension route needs"));
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "bob")
+    void audit_a_refused_write_with_the_denied_outcome() {
+        when(mockUserAccessStore.getGrantsForUser("bob")).thenReturn(List.of());
+
+        JsonObject result = callTool("ext_mcp-test_remove-service", new JsonObject().put("namespace", "finos").put("name", "payments"));
+
+        assertThat(result.getBoolean("isError"), is(true));
+        ArgumentCaptor<AuditLogEntry> entry = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(mockAuditService).record(entry.capture());
+        assertThat(entry.getValue().getOutcome(), is(AuditOutcome.DENIED));
+        assertThat(entry.getValue().getRoute(), is("remove-service"));
+        assertThat(entry.getValue().getActor(), is("bob"));
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void audit_a_write_with_the_outcome_of_the_backend() {
+        when(mockUserAccessStore.getGrantsForUser("alice"))
+                .thenReturn(List.of(new UserAccess("alice", UserAccess.Permission.write, "finos")));
+        backend.reply(FixtureBackend.Reply.json(200, "{}"));
+
+        JsonObject result = callTool("ext_mcp-test_remove-service", new JsonObject().put("namespace", "finos").put("name", "payments"));
+
+        assertThat(result.encode(), result.getBoolean("isError", false), is(false));
+        ArgumentCaptor<AuditLogEntry> entry = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(mockAuditService).record(entry.capture());
+        assertThat(entry.getValue().getOutcome(), is(AuditOutcome.SUCCESS));
+        assertThat(entry.getValue().getJti(), notNullValue());
     }
 
     private static JsonArray listTools() {

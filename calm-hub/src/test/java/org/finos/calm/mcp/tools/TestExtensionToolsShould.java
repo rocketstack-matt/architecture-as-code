@@ -95,7 +95,7 @@ class TestExtensionToolsShould {
     @Test
     void name_the_tools_after_the_extension_and_command_sorted_by_name() {
         assertThat(TOOLS.stream().map(ExtensionTools.ExtensionTool::name).toList(),
-                contains("ext_mcp-test_add-service", "ext_mcp-test_list-services", "ext_mcp-test_remove-service",
+                contains("ext_mcp-test_add-service", "ext_mcp-test_get-service", "ext_mcp-test_list-services", "ext_mcp-test_remove-service",
                         "ext_mcp-test_search", "ext_mcp-test_service-names"));
     }
 
@@ -120,14 +120,14 @@ class TestExtensionToolsShould {
         extensionTools.register();
 
         ArgumentCaptor<String> names = ArgumentCaptor.forClass(String.class);
-        verify(toolManager, times(5)).newTool(names.capture());
+        verify(toolManager, times(6)).newTool(names.capture());
         assertThat(names.getAllValues().getFirst(), is("ext_mcp-test_add-service"));
         verify(definition).setDescription("List the services that a namespace owns");
         verify(definition).setTitle("MCP test: list-services");
         verify(definition).setInputSchema(tool("list-services").command().input());
         verify(definition).setOutputSchema(tool("list-services").command().output());
         verify(definition).setOutputSchema(tool("service-names").outputSchema());
-        verify(definition, times(5)).register();
+        verify(definition, times(6)).register();
     }
 
     @Test
