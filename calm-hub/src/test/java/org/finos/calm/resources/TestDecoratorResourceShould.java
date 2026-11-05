@@ -13,12 +13,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.hasItem;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.*;
@@ -515,8 +520,9 @@ public class TestDecoratorResourceShould {
                 "unique-id": "test-decorator-1",
                 "type": "deployment",
                 "target": ["/api/calm/namespaces/finos/architectures/1/versions/1-0-0"],
+                "target-type": ["architecture"],
                 "applies-to": ["web-service"],
-                "data": {"key": "value"}
+                "data": {"start-time": "2026-02-23T10:00:00Z", "status": "completed"}
             }
             """;
 
@@ -575,6 +581,54 @@ public class TestDecoratorResourceShould {
                 .then()
                 .statusCode(400)
                 .body(containsString("namespace must match pattern"));
+    }
+
+    @Test
+    void return_400_with_the_errors_when_a_decorator_does_not_match_a_known_schema() throws Exception {
+        assumeMetaSchemasBuilt();
+        String invalid = VALID_DECORATOR_JSON.replace("\"status\": \"completed\"", "\"status\": \"done\"");
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(invalid)
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body("error", equalTo("Decorator does not match its $schema"))
+                .body("errors.location", hasItem("/data/status"));
+
+        verify(decoratorStore, never()).createDecorator(anyString(), anyString());
+    }
+
+    @Test
+    void accept_a_decorator_with_an_unknown_schema() throws Exception {
+        when(decoratorStore.createDecorator(anyString(), anyString())).thenReturn(2);
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"$schema\": \"https://example.com/my.decorator.json\", \"type\": \"deployment\", \"data\": 1}")
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(201);
+    }
+
+    @Test
+    void return_400_with_the_errors_when_an_update_does_not_match_a_known_schema() throws Exception {
+        assumeMetaSchemasBuilt();
+        String invalid = VALID_DECORATOR_JSON.replace("\"target-type\": [\"architecture\"],", "");
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(invalid)
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(400)
+                .body("errors.size()", greaterThan(0));
+
+        verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
     }
 
     // ---- PUT /api/calm/namespaces/{namespace}/decorators/{id} ----
@@ -733,5 +787,11 @@ public class TestDecoratorResourceShould {
                 .then()
                 .statusCode(400)
                 .body(containsString("ID must be a positive integer"));
+    }
+
+    // -Pserver-only and -Dskip.npm do not copy the meta-schemas that the decorator Standards reference.
+    private static void assumeMetaSchemasBuilt() {
+        assumeTrue(Files.exists(Path.of("target", "classes", "META-INF", "calm-schemas", "1.3", "meta", "decorators.json")),
+                "run a full build (without -Pserver-only or -Dskip.npm) first");
     }
 }

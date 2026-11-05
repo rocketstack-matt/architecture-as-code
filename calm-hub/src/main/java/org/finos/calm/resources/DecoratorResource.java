@@ -1,6 +1,7 @@
 package org.finos.calm.resources;
 
 import io.quarkus.security.PermissionsAllowed;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
@@ -13,8 +14,11 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.finos.calm.domain.ValueWrapper;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
+import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
+import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.security.CalmHubScopes;
+import org.finos.calm.services.DecoratorWriteService;
 import org.finos.calm.store.DecoratorStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,11 +37,15 @@ import static org.finos.calm.resources.ResourceValidationConstants.*;
 public class DecoratorResource {
 
     private final DecoratorStore decoratorStore;
+    private final DecoratorWriteService decoratorWriteService;
+    private final SecurityIdentity identity;
     private final Logger logger = LoggerFactory.getLogger(DecoratorResource.class);
 
     @Inject
-    public DecoratorResource(DecoratorStore decoratorStore) {
+    public DecoratorResource(DecoratorStore decoratorStore, DecoratorWriteService decoratorWriteService, SecurityIdentity identity) {
         this.decoratorStore = decoratorStore;
+        this.decoratorWriteService = decoratorWriteService;
+        this.identity = identity;
     }
 
     /**
@@ -148,7 +156,7 @@ public class DecoratorResource {
             String decoratorJson
     ) throws URISyntaxException {
         try {
-            int id = decoratorStore.createDecorator(namespace, decoratorJson);
+            int id = decoratorWriteService.createDecorator(DecoratorWriteService.principalName(identity), namespace, decoratorJson);
             URI location = new URI("/api/calm/namespaces/" + namespace + "/decorators/" + id);
             return Response.created(location).entity(Map.of("id", id)).build();
         } catch (JsonParseException e) {
@@ -157,6 +165,12 @@ public class DecoratorResource {
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when creating decorator", namespace, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
+        } catch (ReservedDecoratorTypeException e) {
+            logger.warn("Refused a reserved decorator type when creating a decorator in namespace [{}]", namespace);
+            return CalmResourceErrorResponses.reservedDecoratorTypeResponse(e.getType());
+        } catch (DecoratorSchemaValidationException e) {
+            logger.warn("Decorator does not match its $schema when creating a decorator in namespace [{}]", namespace);
+            return CalmResourceErrorResponses.decoratorSchemaValidationResponse(e.getErrors());
         }
     }
 
@@ -183,7 +197,7 @@ public class DecoratorResource {
             String decoratorJson
     ) {
         try {
-            decoratorStore.updateDecorator(namespace, id, decoratorJson);
+            decoratorWriteService.updateDecorator(DecoratorWriteService.principalName(identity), namespace, id, decoratorJson);
             return Response.ok().build();
         } catch (JsonParseException e) {
             logger.error("Invalid JSON when updating decorator [{}] in namespace [{}]", id, namespace, e);
@@ -194,6 +208,12 @@ public class DecoratorResource {
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when updating decorator [{}]", namespace, id, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
+        } catch (ReservedDecoratorTypeException e) {
+            logger.warn("Refused a reserved decorator type when updating decorator [{}] in namespace [{}]", id, namespace);
+            return CalmResourceErrorResponses.reservedDecoratorTypeResponse(e.getType());
+        } catch (DecoratorSchemaValidationException e) {
+            logger.warn("Decorator [{}] in namespace [{}] does not match its $schema when updating", id, namespace);
+            return CalmResourceErrorResponses.decoratorSchemaValidationResponse(e.getErrors());
         }
     }
 
@@ -217,13 +237,16 @@ public class DecoratorResource {
             @PathParam("id") @Min(value = 1, message = "ID must be a positive integer") int id
     ) {
         try {
-            decoratorStore.deleteDecorator(namespace, id);
+            decoratorWriteService.deleteDecorator(DecoratorWriteService.principalName(identity), namespace, id);
         } catch (DecoratorNotFoundException e) {
             logger.error("Decorator [{}] not found in namespace [{}] when deleting", id, namespace, e);
             return CalmResourceErrorResponses.decoratorNotFoundResponse(namespace, id);
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when deleting decorator [{}]", namespace, id, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
+        } catch (ReservedDecoratorTypeException e) {
+            logger.warn("Refused a reserved decorator type when deleting decorator [{}] in namespace [{}]", id, namespace);
+            return CalmResourceErrorResponses.reservedDecoratorTypeResponse(e.getType());
         }
         return Response.noContent().build();
     }

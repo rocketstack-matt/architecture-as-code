@@ -4,13 +4,17 @@ import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkiverse.mcp.server.ToolResponse;
 import io.quarkus.security.PermissionsAllowed;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
+import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
+import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.security.CalmHubScopes;
+import org.finos.calm.services.DecoratorWriteService;
 import org.finos.calm.store.DecoratorStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +42,12 @@ public class DecoratorTools {
 
     @Inject
     DecoratorStore decoratorStore;
+
+    @Inject
+    DecoratorWriteService decoratorWriteService;
+
+    @Inject
+    SecurityIdentity identity;
 
     @PermissionsAllowed(CalmHubScopes.READ)
     @Tool(description = "List decorators in a namespace, optionally filtered by target architecture path and/or type (e.g. 'threat-model', 'deployment').")
@@ -107,7 +117,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID.")
+    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards).")
     public ToolResponse createDecorator(
             @ToolArg(description = "The namespace to create the decorator in") String namespace,
             @ToolArg(description = "The decorator JSON payload (must include $schema, unique-id, type, target, target-type, applies-to, and data fields)") String decoratorJson) {
@@ -120,17 +130,21 @@ public class DecoratorTools {
         if (err.isPresent()) return err.get();
 
         try {
-            int id = decoratorStore.createDecorator(namespace, decoratorJson);
+            int id = decoratorWriteService.createDecorator(DecoratorWriteService.principalName(identity), namespace, decoratorJson);
             logger.info("Decorator created with ID [{}] in namespace [{}]", id, namespace);
             return ToolResponse.success("Decorator created successfully with ID: " + id);
         } catch (NamespaceNotFoundException e) {
             logger.warn("Namespace not found [{}]", namespace, e);
             return ToolResponse.error("Error: Namespace '" + namespace + "' not found.");
+        } catch (ReservedDecoratorTypeException e) {
+            return reservedTypeError(e);
+        } catch (DecoratorSchemaValidationException e) {
+            return schemaError(e);
         }
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation.")
+    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows.")
     public ToolResponse updateDecorator(
             @ToolArg(description = "The namespace containing the decorator") String namespace,
             @ToolArg(description = "The decorator numeric ID to update (positive integer)") int decoratorId,
@@ -146,7 +160,7 @@ public class DecoratorTools {
         if (err.isPresent()) return err.get();
 
         try {
-            decoratorStore.updateDecorator(namespace, decoratorId, decoratorJson);
+            decoratorWriteService.updateDecorator(DecoratorWriteService.principalName(identity), namespace, decoratorId, decoratorJson);
             logger.info("Decorator [{}] updated in namespace [{}]", decoratorId, namespace);
             // Return updated representation so callers can verify the change without a follow-up getDecorator call
             Optional<Decorator> updated = decoratorStore.getDecoratorById(namespace, decoratorId);
@@ -165,6 +179,22 @@ public class DecoratorTools {
         } catch (DecoratorNotFoundException e) {
             logger.warn("Decorator [{}] not found in namespace [{}]", decoratorId, namespace, e);
             return ToolResponse.error("Error: Decorator " + decoratorId + " not found in namespace '" + namespace + "'.");
+        } catch (ReservedDecoratorTypeException e) {
+            return reservedTypeError(e);
+        } catch (DecoratorSchemaValidationException e) {
+            return schemaError(e);
         }
+    }
+
+    private static ToolResponse reservedTypeError(ReservedDecoratorTypeException e) {
+        logger.warn("Refused a write of reserved decorator type");
+        return ToolResponse.error("Error: Decorator type '" + e.getType() + "' is reserved and the caller may not write it.");
+    }
+
+    private static ToolResponse schemaError(DecoratorSchemaValidationException e) {
+        StringBuilder sb = new StringBuilder("Error: Decorator does not match its $schema:\n");
+        e.getErrors().forEach(error -> sb.append("- ").append(error.location().isEmpty() ? "(root)" : error.location())
+                .append(": ").append(error.error()).append("\n"));
+        return ToolResponse.error(sb.toString());
     }
 }

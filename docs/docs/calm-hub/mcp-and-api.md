@@ -103,6 +103,26 @@ A snapshot cannot be created if its release version is already published — CAL
 
 Snapshots are written through the name-based `/calm/...` API only. The numeric `/api/calm/...` write endpoints reject a `-SNAPSHOT` version; their `GET` endpoints can read one.
 
+### Decorator Write Rules
+
+The decorator endpoints (`/api/calm/namespaces/{namespace}/decorators`) and the MCP decorator tools apply the same rules on write.
+
+| Rule | When | Status |
+|:-----|:-----|:-------|
+| Reserved type | The old or new decorator `type` is reserved, and the caller is not one of its writers. Applies to create, update and delete | `403` |
+| Schema check | The decorator `$schema` is one that Hub knows, and the decorator does not match it. The body lists each error with its `location` (a JSON Pointer) | `400` |
+
+Hub knows the calm-schema decorator Standards that it bundles (`deployment`, `kubernetes`, `control-evaluation`) and the base decorator definition (`https://calm.finos.org/release/<version>/meta/decorators.json#/defs/decorator`). Hub accepts a decorator with any other `$schema` without a check.
+
+No type is reserved by default. Reserve a type in `application.properties`:
+
+```properties
+calm.decorators.reserved."validation".writers=system
+calm.decorators.reserved."control-evaluation".writers=policy-engine
+```
+
+A writer is a principal name, the same name that the audit log records for the caller.
+
 ### Access Control
 
 Endpoints are protected by **per-namespace permissions**. Access is granted via `UserAccess` records stored in the active backend; each record ties a username to a permission level for a specific namespace or control domain.
