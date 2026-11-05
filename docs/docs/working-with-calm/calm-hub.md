@@ -224,3 +224,5 @@ Selecting a control from a **Control Domain** (e.g. `security` or `ai-governance
 ## Access Control
 
 CALM Hub uses a hierarchical entitlement model to control who can read, write, and administer namespaces. See [CALM Hub Entitlements](./calm-hub-entitlements) for the full model, worked examples, and API usage.
+
+For Tier 1 extension routes and JSON blocks, see the [blocks author guide](hub-extension-blocks.md).
