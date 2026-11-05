@@ -83,6 +83,7 @@ class TestExtensionToolsMcpShould {
                 "ext_mcp-test_remove-service", "ext_mcp-test_search")));
         JsonObject list = find(tools, "ext_mcp-test_list-services");
         assertThat(list.getString("description"), is("List the services that a namespace owns"));
+        assertThat(list.getString("title"), is("MCP test: list-services"));
         assertThat(list.getJsonObject("inputSchema").getJsonArray("required"), is(new JsonArray().add("namespace")));
         assertThat(list.getJsonObject("outputSchema").getString("type"), is("object"));
         assertThat(list.getJsonObject("annotations").getBoolean("readOnlyHint"), is(true));
@@ -103,6 +104,7 @@ class TestExtensionToolsMcpShould {
 
         assertThat(result.encode(), result.getBoolean("isError", false), is(false));
         assertThat(result.getJsonObject("structuredContent").getJsonArray("services"), is(new JsonArray().add("payments")));
+        assertThat(new JsonObject(text(result)), is(result.getJsonObject("structuredContent")));
         FixtureBackend.Received received = backend.received();
         assertThat(received.method(), is("GET"));
         assertThat(received.pathAndQuery(), is("/namespaces/finos/services?limit=2"));

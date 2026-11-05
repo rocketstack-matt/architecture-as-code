@@ -1,5 +1,6 @@
 package org.finos.calm.mcp.tools;
 
+import io.quarkiverse.mcp.server.TextContent;
 import io.quarkiverse.mcp.server.ToolManager;
 import io.quarkiverse.mcp.server.ToolResponse;
 import io.quarkus.runtime.StartupEvent;
@@ -54,8 +55,8 @@ public class ExtensionTools {
     private static final String INPUT_SCHEMA_BASE = "https://calm.finos.org/calm-hub/extensions/";
 
     /** One command with what its handler needs. */
-    record ExtensionTool(String name, String extensionId, String commandName, ExtensionManifest.Command command,
-                         ExtensionManifest.Route route, InputSchema inputSchema) {
+    record ExtensionTool(String name, String extensionId, String extensionName, String commandName,
+                         ExtensionManifest.Command command, ExtensionManifest.Route route, InputSchema inputSchema) {
 
         boolean readOnly() {
             return "GET".equals(route.method()) || route.readOnly();
@@ -88,7 +89,7 @@ public class ExtensionTools {
         for (ExtensionTool tool : tools) {
             ExtensionManifest.Command command = tool.command();
             ToolManager.ToolDefinition definition = toolManager.newTool(tool.name())
-                    .setTitle(tool.extensionId() + ": " + tool.commandName())
+                    .setTitle(tool.extensionName() + ": " + tool.commandName())
                     .setDescription(command.description())
                     .setInputSchema(command.input())
                     .setAnnotations(annotations(tool))
@@ -114,8 +115,8 @@ public class ExtensionTools {
                 ExtensionManifest.Route route = manifest.route(command.route())
                         .orElseThrow(() -> new IllegalStateException("Extension " + manifest.id() + " command '"
                                 + name + "' names route '" + command.route() + "', which is not declared"));
-                tools.add(new ExtensionTool(ExtensionManifestLoader.toolName(manifest.id(), name), manifest.id(), name,
-                        command, route, InputSchema.of(manifest.id(), name, command.input())));
+                tools.add(new ExtensionTool(ExtensionManifestLoader.toolName(manifest.id(), name), manifest.id(),
+                        manifest.name(), name, command, route, InputSchema.of(manifest.id(), name, command.input())));
             });
         }
         tools.sort(Comparator.comparing(ExtensionTool::name));
@@ -224,7 +225,8 @@ public class ExtensionTools {
             return ToolResponse.success(body);
         }
         try {
-            return ToolResponse.structuredSuccess(new JsonObject(body).getMap());
+            // Clients that do not read structuredContent get the same JSON as text.
+            return new ToolResponse(false, List.of(new TextContent(body)), new JsonObject(body).getMap(), null);
         } catch (DecodeException | ClassCastException e) {
             logger.warn("Extension {} command {} replied with no JSON object, but declares an output schema",
                     tool.extensionId(), tool.commandName());

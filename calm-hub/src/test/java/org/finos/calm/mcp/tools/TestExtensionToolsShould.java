@@ -122,6 +122,7 @@ class TestExtensionToolsShould {
         verify(toolManager, times(4)).newTool(names.capture());
         assertThat(names.getAllValues().getFirst(), is("ext_mcp-test_add-service"));
         verify(definition).setDescription("List the services that a namespace owns");
+        verify(definition).setTitle("MCP test: list-services");
         verify(definition).setInputSchema(tool("list-services").command().input());
         verify(definition).setOutputSchema(tool("list-services").command().output());
         verify(definition, times(4)).register();
@@ -259,6 +260,7 @@ class TestExtensionToolsShould {
 
         assertThat(response.isError(), is(false));
         assertThat(response.structuredContent(), is(Map.of("services", List.of("a"))));
+        assertThat(text(response), is("{\"services\":[\"a\"]}"));
         ArgumentCaptor<ExtensionProxyRequest> request = ArgumentCaptor.forClass(ExtensionProxyRequest.class);
         verify(proxyService).call(same(identity), request.capture());
         assertThat(request.getValue().path(), is("/namespaces/finos/services"));
