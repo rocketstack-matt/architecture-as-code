@@ -441,6 +441,32 @@ describe('Drawer — decorator fetching', () => {
         });
         expect(mockFetchDeploymentDecoratorsForArchitecture).not.toHaveBeenCalled();
     });
+
+    it('does not show externally provided decorators for a dropped file', async () => {
+        const decorators = [{ uniqueId: 'dec-1', type: 'deployment', target: [], appliesTo: ['node-a'], data: {} }];
+        render(<Drawer data={architectureData} decorators={decorators as never} />);
+        expect(screen.getByTestId('metadata-panel')).toHaveTextContent('decorators:1');
+
+        await act(async () => {
+            await mockDropzone.onDrop?.([fakeFile(JSON.stringify({ nodes: [], relationships: [] }))]);
+        });
+
+        expect(screen.queryByTestId('metadata-panel')).not.toBeInTheDocument();
+    });
+
+    it('reports whether a dropped file replaces the loaded resource, and false on unmount', async () => {
+        const onDroppedFileChange = vi.fn();
+        const { unmount } = render(<Drawer data={architectureData} onDroppedFileChange={onDroppedFileChange} />);
+        expect(onDroppedFileChange).toHaveBeenLastCalledWith(false);
+
+        await act(async () => {
+            await mockDropzone.onDrop?.([fakeFile(JSON.stringify({ nodes: [], relationships: [] }))]);
+        });
+        expect(onDroppedFileChange).toHaveBeenLastCalledWith(true);
+
+        unmount();
+        expect(onDroppedFileChange).toHaveBeenLastCalledWith(false);
+    });
 });
 
 /** jsdom's document is always visible; tests override the getter to simulate a background tab. */
