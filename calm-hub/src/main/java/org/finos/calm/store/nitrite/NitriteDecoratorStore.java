@@ -170,28 +170,34 @@ public class NitriteDecoratorStore implements DecoratorStore {
     public void updateDecorator(String namespace, int id, String decoratorJson) throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
-        Document namespaceDoc = fetchNamespaceDocument(namespace);
-        if (namespaceDoc == null) {
-            throw new DecoratorNotFoundException();
+        lock.lock();
+        try {
+            Document namespaceDoc = fetchNamespaceDocument(namespace);
+            if (namespaceDoc == null) {
+                throw new DecoratorNotFoundException();
+            }
+
+            TypeSafeNitriteDocument<Document> typeSafeDoc = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class);
+            List<Document> decorators = typeSafeDoc.getList(DECORATORS_FIELD);
+            if (decorators == null) {
+                throw new DecoratorNotFoundException();
+            }
+
+            Document updatedDoc = parseJsonToNitriteDocument(decoratorJson);
+
+            decorators.stream()
+                    .filter(decoratorEntry -> decoratorEntry.get(SUPERSEDED_BY_FIELD) == null)
+                    .filter(decoratorEntry -> Integer.valueOf(id).equals(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)))
+                    .findFirst()
+                    .orElseThrow(DecoratorNotFoundException::new)
+                    .put("decorator", updatedDoc);
+
+            namespaceDoc.put(DECORATORS_FIELD, decorators);
+            decoratorCollection.update(namespaceDoc);
+            LOG.debug("Updated decorator with ID {} in namespace '{}'", id, namespace);
+        } finally {
+            lock.unlock();
         }
-
-        TypeSafeNitriteDocument<Document> typeSafeDoc = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class);
-        List<Document> decorators = typeSafeDoc.getList(DECORATORS_FIELD);
-        if (decorators == null) {
-            throw new DecoratorNotFoundException();
-        }
-
-        Document updatedDoc = parseJsonToNitriteDocument(decoratorJson);
-
-        decorators.stream()
-                .filter(decoratorEntry -> Integer.valueOf(id).equals(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)))
-                .findFirst()
-                .orElseThrow(DecoratorNotFoundException::new)
-                .put("decorator", updatedDoc);
-
-        namespaceDoc.put(DECORATORS_FIELD, decorators);
-        decoratorCollection.update(namespaceDoc);
-        LOG.debug("Updated decorator with ID {} in namespace '{}'", id, namespace);
     }
 
     @Override

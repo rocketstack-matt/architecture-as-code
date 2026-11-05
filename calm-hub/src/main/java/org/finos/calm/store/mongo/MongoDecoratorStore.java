@@ -140,7 +140,8 @@ public class MongoDecoratorStore implements DecoratorStore {
         Document parsedDecorator = Document.parse(decoratorJson);
 
         long modified = decoratorCollection.updateOne(
-                Filters.and(Filters.eq("namespace", namespace), Filters.eq("decorators.decoratorId", id)),
+                Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
+                        Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false)))),
                 Updates.set("decorators.$.decorator", parsedDecorator)
         ).getModifiedCount();
 
@@ -159,11 +160,24 @@ public class MongoDecoratorStore implements DecoratorStore {
         Document parsedDecorator = Document.parse(decoratorJson);
         int newId = counterStore.getNextDecoratorSequenceValue();
 
-        // Marking the old decorator first, only if it is still current, lets one of two concurrent updates win.
+        // Replace the links and append the successor in one atomic namespace-document update.
+        Document successor = new Document(DECORATOR_ID_FIELD, newId)
+                .append("decorator", parsedDecorator)
+                .append(SUPERSEDES_FIELD, id);
+        Document marked = new Document("$map", new Document("input", "$decorators")
+                .append("as", "entry")
+                .append("in", new Document("$cond", List.of(
+                        new Document("$eq", List.of("$$entry.decoratorId", id)),
+                        new Document("$mergeObjects", List.of("$$entry",
+                                new Document(SUPERSEDED_BY_FIELD, newId))),
+                        "$$entry"))));
+        List<Document> update = List.of(new Document("$set", new Document("decorators",
+                new Document("$concatArrays", List.of(marked,
+                        new Document("$literal", List.of(successor)))))));
         long modified = decoratorCollection.updateOne(
                 Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
                         Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false)))),
-                Updates.set("decorators.$." + SUPERSEDED_BY_FIELD, newId)
+                update
         ).getModifiedCount();
 
         if (modified == 0) {
@@ -172,13 +186,6 @@ public class MongoDecoratorStore implements DecoratorStore {
             }
             throw new DecoratorNotFoundException();
         }
-
-        decoratorCollection.updateOne(
-                Filters.eq("namespace", namespace),
-                Updates.push("decorators", new Document(DECORATOR_ID_FIELD, newId)
-                        .append("decorator", parsedDecorator)
-                        .append(SUPERSEDES_FIELD, id))
-        );
 
         LOG.debug("Decorator with ID {} supersedes decorator {} in namespace '{}'", newId, id, namespace);
         return newId;

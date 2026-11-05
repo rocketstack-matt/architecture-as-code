@@ -4,6 +4,7 @@ import io.quarkus.security.identity.SecurityIdentity;
 import org.bson.json.JsonParseException;
 import org.finos.calm.config.DecoratorConfig;
 import org.finos.calm.domain.Decorator;
+import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
@@ -106,10 +107,10 @@ class TestDecoratorWriteServiceShould {
 
     @Test
     void check_the_reserved_type_before_the_schema() {
-        when(mockSchemaValidator.validate(any())).thenReturn(List.of(new DecoratorSchemaError("", "bad")));
-
         assertThrows(ReservedDecoratorTypeException.class,
                 () -> service.createDecorator("alice", NAMESPACE, RESERVED_JSON));
+
+        verifyNoInteractions(mockSchemaValidator);
     }
 
     @ParameterizedTest
@@ -161,6 +162,18 @@ class TestDecoratorWriteServiceShould {
     }
 
     @Test
+    void refuse_updating_an_unreserved_entry_that_has_been_superseded() throws Exception {
+        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
+        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
+
+        assertThrows(DecoratorSupersededException.class,
+                () -> service.updateDecorator("alice", NAMESPACE, 1, UNRESERVED_JSON));
+
+        verify(mockDecoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
     void refuse_an_update_of_a_reserved_decorator_from_another_principal() throws Exception {
         when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
 
@@ -202,6 +215,18 @@ class TestDecoratorWriteServiceShould {
         when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
 
         assertThrows(ReservedDecoratorTypeException.class, () -> service.deleteDecorator("alice", NAMESPACE, 1));
+        verify(mockDecoratorStore, never()).deleteDecorator(anyString(), anyInt());
+    }
+
+    @Test
+    void refuse_deleting_reserved_history_through_an_unreserved_entry() throws Exception {
+        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
+        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(2, 1, null, decorator("control-evaluation")),
+                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
+
+        assertThrows(ReservedDecoratorTypeException.class, () -> service.deleteDecorator("alice", NAMESPACE, 1));
+
         verify(mockDecoratorStore, never()).deleteDecorator(anyString(), anyInt());
     }
 

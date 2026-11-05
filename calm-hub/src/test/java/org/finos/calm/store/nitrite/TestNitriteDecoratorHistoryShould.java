@@ -85,6 +85,17 @@ class TestNitriteDecoratorHistoryShould {
     }
 
     @Test
+    void refuse_an_in_place_update_of_a_superseded_entry() throws Exception {
+        store.createDecorator(NAMESPACE, decorator("first"));
+        store.supersedeDecorator(NAMESPACE, 1, decorator("second"));
+
+        assertThrows(DecoratorNotFoundException.class,
+                () -> store.updateDecorator(NAMESPACE, 1, decorator("changed")));
+
+        assertThat(store.getDecoratorById(NAMESPACE, 1).orElseThrow().getUniqueId(), is("first"));
+    }
+
+    @Test
     void throw_decorator_not_found_when_superseding_a_missing_decorator() throws Exception {
         assertThrows(DecoratorNotFoundException.class,
                 () -> store.supersedeDecorator(NAMESPACE, 1, decorator("first")));

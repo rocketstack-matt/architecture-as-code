@@ -34,6 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
@@ -831,18 +833,23 @@ class TestMongoDecoratorStoreShould {
         when(counterStore.getNextDecoratorSequenceValue()).thenReturn(5);
         UpdateResult updateResult = mock(UpdateResult.class);
         when(updateResult.getModifiedCount()).thenReturn(1L);
-        ArgumentCaptor<Bson> updates = ArgumentCaptor.forClass(Bson.class);
-        when(decoratorCollection.updateOne(any(Bson.class), updates.capture())).thenReturn(updateResult);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
 
         int newId = decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}");
 
         assertEquals(5, newId);
-        BsonDocument mark = updates.getAllValues().get(0).toBsonDocument();
-        assertEquals(5, mark.getDocument("$set").getInt32("decorators.$.supersededBy").getValue());
-        BsonDocument pushed = updates.getAllValues().get(1).toBsonDocument().getDocument("$push").getDocument("decorators");
-        assertEquals(5, pushed.getInt32("decoratorId").getValue());
-        assertEquals(1, pushed.getInt32("supersedes").getValue());
-        assertEquals("control-evaluation", pushed.getDocument("decorator").getString("type").getValue());
+        verify(decoratorCollection).updateOne(any(Bson.class), argThat((List<? extends Bson> pipeline) -> {
+            BsonDocument stage = pipeline.getFirst().toBsonDocument();
+            var arrays = stage.getDocument("$set").getDocument("decorators").getArray("$concatArrays");
+            BsonDocument pushed = arrays.get(1).asDocument().getArray("$literal").getFirst().asDocument();
+            assertEquals(5, pushed.getInt32("decoratorId").getValue());
+            assertEquals(1, pushed.getInt32("supersedes").getValue());
+            assertEquals("control-evaluation", pushed.getDocument("decorator").getString("type").getValue());
+            assertEquals(5, arrays.getFirst().asDocument().getDocument("$map").getDocument("in")
+                    .getArray("$cond").get(1).asDocument().getArray("$mergeObjects").get(1)
+                    .asDocument().getInt32("supersededBy").getValue());
+            return true;
+        }));
     }
 
     @Test
@@ -850,13 +857,13 @@ class TestMongoDecoratorStoreShould {
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
         UpdateResult updateResult = mock(UpdateResult.class);
         when(updateResult.getModifiedCount()).thenReturn(0L);
-        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
         mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1));
 
         assertThrows(DecoratorSupersededException.class,
                 () -> decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}"));
 
-        verify(decoratorCollection, times(1)).updateOne(any(Bson.class), any(Bson.class));
+        verify(decoratorCollection, times(1)).updateOne(any(Bson.class), anyList());
     }
 
     @Test
@@ -864,7 +871,7 @@ class TestMongoDecoratorStoreShould {
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
         UpdateResult updateResult = mock(UpdateResult.class);
         when(updateResult.getModifiedCount()).thenReturn(0L);
-        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
         mockNamespaceDocument("finos", currentEntry(2, null));
 
         assertThrows(DecoratorNotFoundException.class,
