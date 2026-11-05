@@ -117,10 +117,20 @@ When you select an **Architecture** or **Pattern** artifact, CALM Hub renders th
 
 * **Diagram Tab:** The interactive visual representation of the model.
 * **JSON Tab:** The raw, validated CALM JSON backing the diagram.
-* **Deployments Tab:** Overlays deployment decorators (environments, hosts, and instance settings) on top of the base architecture.
 * **Decorators Tab:** Lists all decorators of the architecture version, of every type. Each shows its type (or "(no type)"), `applies-to`, its created and updated times when Hub returns them, and `data`, with links, dates, lists, tables and collapsible nested values, or as raw JSON. Filter by type. The filter is in the URL, for example `?tab=decorators&type=deployment`.
 
-An unknown `?tab=` value opens the Diagram tab.
+An unknown `?tab=` value opens the Diagram tab. The old `?tab=deployments` link opens the Decorators tab filtered to `deployment`.
+
+### Decorator Overlays
+
+Some decorator types are drawn on the diagram as an overlay. Each node or relationship gets a badge with its status, and a status that needs attention also colours the element: red for an error, amber for a warning. CALM Hub draws two overlays:
+
+| Overlay | Decorator type | Shows |
+|---|---|---|
+| Control evaluations | `control-evaluation` | The latest result of each control: see [Control Evaluations](#control-evaluations) |
+| Deployments | `deployment` | The status of the latest deployment, by `start-time`: completed (OK), pending or in progress (Info), rolled back (Warning), failed (Error) |
+
+The legend at the bottom of the diagram lists each overlay that has decorators on screen, with how many elements show each status. Clear an overlay's checkbox to hide it. **View all** opens the Decorators tab filtered to that type. While the architecture is open, the overlays refresh every 5 seconds.
 
 ![CALM Hub Raw JSON Viewer](/img/hub-ui/json-view.png)
 
@@ -135,7 +145,7 @@ The diagram shows the latest result for each node and relationship of the versio
 * **Containers:** A container (a node that other nodes are `deployed-in` or `composed-of`) shows the same badge beside its label, and a solid red border when not met. A `deployed-in` or `composed-of` relationship is drawn as its container rather than as a line, so its results show on the container.
 * **Evaluations panel:** The metadata panel below the diagram lists every evaluation of the version, newest first, with the elements it applies to and its findings.
 
-While the architecture is open, the results refresh every 5 seconds, so a new decision appears without reloading the page.
+The results refresh every 5 seconds, so a new decision appears without reloading the page.
 
 ![CALM Hub Control Evaluations](/img/hub-ui/control-evaluations.png)
 

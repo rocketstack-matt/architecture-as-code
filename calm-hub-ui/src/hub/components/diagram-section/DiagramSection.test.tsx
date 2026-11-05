@@ -51,10 +51,12 @@ vi.mock('../../../visualizer/components/drawer/Drawer.js', () => ({
         data,
         onPositionsChange,
         onDroppedFileChange,
+        onOpenView,
     }: {
         data: Data;
         onPositionsChange?: (positions: { id: string; position: { x: number; y: number } }[]) => void;
         onDroppedFileChange?: (dropped: boolean) => void;
+        onOpenView?: (view: { id: string; label: string; match: { type?: string; schema?: string } }) => void;
     }) => (
         <div data-testid="drawer">
             Drawer for {data.id}
@@ -64,6 +66,12 @@ vi.mock('../../../visualizer/components/drawer/Drawer.js', () => ({
                 simulate-drag-report
             </button>
             <button onClick={() => onDroppedFileChange?.(true)}>simulate-file-drop</button>
+            <button onClick={() => onOpenView?.({ id: 'deployment', label: 'Deployments', match: { type: 'deployment' } })}>
+                simulate-open-view
+            </button>
+            <button onClick={() => onOpenView?.({ id: 'scan', label: 'Scans', match: { schema: 'https://example.org/scan.json' } })}>
+                simulate-open-schema-view
+            </button>
         </div>
     ),
 }));
@@ -481,11 +489,30 @@ describe('DiagramSection', () => {
             expect(await screen.findByText('Could not load decorators.')).toBeInTheDocument();
         });
 
-        it('shows only deployment decorators on the Deployments tab', async () => {
+        it('redirects the old Deployments tab to the Decorators tab filtered to deployment', async () => {
             renderArchitecture('/?tab=deployments');
 
+            expect(screen.getByRole('tab', { name: 'Decorators' }).className).toContain('tab-active');
+            await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('?tab=decorators&type=deployment'));
             expect(await screen.findByText(/dep-1/)).toBeInTheDocument();
             expect(screen.queryByText(/obs-1/)).not.toBeInTheDocument();
+        });
+
+        it('opens the Decorators tab filtered to a view from the overlay legend', async () => {
+            const user = userEvent.setup();
+            renderArchitecture();
+
+            await user.click(screen.getByText('simulate-open-view'));
+            expect(screen.getByTestId('location')).toHaveTextContent('?tab=decorators&type=deployment');
+            expect(await screen.findByText(/dep-1/)).toBeInTheDocument();
+        });
+
+        it('opens the unfiltered Decorators tab for a view that matches on $schema', async () => {
+            const user = userEvent.setup();
+            renderArchitecture();
+
+            await user.click(screen.getByText('simulate-open-schema-view'));
+            expect(screen.getByTestId('location')).toHaveTextContent(/^\?tab=decorators$/);
         });
 
         it('offers the tab in the mobile view menu, selected when active', async () => {
@@ -666,7 +693,8 @@ describe('DiagramSection', () => {
 
             expect(screen.getByRole('tab', { name: /diagram/i })).toBeInTheDocument();
             expect(screen.getByRole('tab', { name: /json/i })).toBeInTheDocument();
-            expect(screen.getByRole('tab', { name: /deployments/i })).toBeInTheDocument();
+            expect(screen.getByRole('tab', { name: 'Decorators' })).toBeInTheDocument();
+            expect(screen.queryByRole('tab', { name: /deployments/i })).not.toBeInTheDocument();
         });
 
         it('paints the active view tab with the redesign brand blue, not the old accent (#8)', () => {
@@ -682,36 +710,6 @@ describe('DiagramSection', () => {
             const activeTab = screen.getByRole('tab', { name: /diagram/i });
             expect(activeTab).toHaveClass('!bg-[var(--color-interaction)]');
             expect(activeTab.className).not.toContain('bg-accent');
-        });
-
-        it('renders Deployments tab only for architectures, not patterns', () => {
-            const { rerender } = render(
-                <MemoryRouter>
-                    <DiagramSection data={architectureData} />
-                </MemoryRouter>
-            );
-            expect(screen.getByRole('tab', { name: /deployments/i })).toBeInTheDocument();
-
-            rerender(
-                <MemoryRouter>
-                    <DiagramSection data={patternData} />
-                </MemoryRouter>
-            );
-            expect(screen.queryByRole('tab', { name: /deployments/i })).not.toBeInTheDocument();
-        });
-
-        it('switches to Deployments tab when clicked', async () => {
-            const user = userEvent.setup();
-            render(
-                <MemoryRouter>
-                    <DiagramSection data={architectureData} />
-                </MemoryRouter>
-            );
-
-            await user.click(screen.getByRole('tab', { name: /deployments/i }));
-
-            expect(screen.queryByTestId('drawer')).not.toBeInTheDocument();
-            expect(screen.queryByTestId('monaco-editor')).not.toBeInTheDocument();
         });
 
         it('shows diagram tab by default', () => {
@@ -950,7 +948,7 @@ describe('DiagramSection', () => {
             );
 
             await user.click(screen.getByRole('button', { name: /view options/i }));
-            // Opening reveals the view-mode list (Diagram / JSON / Deployments rows).
+            // Opening reveals the view-mode list (Diagram / JSON / Decorators rows).
             expect(screen.getByRole('button', { name: /close view options/i })).toBeInTheDocument();
             restore();
         });

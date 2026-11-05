@@ -1,5 +1,4 @@
-import { IoCodeOutline, IoEyeOutline, IoGitNetworkOutline, IoPricetagsOutline, IoRocketOutline } from 'react-icons/io5';
-import { DeploymentPanel } from '../../../../visualizer/components/reactflow/DeploymentPanel.js';
+import { IoCodeOutline, IoEyeOutline, IoGitNetworkOutline, IoPricetagsOutline } from 'react-icons/io5';
 import { JsonRenderer } from '../../json-renderer/JsonRenderer.js';
 import { DecoratorsPanel } from '../decorators/DecoratorsPanel.js';
 import { UsedByPanel } from '../used-by/UsedByPanel.js';
@@ -8,6 +7,11 @@ import { DEFAULT_DIAGRAM_TAB_ID, type DiagramTab } from './diagramTabRegistry.js
 
 /** The `?tab=decorators` query parameter that filters by decorator type. */
 export const DECORATOR_TYPE_PARAM = 'type';
+
+/** Old `?tab=` values, and the query that replaces each. Deployments became a decorator view. */
+export const DIAGRAM_TAB_REDIRECTS: Readonly<Record<string, Record<string, string>>> = {
+    deployments: { tab: 'decorators', [DECORATOR_TYPE_PARAM]: 'deployment' },
+};
 
 /** The tabs of the diagram section, in display order. */
 export const DIAGRAM_TABS: readonly DiagramTab[] = [
@@ -24,17 +28,6 @@ export const DIAGRAM_TABS: readonly DiagramTab[] = [
         render: ({ data }) => (
             <div className="h-full bg-base-200 overflow-auto">
                 <JsonRenderer json={data} />
-            </div>
-        ),
-    },
-    {
-        id: 'deployments',
-        label: 'Deployments',
-        icon: IoRocketOutline,
-        isVisible: ({ isArchitecture }) => isArchitecture,
-        render: ({ deploymentDecorators }) => (
-            <div className="h-full bg-base-200 overflow-auto p-4">
-                <DeploymentPanel decorators={deploymentDecorators} />
             </div>
         ),
     },
