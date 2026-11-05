@@ -830,8 +830,9 @@ class TestMongoDecoratorStoreShould {
 
         BsonDocument current = filter.getValue().toBsonDocument().getArray("$and").get(1)
                 .asDocument().getDocument("decorators").getDocument("$elemMatch");
-        assertEquals(1, current.getInt32("decoratorId").getValue());
-        assertEquals(false, current.getDocument("supersededBy").getBoolean("$exists").getValue());
+        assertEquals(1, current.getArray("$and").getFirst().asDocument().getInt32("decoratorId").getValue());
+        assertEquals(false, current.getArray("$and").get(1).asDocument()
+                .getDocument("supersededBy").getBoolean("$exists").getValue());
     }
 
     @Test
