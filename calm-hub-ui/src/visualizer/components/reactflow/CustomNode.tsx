@@ -21,11 +21,13 @@ import { extractId, extractNodeType, isNavigableArch, resolveDetailedArchitectur
 import { THEME, getNodeTypeColor, getRiskLevelColor } from './theme.js';
 import type { RiskItem, MitigationItem, ControlItem } from '../../contracts/contracts.js';
 import { useDiagramActions } from '../../context/DiagramActionsContext.js';
-import { useElementEvaluation } from '../../context/ControlEvaluationContext.js';
+import { useElementEvaluation, useElementOverlays } from '../../context/DecoratorOverlayContext.js';
 import { usableColor } from './utils/usableColor.js';
 import { usePresentationMode, type PresentationModeStore } from '../../../theme/usePresentationMode.js';
 import { FindingText } from './FindingText.js';
-import { EvaluationBadge } from './EvaluationBadge.js';
+import { OverlayBadge } from './overlay/OverlayBadge.js';
+import { overlayOutline } from './overlay/overlayStyle.js';
+import { worstStatus } from '../../overlay/overlayEngine.js';
 import { useDecisionOverlay } from '../../context/DecisionOverlayContext.js';
 import { decisionSummary } from './utils/decisionSummary.js';
 import { DecisionCallout } from './DecisionCallout.js';
@@ -133,8 +135,9 @@ function CustomNodeComponent({ id, data, presentationStore }: CustomNodeProps) {
     const size = presenting
         ? { width: '320px', padding: '20px', text: '24px', icon: '24px', zoomIcon: '26px', badgeText: '18px', badgeIcon: '18px', badgePadding: '3px 8px' }
         : { width: '220px', padding: '16px', text: '14px', icon: '16px', zoomIcon: '20px', badgeText: '12px', badgeIcon: '12px', badgePadding: '2px 6px' };
+    const overlays = useElementOverlays(data['unique-id']);
+    const outline = overlayOutline(worstStatus(overlays.map(({ overlay }) => overlay.status)));
     const evaluation = useElementEvaluation(data['unique-id']);
-    const evaluationNotMet = evaluation?.status === 'not-met';
     const { showDecisions, subjectLabels } = useDecisionOverlay();
     const summary = showDecisions && evaluation
         ? decisionSummary(evaluation, { elementId: data['unique-id'], subjectLabel: (id) => subjectLabels.get(id) })
@@ -202,8 +205,8 @@ function CustomNodeComponent({ id, data, presentationStore }: CustomNodeProps) {
         style={{
           background: blockBackground ?? THEME.colors.card,
           // The AIGF risk colour outranks the block style so a risky node stays flagged
-          border: evaluationNotMet
-            ? `3px solid ${THEME.colors.error}`
+          border: outline
+            ? `3px solid ${outline}`
             : `2px solid ${riskLevel ? borderColor : (blockBackground ?? borderColor)}`,
           borderRadius: '12px',
           padding: size.padding,
@@ -230,9 +233,9 @@ function CustomNodeComponent({ id, data, presentationStore }: CustomNodeProps) {
             </div>
           )}
         </div>
-        {(riskCount > 0 || mitigationCount > 0 || controlCount > 0 || evaluation) && (
+        {(riskCount > 0 || mitigationCount > 0 || controlCount > 0 || overlays.length > 0) && (
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            {evaluation && <EvaluationBadge status={evaluation.status} presenting={presenting} />}
+            {overlays.map((shown) => <OverlayBadge key={shown.view.id} shown={shown} presenting={presenting} />)}
             {riskCount > 0 && (
               <div
                 style={{

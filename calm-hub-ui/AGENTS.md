@@ -174,6 +174,16 @@ code, so that it can move to a package that the VS Code extension shares. The UI
 under the diagram). Hub gets the decorators from `DiagramSection` (`onDecoratorsChange`) and gives
 them to the details drawer through `DecoratorsContext`.
 
+### Decorator overlays
+
+One engine (`visualizer/overlay/`) draws decorators on the diagram from `decorator-views` entries that have an
+`overlay` (types in `visualizer/contracts/decorator-view-contracts.ts`). Status values map to the fixed scale
+`ok`, `warn`, `error`, `info`. The built-in views for `control-evaluation` and `deployment` are constants in
+`overlay/decoratorViews.ts`; `useDecoratorViews()` is the one place to swap them for the registry. `Drawer` polls
+each view's decorator type every 5 s and gives the result to the diagram through `DecoratorOverlayContext`. Nodes and
+edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
+Evaluations panel read control-evaluation fields, so they stay tied to that view id.
+
 ### Operator UI config
 
 `UiConfigProvider` (`components/ui-config/`) loads `GET /api/calm/ui/config` one time.

@@ -25,7 +25,7 @@ import { computeChanges, type VersionChange } from './timeline/perVersionChanges
 import { fetchVersionData, fetchVersionList } from './compare/compareData.js';
 import { CalmService } from '../../../service/calm-service.js';
 import { colors } from '../../../theme/colors.js';
-import type { Decorator, DeploymentDecorator, SelectedItem } from '../../../visualizer/contracts/contracts.js';
+import type { Decorator, DecoratorView, SelectedItem } from '../../../visualizer/contracts/contracts.js';
 import { useDefaultLayout } from '../../hooks/useDefaultLayout.js';
 import { loadStoredNodePositions, type StoredNodePosition } from '../../../visualizer/services/node-position-service.js';
 import { useUserAccess } from '../../../admin/context/UserAccessContext.js';
@@ -33,11 +33,12 @@ import { IoSaveOutline, IoRefreshOutline } from 'react-icons/io5';
 import { PatternImplementationService } from '../../../service/pattern-implementation-service.js';
 import { usePatternImplementations } from './used-by/usePatternImplementations.js';
 import { useArchitectureDecorators } from './decorators/useArchitectureDecorators.js';
-import { DIAGRAM_TABS } from './tabs/diagramTabs.js';
+import { DECORATOR_TYPE_PARAM, DIAGRAM_TAB_REDIRECTS, DIAGRAM_TABS } from './tabs/diagramTabs.js';
 import {
     DEFAULT_DIAGRAM_TAB_ID,
     diagramTabLabel,
     diagramTabQuery,
+    redirectedTabQuery,
     resolveDiagramTab,
     visibleDiagramTabs,
     type DiagramTab,
@@ -68,7 +69,7 @@ const iconMap = {
     Patterns: IoGridOutline,
 } as const;
 
-const NO_DECORATORS: DeploymentDecorator[] = [];
+const NO_DECORATORS: Decorator[] = [];
 const NO_MOMENTS: TimelineMoment[] = [];
 
 const subscribeToNothing = () => () => {};
@@ -76,7 +77,10 @@ const getNavbarSlot = () => document.getElementById('navbar-actions');
 const getNoNavbarSlot = () => null;
 
 export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumbs, onDisplayNameChange, onDecoratorsChange }: DiagramSectionProps) {
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [urlSearchParams, setSearchParams] = useSearchParams();
+    // An old tab link opens its replacement at once; the effect below then fixes the URL.
+    const redirectedQuery = redirectedTabQuery(DIAGRAM_TAB_REDIRECTS, urlSearchParams);
+    const searchParams = redirectedQuery ?? urlSearchParams;
     const navigate = useNavigate();
     const location = useLocation();
     const isMobile = useIsMobile();
@@ -146,10 +150,6 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     const resourceKey = `${data.calmType}|${data.name}|${data.id}`;
     const decoratorsState = useArchitectureDecorators(calmService, data, isArchitecture);
     const allDecorators = decoratorsState.status === 'loaded' ? decoratorsState.decorators : NO_DECORATORS;
-    const decorators = useMemo(
-        () => allDecorators.filter((d): d is DeploymentDecorator => d.type === 'deployment'),
-        [allDecorators]
-    );
     // A dropped file is not the loaded architecture, so the details drawer must not show its decorators.
     const [showsDroppedFile, setShowsDroppedFile] = useState(false);
     const [compareFrom, setCompareFrom] = useState<string | null>(null);
@@ -221,6 +221,17 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     const setTabParams = (params: Record<string, string>) => {
         setSearchParams({ tab: activeTab.id, ...params }, { replace: true, state: location.state });
     };
+    const redirectTo = redirectedQuery?.toString();
+    useEffect(() => {
+        if (redirectTo !== undefined) setSearchParams(new URLSearchParams(redirectTo), { replace: true, state: location.state });
+    }, [redirectTo, setSearchParams, location.state]);
+    const openDecoratorView = useCallback((view: DecoratorView) => {
+        const type = view.match.type;
+        setSearchParams(
+            { tab: 'decorators', ...(type ? { [DECORATOR_TYPE_PARAM]: type } : {}) },
+            { replace: true, state: location.state }
+        );
+    }, [setSearchParams, location.state]);
 
     // Save/reset the shared default layout — supported for both architectures
     // and patterns (backed by separate resources/collections server-side, see
@@ -450,16 +461,15 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
             <Drawer
                 data={data}
                 onItemSelect={onItemSelect}
-                decorators={decorators}
                 viewportKeyOverride={defaultLayoutState.viewportKey}
                 defaultLayout={defaultLayoutState.defaultLayout}
                 layoutEpoch={defaultLayoutState.layoutEpoch}
                 onPositionsChange={handlePositionsChange}
                 onDroppedFileChange={setShowsDroppedFile}
+                onOpenView={openDecoratorView}
             />
         ),
         decorators: decoratorsState,
-        deploymentDecorators: decorators,
         usedBy,
     };
 

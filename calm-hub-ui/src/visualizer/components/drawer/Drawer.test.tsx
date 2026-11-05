@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { Drawer } from './Drawer.js';
 import { Data } from '../../../model/calm.js';
 import type { ReactFlowVisualizerProps } from '../../contracts/contracts.js';
@@ -19,38 +19,50 @@ function fakeFile(text: string): File {
     return { text: () => Promise.resolve(text) } as unknown as File;
 }
 
-const mockFetchDeploymentDecoratorsForArchitecture = vi.fn().mockResolvedValue([]);
 const EVALUATION_TARGET = '/api/calm/namespaces/my-namespace/architectures/42/versions/1-0-0';
 const mockResolveArchitectureVersionTarget = vi.fn().mockResolvedValue(EVALUATION_TARGET);
+// The poll requests each overlay view's type; these stand for the two built-in views.
 const mockFetchControlEvaluationDecorators = vi.fn().mockResolvedValue([]);
+const mockFetchDeploymentDecorators = vi.fn().mockResolvedValue([]);
 
 vi.mock('../../../service/calm-service.js', () => ({
     CalmService: vi.fn().mockImplementation(function () { return {
-        fetchDeploymentDecoratorsForArchitecture: (...args: unknown[]) => mockFetchDeploymentDecoratorsForArchitecture(...args),
         resolveArchitectureVersionTarget: (...args: unknown[]) => mockResolveArchitectureVersionTarget(...args),
-        fetchControlEvaluationDecorators: (...args: unknown[]) => mockFetchControlEvaluationDecorators(...args),
+        fetchDecoratorsForTarget: (namespace: string, target: string, type?: string) => type === 'control-evaluation'
+            ? mockFetchControlEvaluationDecorators(namespace, target)
+            : type === 'deployment'
+              ? mockFetchDeploymentDecorators(namespace, target)
+              : Promise.reject(new Error(`unexpected type ${type}`)),
     }; }),
 }));
 
 vi.mock('../reactflow/MetadataPanel.js', () => ({
-    MetadataPanel: ({ decorators, evaluations }: { decorators: unknown[]; evaluations?: unknown[] }) => (
-        <div data-testid="metadata-panel">decorators:{decorators.length} evaluations:{evaluations?.length ?? 0}</div>
+    MetadataPanel: ({ evaluations }: { evaluations?: unknown[] }) => (
+        <div data-testid="metadata-panel">evaluations:{evaluations?.length ?? 0}</div>
     ),
 }));
 
 // Mock dependencies
 vi.mock('../reactflow/ReactFlowVisualizer.js', async () => {
-    const { useElementEvaluation } = await vi.importActual<typeof import('../../context/ControlEvaluationContext.js')>(
-        '../../context/ControlEvaluationContext.js'
-    );
-    // Reads node n1's and container sys's evaluations from the context the Drawer provides, as CustomNode and
+    const { useElementEvaluation, useElementOverlays, useDecoratorOverlays } =
+        await vi.importActual<typeof import('../../context/DecoratorOverlayContext.js')>('../../context/DecoratorOverlayContext.js');
+    // Reads node n1's and container sys's overlays from the context the Drawer provides, as CustomNode and
     // SystemGroupNode do.
-    const EvaluationProbe = () => (
-        <>
-            <div data-testid="evaluation-n1">{useElementEvaluation('n1')?.status ?? '(none)'}</div>
-            <div data-testid="evaluation-sys">{useElementEvaluation('sys')?.status ?? '(none)'}</div>
-        </>
-    );
+    const EvaluationProbe = () => {
+        const { overlays, toggleView, onOpenView } = useDecoratorOverlays();
+        return (
+            <>
+                <div data-testid="evaluation-n1">{useElementEvaluation('n1')?.status ?? '(none)'}</div>
+                <div data-testid="evaluation-sys">{useElementEvaluation('sys')?.status ?? '(none)'}</div>
+                <div data-testid="overlays-n1">
+                    {useElementOverlays('n1').map(({ view, overlay }) => `${view.id}:${overlay.status}`).join(' ') || '(none)'}
+                </div>
+                <div data-testid="overlay-views">{overlays.map(({ view }) => view.id).join(' ') || '(none)'}</div>
+                <button onClick={() => toggleView('deployment')}>toggle-deployment</button>
+                <button onClick={() => onOpenView?.(overlays[0].view)}>open-first-view</button>
+            </>
+        );
+    };
     return {
         ReactFlowVisualizer: ({ calmData, viewportKey, defaultLayout, layoutEpoch, onPositionsChange }: ReactFlowVisualizerProps) => {
             visualizerRenders.count += 1;
@@ -353,107 +365,7 @@ describe('Drawer', () => {
     });
 });
 
-describe('Drawer — decorator fetching', () => {
-    beforeEach(() => {
-        mockFetchDeploymentDecoratorsForArchitecture.mockReset();
-        mockFetchDeploymentDecoratorsForArchitecture.mockResolvedValue([]);
-    });
-
-    it('delegates decorator fetching to the shared service method with namespace, id and version', async () => {
-        render(<Drawer data={architectureData} />);
-
-        await waitFor(() => {
-            expect(mockFetchDeploymentDecoratorsForArchitecture).toHaveBeenCalledWith(
-                'my-namespace',
-                'my-arch',
-                '1.0.0'
-            );
-        });
-    });
-
-    it('does not fetch decorator values when decorators prop is provided', async () => {
-        render(<Drawer data={architectureData} decorators={[]} />);
-
-        await new Promise((r) => setTimeout(r, 50));
-        expect(mockFetchDeploymentDecoratorsForArchitecture).not.toHaveBeenCalled();
-    });
-
-    it('does not fetch decorator values for pattern data', async () => {
-        render(<Drawer data={patternData} />);
-
-        await new Promise((r) => setTimeout(r, 50));
-        expect(mockFetchDeploymentDecoratorsForArchitecture).not.toHaveBeenCalled();
-    });
-
-    it('passes fetched decorators to MetadataPanel', async () => {
-        const decorators = [{
-            schema: 'https://calm.finos.org/standards/deployment/1.0/deployment.decorator.standard.json',
-            uniqueId: 'dec-1',
-            type: 'deployment',
-            target: ['/api/calm/namespaces/my-namespace/architectures/my-arch/versions/1-0-0'],
-            appliesTo: ['node-a'],
-            data: {
-                status: 'completed',
-                'start-time': '2024-01-01T10:00:00Z',
-                'end-time': '2024-01-01T10:05:00Z',
-            },
-        }];
-        mockFetchDeploymentDecoratorsForArchitecture.mockResolvedValue(decorators);
-
-        render(<Drawer data={architectureData} />);
-
-        await waitFor(() => {
-            expect(screen.getByTestId('metadata-panel')).toHaveTextContent('decorators:1');
-        });
-    });
-
-    it('does not show the previous version\'s decorators while the next version loads', async () => {
-        mockFetchDeploymentDecoratorsForArchitecture.mockResolvedValue([{ uniqueId: 'dec-1' }]);
-        const { rerender } = render(<Drawer data={architectureData} />);
-        await waitFor(() => {
-            expect(screen.getByTestId('metadata-panel')).toHaveTextContent('decorators:1');
-        });
-
-        mockFetchDeploymentDecoratorsForArchitecture.mockImplementation(() => new Promise(() => {}));
-        rerender(<Drawer data={{ ...architectureData, version: '2.0.0' }} />);
-
-        expect(screen.queryByTestId('metadata-panel')?.textContent ?? '').not.toContain('decorators:1');
-    });
-
-    it('passes externally provided decorators to MetadataPanel without fetching', async () => {
-        const decorators = [{
-            schema: 'https://calm.finos.org/standards/deployment/1.0/deployment.decorator.standard.json',
-            uniqueId: 'dec-ext',
-            type: 'deployment',
-            target: ['/api/calm/namespaces/my-namespace/architectures/my-arch/versions/1-0-0'],
-            appliesTo: ['node-a'],
-            data: {
-                status: 'failed',
-                'start-time': '2024-01-01T10:00:00Z',
-                'end-time': '2024-01-01T10:05:00Z',
-            },
-        }];
-
-        render(<Drawer data={architectureData} decorators={decorators} />);
-
-        await waitFor(() => {
-            expect(screen.getByTestId('metadata-panel')).toHaveTextContent('decorators:1');
-        });
-        expect(mockFetchDeploymentDecoratorsForArchitecture).not.toHaveBeenCalled();
-    });
-
-    it('does not show externally provided decorators for a dropped file', async () => {
-        const decorators = [{ uniqueId: 'dec-1', type: 'deployment', target: [], appliesTo: ['node-a'], data: {} }];
-        render(<Drawer data={architectureData} decorators={decorators as never} />);
-        expect(screen.getByTestId('metadata-panel')).toHaveTextContent('decorators:1');
-
-        await act(async () => {
-            await mockDropzone.onDrop?.([fakeFile(JSON.stringify({ nodes: [], relationships: [] }))]);
-        });
-
-        expect(screen.queryByTestId('metadata-panel')).not.toBeInTheDocument();
-    });
-
+describe('Drawer — dropped files', () => {
     it('reports whether a dropped file replaces the loaded resource, and false on unmount', async () => {
         const onDroppedFileChange = vi.fn();
         const { unmount } = render(<Drawer data={architectureData} onDroppedFileChange={onDroppedFileChange} />);
@@ -500,8 +412,8 @@ describe('Drawer — control evaluations', () => {
 
     beforeEach(() => {
         vi.useFakeTimers();
-        mockFetchDeploymentDecoratorsForArchitecture.mockReset();
-        mockFetchDeploymentDecoratorsForArchitecture.mockResolvedValue([]);
+        mockFetchDeploymentDecorators.mockReset();
+        mockFetchDeploymentDecorators.mockResolvedValue([]);
         mockFetchControlEvaluationDecorators.mockReset();
         mockFetchControlEvaluationDecorators.mockResolvedValue([]);
         mockResolveArchitectureVersionTarget.mockReset();
@@ -724,5 +636,77 @@ describe('Drawer — control evaluations', () => {
         await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
         expect(mockFetchControlEvaluationDecorators).toHaveBeenCalledTimes(5);
         expect(errorSpy).toHaveBeenCalledTimes(1);
+    });
+
+    const deployment = (status: string) => ({
+        uniqueId: `dep-${status}`,
+        type: 'deployment',
+        target: [EVALUATION_TARGET],
+        appliesTo: ['n1'],
+        data: { status, 'start-time': '2026-11-04T15:00:00Z' },
+    });
+
+    it('requests each built-in view\'s decorator type on every refresh', async () => {
+        render(<Drawer data={architectureData} />);
+        await flush();
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+        expect(mockFetchControlEvaluationDecorators).toHaveBeenCalledTimes(2);
+        expect(mockFetchDeploymentDecorators).toHaveBeenCalledTimes(2);
+        expect(mockFetchDeploymentDecorators).toHaveBeenLastCalledWith('my-namespace', EVALUATION_TARGET);
+    });
+
+    it('draws every view with decorators on an element, and leaves views with none off the legend', async () => {
+        mockFetchDeploymentDecorators.mockResolvedValue([deployment('failed')]);
+        render(<Drawer data={architectureWithNode} />);
+        await flush();
+
+        expect(screen.getByTestId('overlays-n1')).toHaveTextContent('deployment:error');
+        expect(screen.getByTestId('overlay-views')).toHaveTextContent(/^deployment$/);
+        expect(screen.getByTestId('evaluation-n1')).toHaveTextContent('(none)');
+
+        mockFetchControlEvaluationDecorators.mockResolvedValue([evaluation('met')]);
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+        expect(screen.getByTestId('overlays-n1')).toHaveTextContent('control-evaluation:ok deployment:error');
+        expect(screen.getByTestId('metadata-panel')).toHaveTextContent('evaluations:1');
+    });
+
+    it('hides a view that the legend turns off, and shows it again when turned back on', async () => {
+        mockFetchControlEvaluationDecorators.mockResolvedValue([evaluation('not-met')]);
+        mockFetchDeploymentDecorators.mockResolvedValue([deployment('completed')]);
+        render(<Drawer data={architectureWithNode} />);
+        await flush();
+        expect(screen.getByTestId('overlays-n1')).toHaveTextContent('control-evaluation:error deployment:ok');
+
+        await act(async () => { screen.getByText('toggle-deployment').click(); });
+        expect(screen.getByTestId('overlays-n1')).toHaveTextContent(/^control-evaluation:error$/);
+        expect(screen.getByTestId('overlay-views')).toHaveTextContent('control-evaluation deployment');
+
+        await act(async () => { screen.getByText('toggle-deployment').click(); });
+        expect(screen.getByTestId('overlays-n1')).toHaveTextContent('control-evaluation:error deployment:ok');
+    });
+
+    it('keeps every view\'s last result when one view\'s request fails', async () => {
+        mockFetchControlEvaluationDecorators.mockResolvedValue([evaluation('not-met')]);
+        mockFetchDeploymentDecorators.mockResolvedValueOnce([deployment('completed')]).mockRejectedValue(new Error('hub down'));
+        render(<Drawer data={architectureWithNode} />);
+        await flush();
+
+        mockFetchControlEvaluationDecorators.mockResolvedValue([evaluation('met')]);
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+        expect(screen.getByTestId('overlays-n1')).toHaveTextContent('control-evaluation:error deployment:ok');
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes onOpenView to the overlay legend', async () => {
+        const onOpenView = vi.fn();
+        mockFetchDeploymentDecorators.mockResolvedValue([deployment('completed')]);
+        render(<Drawer data={architectureWithNode} onOpenView={onOpenView} />);
+        await flush();
+
+        await act(async () => { screen.getByText('open-first-view').click(); });
+        expect(onOpenView).toHaveBeenCalledWith(expect.objectContaining({ id: 'deployment' }));
     });
 });
