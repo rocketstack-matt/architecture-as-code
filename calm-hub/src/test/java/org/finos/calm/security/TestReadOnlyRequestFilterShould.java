@@ -11,6 +11,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.net.URI;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
@@ -153,5 +155,39 @@ public class TestReadOnlyRequestFilterShould {
         filter.filter(requestContext);
 
         verify(requestContext, never()).abortWith(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/calm/extensions/team-services/api/search", "api/calm/extensions/team-services/api/x/y"})
+    void leave_the_extension_proxy_to_enforce_read_only_mode(String path) {
+        filter.readOnly = true;
+        when(requestContext.getMethod()).thenReturn("POST");
+        when(uriInfo.getPath()).thenReturn(path);
+        when(uriInfo.getRequestUri()).thenReturn(URI.create("http://hub/" + path.replaceFirst("^/", "")));
+
+        filter.filter(requestContext);
+
+        verify(requestContext, never()).abortWith(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/api/calm/extensions/api/namespaces",
+            "/api/calm/extensions/a/b/api/x",
+            "/api/calm/extensions/x/api/../../../namespaces",
+            "/api/calm/extensions/x/api/%2e%2e/namespaces",
+            "/api/calm/extensions/x/api//namespaces",
+            "/api/calm/extensionsx/x/api/y",
+            "/api/calm/namespaces/api/calm/extensions/x/api/y"
+    })
+    void reject_a_write_that_only_looks_like_the_extension_proxy(String path) {
+        filter.readOnly = true;
+        when(requestContext.getMethod()).thenReturn("POST");
+        when(uriInfo.getPath()).thenReturn(path);
+        when(uriInfo.getRequestUri()).thenReturn(URI.create("http://hub" + path));
+
+        filter.filter(requestContext);
+
+        verify(requestContext).abortWith(any());
     }
 }

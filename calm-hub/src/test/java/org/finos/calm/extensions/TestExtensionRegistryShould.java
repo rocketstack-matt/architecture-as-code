@@ -204,6 +204,7 @@ class TestExtensionRegistryShould {
 
         ExtensionRegistry registry = registry(dir(), NO_BUILTINS);
         ExtensionManifest manifest = registry.available().getFirst();
+        assertThat(registry.isReadOnly(), equalTo(true));
 
         assertThat(manifest.routes().stream().map(ExtensionManifest.Route::id).toList(),
                 contains("screen", "services", "domain-services", "search"));
@@ -278,6 +279,31 @@ class TestExtensionRegistryShould {
         }
     }
 
+    @Test
+    void refuse_extensions_with_routes_when_auth_is_off() throws IOException {
+        write("team-services", valid());
+        properties.put("calm.extensions.\"team-services\".backend-url", "http://localhost:8091");
+        properties.put("calm.auth.enabled", "false");
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> registry(dir(), NO_BUILTINS));
+
+        assertThat(e.getMessage(), containsString("an enabled extension has routes, but calm.auth.enabled is false"));
+    }
+
+    @Test
+    void allow_extensions_with_auth_off_when_the_operator_opts_in_or_there_are_no_routes() throws IOException {
+        write("alpha", decoratorViewsOnly("alpha"));
+        properties.put("calm.auth.enabled", "false");
+
+        assertThat(ids(registry(dir(), NO_BUILTINS)), contains("alpha"));
+
+        write("team-services", valid());
+        properties.put("calm.extensions.\"team-services\".backend-url", "http://localhost:8091");
+        properties.put("calm.extensions.allow-without-auth", "true");
+
+        assertThat(ids(registry(dir(), NO_BUILTINS)), contains("alpha", "team-services"));
+    }
+
     private static JsonObject withReadOnlySearch() {
         JsonObject manifest = valid();
         manifest.getJsonArray("routes")
@@ -319,6 +345,7 @@ class TestExtensionRegistryShould {
 
     private ExtensionRegistry registry(Optional<String> dir, String builtinBase) {
         dir.ifPresent(d -> properties.put("calm.extensions.dir", d));
+        properties.putIfAbsent("calm.auth.enabled", "true");
         SmallRyeConfig source = new SmallRyeConfigBuilder()
                 .withMapping(ExtensionsConfig.class)
                 .withSources(new PropertiesConfigSource(Map.copyOf(properties), "test", 100))

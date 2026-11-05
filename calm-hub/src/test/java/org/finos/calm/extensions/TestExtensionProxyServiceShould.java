@@ -7,12 +7,19 @@ import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfig;
 import io.smallrye.config.SmallRyeConfigBuilder;
 import org.finos.calm.config.ExtensionsConfig;
+import org.finos.calm.domain.audit.AuditAction;
+import org.finos.calm.domain.audit.AuditEntityType;
+import org.finos.calm.domain.audit.AuditLogEntry;
+import org.finos.calm.domain.audit.AuditOutcome;
 import org.finos.calm.domain.extensions.ExtensionManifest;
 import org.finos.calm.domain.extensions.ExtensionManifest.Route;
+import org.finos.calm.security.AuditService;
+import org.finos.calm.security.CalmHubPermissionChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -31,7 +38,11 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class TestExtensionProxyServiceShould {
@@ -50,6 +61,8 @@ class TestExtensionProxyServiceShould {
 
     private final FixtureBackend backend = new FixtureBackend();
     private final ExtensionRegistry registry = mock(ExtensionRegistry.class);
+    private final CalmHubPermissionChecker permissions = mock(CalmHubPermissionChecker.class);
+    private final AuditService auditService = mock(AuditService.class);
     private final SecurityIdentity alice = identity("alice");
     private ExtensionProxyService service;
 
@@ -66,7 +79,9 @@ class TestExtensionProxyServiceShould {
         ExtensionIdentitySigner signer = new ExtensionIdentitySigner(config.getConfigMapping(ExtensionsConfig.class),
                 config, registry);
         signer.load();
-        service = new ExtensionProxyService(registry, signer, "oidc");
+        service = new ExtensionProxyService(registry, signer, permissions, auditService, "oidc");
+        when(permissions.canRead(any(), any())).thenReturn(true);
+        when(permissions.canWrite(any(), any())).thenReturn(true);
         register(backend.url("/base"), limits(1024, 1024, Duration.ofSeconds(5)));
     }
 
@@ -215,6 +230,111 @@ class TestExtensionProxyServiceShould {
         assertThat(ExtensionProxyService.authMode(authOff, false), is("none"));
         assertThat(ExtensionProxyService.authMode(authOn, false), is("oidc"));
         assertThat(ExtensionProxyService.authMode(authOn, true), is("proxy"));
+    }
+
+    @Test
+    void check_the_scope_with_the_namespace_from_the_path_only() {
+        when(permissions.canRead(any(), any())).thenReturn(false);
+        when(permissions.canRead(alice, "finos.payments")).thenReturn(true);
+
+        service.call(alice, request("GET", "/namespaces/finos.payments/services", "namespace=finos.other", null));
+        assertThat(status(request("GET", "/namespaces/finos.other/services", "namespace=finos.payments", null)), is(403));
+
+        verify(permissions).canRead(alice, "finos.other");
+    }
+
+    @Test
+    void refuse_a_namespace_that_is_not_valid_before_any_check() {
+        assertThat(status(request("GET", "/namespaces/a%20b/services", null, null)), is(400));
+        verify(permissions, never()).canRead(any(), any());
+    }
+
+    @Test
+    void return_401_for_an_anonymous_or_missing_caller() {
+        SecurityIdentity anonymous = mock(SecurityIdentity.class);
+        when(anonymous.isAnonymous()).thenReturn(true);
+
+        assertThat(assertThrows(ExtensionProxyException.class,
+                () -> service.call(anonymous, request("GET", "/screen", null, null))).status(), is(401));
+        assertThat(assertThrows(ExtensionProxyException.class,
+                () -> service.call(null, request("GET", "/screen", null, null))).status(), is(401));
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    void check_global_admin_and_domain_scopes_with_the_permission_checker() {
+        ExtensionManifest manifest = new ExtensionManifest("team-services", "1.0.0", 0, "Team services", null, null,
+                List.of(new Route("admin", "GET", "/admin", "global_admin", false),
+                        new Route("domain", "PUT", "/domains/{domain}/services", "domain_write", false),
+                        new Route("domain-admin", "DELETE", "/domains/{domain}/services", "domain_admin", false),
+                        new Route("domain-read", "GET", "/domains/{domain}/services", "domain_read", false),
+                        new Route("ns-admin", "DELETE", "/namespaces/{namespace}/services", "admin", false)),
+                null, null);
+        when(registry.find("team-services")).thenReturn(Optional.of(new RegisteredExtension(manifest, 0,
+                Optional.of(backend.url("/base")), limits(1024, 1024, Duration.ofSeconds(5)))));
+
+        assertThat(status(request("GET", "/admin", null, null)), is(403));
+        assertThat(status(request("PUT", "/domains/payments/services", null, null)), is(403));
+        assertThat(status(request("DELETE", "/domains/payments/services", null, null)), is(403));
+        assertThat(status(request("GET", "/domains/payments/services", null, null)), is(403));
+        assertThat(status(request("DELETE", "/namespaces/finos/services", null, null)), is(403));
+        verify(permissions).hasGlobalAdmin(alice);
+        verify(permissions).canWriteByDomain(alice, "payments");
+        verify(permissions).allowDomainAdmin(alice, "payments");
+        verify(permissions).canReadByDomain(alice, "payments");
+        verify(permissions).allowNamespaceAdmin(alice, "finos");
+
+        when(permissions.hasGlobalAdmin(alice)).thenReturn(true);
+        assertThat(service.call(alice, request("GET", "/admin", null, null)).status(), is(200));
+    }
+
+    @Test
+    void allow_only_get_and_read_only_routes_on_a_read_only_hub() {
+        when(registry.isReadOnly()).thenReturn(true);
+
+        assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(405));
+        assertThat(service.call(alice, request("POST", "/search", null, "{}")).status(), is(200));
+        assertThat(service.call(alice, request("GET", "/screen", null, null)).status(), is(200));
+    }
+
+    @Test
+    void audit_a_write_route_with_the_extension_route_and_jti() throws IOException {
+        service.call(alice, request("POST", "/namespaces/finos/services", null, "{\"name\":\"x\"}"));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        AuditLogEntry entry = captor.getValue();
+        assertThat(entry.getEntityType(), is(AuditEntityType.EXTENSION));
+        assertThat(entry.getAction(), is(AuditAction.CREATE));
+        assertThat(entry.getOutcome(), is(AuditOutcome.SUCCESS));
+        assertThat(entry.getActor(), is("alice"));
+        assertThat(entry.getNamespace(), is("finos"));
+        assertThat(entry.getEntityId(), is("team-services"));
+        assertThat(entry.getRoute(), is("add-service"));
+        assertThat(entry.getJti(), is(claims(backend.received().header("X-Calm-Hub-Identity")).get("jti").asText()));
+    }
+
+    @Test
+    void audit_a_denied_write_and_not_a_read_or_a_read_only_route() {
+        when(permissions.canWrite(any(), any())).thenReturn(false);
+
+        assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(403));
+        service.call(alice, request("GET", "/screen", null, null));
+        service.call(alice, request("POST", "/search", null, "{}"));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getOutcome(), is(AuditOutcome.DENIED));
+        assertThat(captor.getValue().getJti(), nullValue());
+        assertThat(captor.getValue().getRoute(), is("add-service"));
+    }
+
+    @Test
+    void not_audit_a_write_that_the_backend_failed() {
+        backend.reply(FixtureBackend.Reply.json(500, "{}"));
+
+        assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(502));
+        verify(auditService, never()).record(any());
     }
 
     static SecurityIdentity identity(String name) {

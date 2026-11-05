@@ -90,6 +90,12 @@ public class ExtensionRegistry {
                             + "for a loopback host, or with " + key(id, "allow-http") + "=true"));
             enabled.add(new RegisteredExtension(manifest, order.orElse(0), backendUrl, limits));
         }
+        // With auth off every caller is a global admin, so every route would be open (ADR 0011).
+        boolean authEnabled = properties.getOptionalValue("calm.auth.enabled", Boolean.class).orElse(false);
+        if (!authEnabled && !config.allowWithoutAuth() && enabled.stream().anyMatch(e -> !e.manifest().routes().isEmpty())) {
+            errors.add("an enabled extension has routes, but calm.auth.enabled is false. Every caller would be a global "
+                    + "admin. Turn auth on, or set calm.extensions.allow-without-auth=true for local development");
+        }
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Invalid calm.extensions configuration: " + String.join("; ", errors));
         }
@@ -98,6 +104,11 @@ public class ExtensionRegistry {
         if (!extensions.isEmpty()) {
             LOG.info("Enabled extensions: {}", extensions.stream().map(RegisteredExtension::id).toList());
         }
+    }
+
+    /** True on a read-only Hub, where the proxy allows a non-GET method only on a {@code readOnly} route. */
+    public boolean isReadOnly() {
+        return readOnly;
     }
 
     /** The enabled extensions in order, with the settings that only Hub may see. */

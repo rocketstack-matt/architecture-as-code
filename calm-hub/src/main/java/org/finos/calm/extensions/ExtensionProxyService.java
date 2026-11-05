@@ -5,7 +5,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.Config;
+import org.finos.calm.domain.audit.AuditAction;
+import org.finos.calm.domain.audit.AuditEntityType;
+import org.finos.calm.domain.audit.AuditLogEntry;
+import org.finos.calm.domain.audit.AuditOutcome;
 import org.finos.calm.domain.extensions.ExtensionManifest;
+import org.finos.calm.resources.ResourceValidationConstants;
+import org.finos.calm.security.AuditService;
+import org.finos.calm.security.CalmHubPermissionChecker;
 import org.finos.calm.security.ProxyAuthenticationMechanism;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +27,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -33,6 +42,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 /**
  * Calls an extension route for a caller (ADR 0011). The REST proxy and the MCP tools both use this
@@ -46,21 +56,29 @@ public class ExtensionProxyService {
     private static final Logger LOG = LoggerFactory.getLogger(ExtensionProxyService.class);
     private static final Set<String> REPLY_TYPES = Set.of("application/json", "text/event-stream", "text/plain");
     private static final List<String> REPLY_HEADERS = List.of("Content-Type", "Cache-Control", "ETag");
+    private static final Pattern NAMESPACE = Pattern.compile(ResourceValidationConstants.NAMESPACE_REGEX);
+    private static final Pattern DOMAIN = Pattern.compile(ResourceValidationConstants.DOMAIN_REGEX);
 
     private final ExtensionRegistry registry;
     private final ExtensionIdentitySigner signer;
+    private final CalmHubPermissionChecker permissions;
+    private final AuditService auditService;
     private final String authMode;
     private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
 
     @Inject
-    public ExtensionProxyService(ExtensionRegistry registry, ExtensionIdentitySigner signer, Config properties,
+    public ExtensionProxyService(ExtensionRegistry registry, ExtensionIdentitySigner signer,
+                                 CalmHubPermissionChecker permissions, AuditService auditService, Config properties,
                                  Instance<ProxyAuthenticationMechanism> proxyAuthentication) {
-        this(registry, signer, authMode(properties, proxyAuthentication.isResolvable()));
+        this(registry, signer, permissions, auditService, authMode(properties, proxyAuthentication.isResolvable()));
     }
 
-    ExtensionProxyService(ExtensionRegistry registry, ExtensionIdentitySigner signer, String authMode) {
+    ExtensionProxyService(ExtensionRegistry registry, ExtensionIdentitySigner signer,
+                          CalmHubPermissionChecker permissions, AuditService auditService, String authMode) {
         this.registry = registry;
         this.signer = signer;
+        this.permissions = permissions;
+        this.auditService = auditService;
         this.authMode = authMode;
     }
 
@@ -82,6 +100,26 @@ public class ExtensionProxyService {
         String path = ExtensionPaths.checkPath(request.path());
         ExtensionRouteMatcher.RouteMatch match = ExtensionRouteMatcher.match(extension.manifest(), method, path);
         ExtensionManifest.Route route = match.route();
+        if (registry.isReadOnly() && !"GET".equals(method) && !route.readOnly()) {
+            throw new ExtensionProxyException(405, "This CALM Hub instance is read-only");
+        }
+        // Hub takes the namespace and the domain only from the matched path, never from the query or body.
+        String namespace = match.parameters().get("namespace");
+        String domain = match.parameters().get("domain");
+        if ((namespace != null && !NAMESPACE.matcher(namespace).matches())
+                || (domain != null && !DOMAIN.matcher(domain).matches())) {
+            throw new ExtensionProxyException(400, "The namespace or domain in the path is not valid");
+        }
+        boolean audited = !"GET".equals(method) && !route.readOnly();
+        if (!isAuthorised(identity, route.scope(), namespace, domain)) {
+            if (audited) {
+                audit(identity, method, extension, route, namespace, domain, null, AuditOutcome.DENIED);
+            }
+            boolean anonymous = identity == null || identity.isAnonymous();
+            throw anonymous
+                    ? new ExtensionProxyException(401, "Sign in to call this extension")
+                    : new ExtensionProxyException(403, "You do not have the scope that this extension route needs");
+        }
 
         String query = ExtensionPaths.canonicalQuery(request.rawQuery());
         String pathAndQuery = query.isEmpty() ? path : path + "?" + query;
@@ -91,10 +129,60 @@ public class ExtensionProxyService {
 
         String jti = UUID.randomUUID().toString();
         String assertion = signer.sign(new ExtensionAssertion(identity.getPrincipal().getName(), extension.id(), jti,
-                authMode, extension.manifest().hubApi(), route.id(), route.scope(), match.parameters().get("namespace"),
-                method, pathAndQuery));
+                authMode, extension.manifest().hubApi(), route.id(), route.scope(), namespace, method, pathAndQuery));
         HttpRequest outbound = outboundRequest(request, method, target, body, limits, assertion);
-        return send(extension, route, outbound);
+        ExtensionProxyResponse reply = send(extension, route, outbound);
+        if (audited) {
+            AuditOutcome outcome = reply.status() < 300 ? AuditOutcome.SUCCESS
+                    : reply.status() == 403 ? AuditOutcome.DENIED : null;
+            if (outcome != null) {
+                audit(identity, method, extension, route, namespace, domain, jti, outcome);
+            }
+        }
+        return reply;
+    }
+
+    /**
+     * The same rules as {@code @PermissionsAllowed}, through {@link CalmHubPermissionChecker}: READ
+     * needs every ancestor namespace, WRITE any one. Every scope needs a signed-in caller, also when
+     * {@code calm.auth.allow-public-read} is on.
+     */
+    private boolean isAuthorised(SecurityIdentity identity, String scope, String namespace, String domain) {
+        if (identity == null || identity.isAnonymous()) {
+            return false;
+        }
+        return switch (scope) {
+            case "authenticated" -> true;
+            case "global_admin" -> permissions.hasGlobalAdmin(identity);
+            case "read" -> permissions.canRead(identity, namespace);
+            case "write" -> permissions.canWrite(identity, namespace);
+            case "admin" -> permissions.allowNamespaceAdmin(identity, namespace);
+            case "domain_read" -> permissions.canReadByDomain(identity, domain);
+            case "domain_write" -> permissions.canWriteByDomain(identity, domain);
+            case "domain_admin" -> permissions.allowDomainAdmin(identity, domain);
+            // The loader refuses any other scope at start up; fail closed all the same.
+            default -> false;
+        };
+    }
+
+    private void audit(SecurityIdentity identity, String method, RegisteredExtension extension,
+                       ExtensionManifest.Route route, String namespace, String domain, String jti, AuditOutcome outcome) {
+        auditService.record(new AuditLogEntry.AuditLogEntryBuilder()
+                .setTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+                .setActor(identity == null || identity.isAnonymous() ? "anonymous" : identity.getPrincipal().getName())
+                .setAction(switch (method) {
+                    case "POST" -> AuditAction.CREATE;
+                    case "DELETE" -> AuditAction.DELETE;
+                    default -> AuditAction.UPDATE;
+                })
+                .setEntityType(AuditEntityType.EXTENSION)
+                .setNamespace(namespace)
+                .setDomain(domain)
+                .setEntityId(extension.id())
+                .setRoute(route.id())
+                .setJti(jti)
+                .setOutcome(outcome)
+                .build());
     }
 
     private static HttpRequest outboundRequest(ExtensionProxyRequest request, String method, URI target, byte[] body,

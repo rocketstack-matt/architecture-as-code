@@ -44,7 +44,7 @@ public class ExtensionManifestLoader {
     /** The tool name limit of common MCP clients. The MCP specification allows 128. */
     static final int MAX_TOOL_NAME_LENGTH = 64;
     /** Ids that would clash with the static {@code calm.extensions.*} settings. */
-    static final Set<String> RESERVED_IDS = Set.of("dir", "identity", "http");
+    static final Set<String> RESERVED_IDS = Set.of("dir", "identity", "http", "allow-without-auth");
 
     private static final String SCHEMA_PATH = "META-INF/calm-extensions/schema/%d/extension.schema.json";
     private static final Pattern PATH_PARAM = Pattern.compile("\\{([^}]+)}");

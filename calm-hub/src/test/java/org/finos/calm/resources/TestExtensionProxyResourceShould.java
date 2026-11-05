@@ -1,19 +1,23 @@
 package org.finos.calm.resources;
 
+import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.security.TestSecurity;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.finos.calm.domain.UserAccess;
 import org.finos.calm.extensions.ExtensionTestKeys;
 import org.finos.calm.extensions.FixtureBackend;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.finos.calm.store.UserAccessStore;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import static io.restassured.RestAssured.given;
@@ -21,6 +25,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.oneOf;
+import static org.mockito.Mockito.when;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
@@ -31,6 +36,9 @@ class TestExtensionProxyResourceShould {
     static final String CSP = "sandbox; default-src 'none'";
     private static final String BASE = "/api/calm/extensions/proxy-test/api";
     private static FixtureBackend backend;
+
+    @InjectMock
+    UserAccessStore mockUserAccessStore;
 
     public static class ProxyProfile implements QuarkusTestProfile {
         private static final ExtensionTestKeys.KeyFiles KEYS = ExtensionTestKeys.rsaInTempDir();
@@ -136,6 +144,20 @@ class TestExtensionProxyResourceShould {
                 .then()
                 .statusCode(502)
                 .body("error", equalTo("The extension failed"));
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void check_the_namespace_scope_with_the_grants_of_the_caller() {
+        when(mockUserAccessStore.getGrantsForUser("alice"))
+                .thenReturn(List.of(new UserAccess("alice", UserAccess.Permission.read, "finos")));
+
+        given().when().get(BASE + "/namespaces/finos/services").then().statusCode(200);
+        given().when().get(BASE + "/namespaces/other/services").then().statusCode(403)
+                .body("error", equalTo("You do not have the scope that this extension route needs"));
+        given().contentType("application/json").body("{}").when().post(BASE + "/namespaces/finos/services")
+                .then().statusCode(403);
+        given().when().get(BASE + "/admin").then().statusCode(403);
     }
 
     @Test

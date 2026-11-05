@@ -14,6 +14,13 @@ import java.util.Optional;
 @ConfigMapping(prefix = "calm.extensions")
 public interface ExtensionsConfig {
 
+    /**
+     * Allows enabled extensions with routes when {@code calm.auth.enabled} is false. Only for local
+     * development: every caller is then a global admin.
+     */
+    @WithDefault("false")
+    boolean allowWithoutAuth();
+
     /** Holds one folder for each extension, with an {@code extension.json} in it. */
     Optional<String> dir();
 
