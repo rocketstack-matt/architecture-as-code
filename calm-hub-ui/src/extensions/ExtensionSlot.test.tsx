@@ -8,7 +8,7 @@ const extension: ExtensionSummary = {
     id: 'test',
     name: 'Test',
     hubApi: 0,
-    routes: [{ id: 'summary', path: '/summary', method: 'GET', scope: 'global', readOnly: true }],
+    routes: [{ id: 'summary', path: '/summary', method: 'GET', scope: 'authenticated', readOnly: true }],
     contributes: {},
 };
 afterEach(() => vi.restoreAllMocks());

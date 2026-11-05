@@ -7,7 +7,7 @@ export function extensionRequest(id: string, route: ExtensionRoute, context: Ext
     const values: Record<string, string | undefined> = { ...context };
     const path = route.path.replace(/\{([^}]+)\}/g, (_, key: string) => {
         const value = values[key];
-        if (!value) throw new Error(`Missing extension context: ${key}`);
+        if (typeof value !== 'string' || !value) throw new Error(`Missing extension context: ${key}`);
         return encodeURIComponent(value);
     });
     if (!path.startsWith('/') || path.split('/').some((part) => part === '.' || part === '..')) {

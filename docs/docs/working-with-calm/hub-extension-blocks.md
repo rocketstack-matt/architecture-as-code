@@ -40,4 +40,5 @@ have no selected resource. No token contains this UI context.
 
 An `action` contribution declares a button on the landing page and resource toolbar. Hub calls its route and asks for confirmation when
 `readOnly` is false. Context also goes in the JSON body for methods other than GET and DELETE.
+Actions show only when their route placeholders have context values.
 Actions do not accept user input or render a reply in this version.

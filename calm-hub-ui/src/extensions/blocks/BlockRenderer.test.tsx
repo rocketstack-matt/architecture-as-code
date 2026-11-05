@@ -68,3 +68,9 @@ describe('extension blocks', () => {
         expect(screen.getByText('Hub remains')).toBeInTheDocument();
     });
 });
+
+it('renders Markdown tables with the Hub Markdown styles', () => {
+    const { container } = draw({ type: 'markdown', text: '| Name |\n| --- |\n| Service |' });
+    expect(screen.getByRole('table')).toHaveTextContent('Service');
+    expect(container.querySelector('.adr-markdown')).not.toBeNull();
+});

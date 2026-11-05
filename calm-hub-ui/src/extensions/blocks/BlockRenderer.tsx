@@ -1,5 +1,7 @@
 import { ScreenBlock } from '../../model/extensions.js';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import '../../hub/components/adr-renderer/AdrMarkdown.css';
 import { safeHref } from '../ScreenLink.js';
 import { ALERT_CLASS } from '../tone.js';
 import { CardsBlock } from './CardsBlock.js';
@@ -12,22 +14,25 @@ export function BlockRenderer({ block }: { block: ScreenBlock }) {
     switch (block.type) {
         case 'markdown':
             return (
-                <Markdown
-                    skipHtml
-                    components={{
-                        a: ({ href, children }) =>
-                            safeHref(href) ? (
-                                <a href={safeHref(href)} target="_blank" rel="noopener noreferrer">
-                                    {children}
-                                </a>
-                            ) : (
-                                <span>{children}</span>
-                            ),
-                        img: ({ alt }) => <span>{alt}</span>,
-                    }}
-                >
-                    {block.text}
-                </Markdown>
+                <div className="adr-markdown">
+                    <Markdown
+                        remarkPlugins={[remarkGfm]}
+                        skipHtml
+                        components={{
+                            a: ({ href, children }) =>
+                                safeHref(href) ? (
+                                    <a href={safeHref(href)} target="_blank" rel="noopener noreferrer">
+                                        {children}
+                                    </a>
+                                ) : (
+                                    <span>{children}</span>
+                                ),
+                            img: ({ alt }) => <span>{alt}</span>,
+                        }}
+                    >
+                        {block.text}
+                    </Markdown>
+                </div>
             );
         case 'keyValue':
             return <KeyValueBlock items={block.items} />;

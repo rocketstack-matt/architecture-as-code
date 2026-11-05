@@ -5,9 +5,9 @@ import { ExtensionService, extensionRequest } from './extension-service.js';
 import { ExtensionRoute } from '../model/extensions.js';
 vi.mock('../authService.js', () => ({ getAuthHeaders: vi.fn().mockResolvedValue({ Authorization: 'test' }) }));
 const ax = axios.create();
-const mock = new AxiosMockAdapter(ax);
+const mock = new AxiosMockAdapter(ax as never);
 const service = new ExtensionService(ax);
-const route: ExtensionRoute = { id: 'summary', method: 'GET', path: '/summary/{namespace}', scope: 'namespace', readOnly: true };
+const route: ExtensionRoute = { id: 'summary', method: 'GET', path: '/summary/{namespace}', scope: 'read', readOnly: true };
 afterEach(() => mock.reset());
 
 describe('ExtensionService', () => {

@@ -69,3 +69,19 @@ describe('extension points', () => {
         expect(await screen.findByRole('heading', { name: 'Summary' })).toBeInTheDocument();
     });
 });
+
+it('shows actions only when their route context is available', () => {
+    const scoped = { ...extension, routes: [{ ...extension.routes[0], path: '/data/{namespace}/{selectedElement}' }] };
+    const view = render(
+        <ExtensionsContext.Provider value={[scoped]}>
+            <ExtensionPoints point="action" />
+        </ExtensionsContext.Provider>
+    );
+    expect(screen.queryByRole('button')).toBeNull();
+    view.rerender(
+        <ExtensionsContext.Provider value={[scoped]}>
+            <ExtensionPoints point="action" context={{ namespace: 'test', selectedElement: 'node' }} />
+        </ExtensionsContext.Provider>
+    );
+    expect(screen.getByRole('button', { name: 'Summary' })).toBeInTheDocument();
+});
