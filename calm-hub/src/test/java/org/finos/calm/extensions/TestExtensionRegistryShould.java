@@ -57,7 +57,7 @@ class TestExtensionRegistryShould {
     @Test
     void not_warn_about_known_extensions_or_shared_settings() {
         properties.put("calm.extensions.\"builtin-views\".enabled", "false");
-        properties.put("calm.extensions.http.connect-timeout", "PT5S");
+        properties.put("calm.extensions.http.connect-timeout-seconds", "5");
 
         List<String> warnings = captureWarnings(ExtensionRegistry.class, () -> registry(Optional.empty(), BUILTIN_BASE));
 
