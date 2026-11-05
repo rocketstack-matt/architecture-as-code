@@ -58,6 +58,28 @@
       },
       "destructive": false
     },
+    "service-names": {
+      "route": "services",
+      "description": "List the names of the services that a namespace owns",
+      "input": {
+        "type": "object",
+        "properties": { "namespace": { "type": "string" } },
+        "required": ["namespace"]
+      },
+      "output": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/name" },
+        "$defs": { "name": { "type": "string" } }
+      }
+    },
+    "remote-search": {
+      "route": "search",
+      "description": "Search with a filter from a remote schema",
+      "input": {
+        "type": "object",
+        "properties": { "filter": { "$ref": "https://example.com/filter.json" } }
+      }
+    },
     "remove-service": {
       "route": "remove-service",
       "description": "Remove a service from a namespace",

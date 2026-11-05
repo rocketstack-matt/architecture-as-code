@@ -341,6 +341,7 @@ Tool providers are in `src/main/java/org/finos/calm/mcp/tools/`:
 `ArchitectureTools`, `PatternTools`, `ControlTools`, `DomainTools`, `InterfaceTools`,  
 `NamespaceTools`, `SearchTools`, `StandardTools`, `TimelineTools`, `AdrTools`.  
 `ExtensionTools` registers one `ext_<id>_<command>` tool for each extension command at start up, with `ToolManager`.
+It wraps an output schema that is not an object in `result`, and skips a command whose input schema has a remote `$ref`.
 
 Enable for development:
 ```bash

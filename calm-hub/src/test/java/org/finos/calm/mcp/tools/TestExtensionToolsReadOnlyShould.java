@@ -40,6 +40,8 @@ class TestExtensionToolsReadOnlyShould {
     void register_only_the_commands_that_a_read_only_hub_can_run() {
         assertThat(toolManager.getTool("ext_mcp-test_list-services"), notNullValue());
         assertThat(toolManager.getTool("ext_mcp-test_search"), notNullValue());
+        assertThat(toolManager.getTool("ext_mcp-test_service-names"), notNullValue());
+        assertThat(toolManager.getTool("ext_mcp-test_remote-search"), nullValue());
         assertThat(toolManager.getTool("ext_mcp-test_add-service"), nullValue());
         assertThat(toolManager.getTool("ext_mcp-test_remove-service"), nullValue());
     }

@@ -32,13 +32,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,7 +56,10 @@ public class ExtensionTools {
 
     private static final Logger logger = LoggerFactory.getLogger(ExtensionTools.class);
     private static final Pattern PATH_PARAM = Pattern.compile("\\{([^}]+)}");
-    private static final String INPUT_SCHEMA_BASE = "https://calm.finos.org/calm-hub/extensions/";
+    private static final String SCHEMA_BASE = "https://calm.finos.org/calm-hub/extensions/";
+    private static final String RESULT = "result";
+    // Values of these keywords are data, not schemas.
+    private static final Set<String> DATA_KEYWORDS = Set.of("const", "enum", "default", "examples");
 
     /** One command with what its handler needs. */
     record ExtensionTool(String name, String extensionId, String extensionName, String commandName,
@@ -60,6 +67,29 @@ public class ExtensionTools {
 
         boolean readOnly() {
             return "GET".equals(route.method()) || route.readOnly();
+        }
+
+        /** MCP requires an object output schema, so Hub wraps any other output in {@code result}. */
+        boolean wrapsOutput() {
+            return command.output() != null && !"object".equals(command.output().get("type"));
+        }
+
+        Map<String, Object> outputSchema() {
+            if (!wrapsOutput()) {
+                return command.output();
+            }
+            Map<String, Object> result = new LinkedHashMap<>(command.output());
+            Map<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+            Object draft = result.remove("$schema");
+            if (draft != null) {
+                schema.put("$schema", draft);
+            }
+            // Its own $id keeps the local $refs of the output schema pointing into it.
+            result.putIfAbsent("$id", SCHEMA_BASE + extensionId + "/commands/" + commandName + "/output.json");
+            schema.put("properties", Map.of(RESULT, result));
+            schema.put("required", List.of(RESULT));
+            return schema;
         }
     }
 
@@ -95,7 +125,7 @@ public class ExtensionTools {
                     .setAnnotations(annotations(tool))
                     .setHandler(args -> call(tool, args.args()));
             if (command.output() != null) {
-                definition.setOutputSchema(command.output());
+                definition.setOutputSchema(tool.outputSchema());
             }
             definition.register();
         }
@@ -115,6 +145,12 @@ public class ExtensionTools {
                 ExtensionManifest.Route route = manifest.route(command.route())
                         .orElseThrow(() -> new IllegalStateException("Extension " + manifest.id() + " command '"
                                 + name + "' names route '" + command.route() + "', which is not declared"));
+                String remoteRef = remoteRef(command.input(), inputSchemaId(manifest.id(), name));
+                if (remoteRef != null) {
+                    logger.warn("Extension {} command '{}' has no MCP tool: its input schema has the remote $ref '{}', "
+                            + "which CALM Hub does not fetch", manifest.id(), name, remoteRef);
+                    return;
+                }
                 tools.add(new ExtensionTool(ExtensionManifestLoader.toolName(manifest.id(), name), manifest.id(),
                         manifest.name(), name, command, route, InputSchema.of(manifest.id(), name, command.input())));
             });
@@ -214,7 +250,10 @@ public class ExtensionTools {
                 null, new ByteArrayInputStream(body));
     }
 
-    /** A 2xx reply is the tool result. A command with an output schema must reply with a JSON object. */
+    /**
+     * A 2xx reply is the tool result. A command with an object output schema must reply with a JSON
+     * object. Any other output schema is wrapped, so the reply can be any JSON value.
+     */
     static ToolResponse response(ExtensionTool tool, ExtensionProxyResponse reply) {
         String body = new String(reply.body(), StandardCharsets.UTF_8);
         if (reply.status() >= 300) {
@@ -223,6 +262,19 @@ public class ExtensionTools {
         }
         if (tool.command().output() == null) {
             return ToolResponse.success(body);
+        }
+        if (tool.wrapsOutput()) {
+            try {
+                Object value = Json.decodeValue(body);
+                Map<String, Object> structured = new LinkedHashMap<>();
+                structured.put(RESULT, value instanceof JsonObject object ? object.getMap()
+                        : value instanceof JsonArray array ? array.getList() : value);
+                return new ToolResponse(false, List.of(new TextContent(Json.encode(structured))), structured, null);
+            } catch (DecodeException e) {
+                logger.warn("Extension {} command {} replied with no JSON, but declares an output schema",
+                        tool.extensionId(), tool.commandName());
+                return ToolResponse.error("Error: The extension reply is not the JSON that this command declares.");
+            }
         }
         try {
             // Clients that do not read structuredContent get the same JSON as text.
@@ -264,6 +316,71 @@ public class ExtensionTools {
         return sb.toString();
     }
 
+    static String inputSchemaId(String extensionId, String commandName) {
+        return SCHEMA_BASE + extensionId + "/commands/" + commandName + "/input.json";
+    }
+
+    /**
+     * The first {@code $ref} or {@code $dynamicRef} that points outside the schema, or null. Hub does
+     * not fetch remote schemas, so a tool with one would fail on every call.
+     */
+    static String remoteRef(Map<String, Object> schema, String defaultId) {
+        URI fallback = URI.create(defaultId);
+        URI base = schema.get("$id") instanceof String id ? Optional.ofNullable(uri(id, fallback)).orElse(fallback) : fallback;
+        Set<URI> ids = new HashSet<>();
+        List<Map.Entry<URI, String>> refs = new ArrayList<>();
+        collectRefs(schema, base, ids, refs);
+        for (Map.Entry<URI, String> ref : refs) {
+            URI target = uri(ref.getValue(), ref.getKey());
+            if (target == null || !ids.contains(withoutFragment(target))) {
+                return ref.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static void collectRefs(Object node, URI base, Set<URI> ids, List<Map.Entry<URI, String>> refs) {
+        if (node instanceof List<?> list) {
+            list.forEach(item -> collectRefs(item, base, ids, refs));
+            return;
+        }
+        if (!(node instanceof Map<?, ?> map)) {
+            return;
+        }
+        URI here = base;
+        if (map.get("$id") instanceof String id) {
+            URI resolved = uri(id, base);
+            if (resolved != null) {
+                here = resolved;
+            }
+        }
+        ids.add(withoutFragment(here));
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object key = entry.getKey();
+            if (("$ref".equals(key) || "$dynamicRef".equals(key)) && entry.getValue() instanceof String ref) {
+                refs.add(Map.entry(here, ref));
+            } else if (!DATA_KEYWORDS.contains(key)) {
+                collectRefs(entry.getValue(), here, ids, refs);
+            }
+        }
+    }
+
+    private static URI uri(String value, URI base) {
+        try {
+            return base.resolve(new URI(value));
+        } catch (URISyntaxException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static URI withoutFragment(URI uri) {
+        try {
+            return new URI(uri.getScheme(), uri.getSchemeSpecificPart(), null);
+        } catch (URISyntaxException e) {
+            return uri;
+        }
+    }
+
     /**
      * MCP servers do not check arguments against the input schema, so Hub does. Local {@code $ref}s
      * resolve only once the schema is in a repository. A schema that cannot be read stops Hub.
@@ -273,7 +390,7 @@ public class ExtensionTools {
         static InputSchema of(String extensionId, String commandName, Map<String, Object> input) {
             try {
                 JsonObject schema = new JsonObject(new LinkedHashMap<>(input)).copy();
-                String id = schema.getString("$id", INPUT_SCHEMA_BASE + extensionId + "/commands/" + commandName + "/input.json");
+                String id = schema.getString("$id", inputSchemaId(extensionId, commandName));
                 JsonSchemaOptions options = new JsonSchemaOptions()
                         .setDraft(Draft.DRAFT202012)
                         .setBaseUri(id)

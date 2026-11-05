@@ -47,6 +47,7 @@ class TestExtensionToolsShould {
 
     private static final List<ExtensionManifest> MANIFESTS =
             new ExtensionManifestLoader().loadDirectory(Path.of("src/test/resources/extensions-test/mcp"));
+    private static final List<ExtensionTools.ExtensionTool> TOOLS = ExtensionTools.tools(MANIFESTS);
 
     @Mock(answer = Answers.RETURNS_SELF)
     ToolManager.ToolDefinition definition;
@@ -76,7 +77,7 @@ class TestExtensionToolsShould {
     }
 
     private static ExtensionTools.ExtensionTool tool(String command) {
-        return ExtensionTools.tools(MANIFESTS).stream()
+        return TOOLS.stream()
                 .filter(t -> t.commandName().equals(command))
                 .findFirst().orElseThrow();
     }
@@ -93,9 +94,9 @@ class TestExtensionToolsShould {
 
     @Test
     void name_the_tools_after_the_extension_and_command_sorted_by_name() {
-        assertThat(ExtensionTools.tools(MANIFESTS).stream().map(ExtensionTools.ExtensionTool::name).toList(),
+        assertThat(TOOLS.stream().map(ExtensionTools.ExtensionTool::name).toList(),
                 contains("ext_mcp-test_add-service", "ext_mcp-test_list-services", "ext_mcp-test_remove-service",
-                        "ext_mcp-test_search"));
+                        "ext_mcp-test_search", "ext_mcp-test_service-names"));
     }
 
     @Test
@@ -119,13 +120,68 @@ class TestExtensionToolsShould {
         extensionTools.register();
 
         ArgumentCaptor<String> names = ArgumentCaptor.forClass(String.class);
-        verify(toolManager, times(4)).newTool(names.capture());
+        verify(toolManager, times(5)).newTool(names.capture());
         assertThat(names.getAllValues().getFirst(), is("ext_mcp-test_add-service"));
         verify(definition).setDescription("List the services that a namespace owns");
         verify(definition).setTitle("MCP test: list-services");
         verify(definition).setInputSchema(tool("list-services").command().input());
         verify(definition).setOutputSchema(tool("list-services").command().output());
-        verify(definition, times(4)).register();
+        verify(definition).setOutputSchema(tool("service-names").outputSchema());
+        verify(definition, times(5)).register();
+    }
+
+    @Test
+    void publish_an_object_output_schema_as_it_is() {
+        assertThat(tool("list-services").wrapsOutput(), is(false));
+        assertThat(tool("list-services").outputSchema(), is(tool("list-services").command().output()));
+    }
+
+    @Test
+    void wrap_an_output_schema_that_is_not_an_object_in_result() {
+        Map<String, Object> schema = tool("service-names").outputSchema();
+
+        assertThat(tool("service-names").wrapsOutput(), is(true));
+        assertThat(schema.get("type"), is("object"));
+        assertThat(schema.get("required"), is(List.of("result")));
+        Map<?, ?> result = (Map<?, ?>) ((Map<?, ?>) schema.get("properties")).get("result");
+        assertThat(result.get("type"), is("array"));
+        assertThat(result.get("$id"), is("https://calm.finos.org/calm-hub/extensions/mcp-test/commands/service-names/output.json"));
+        assertThat(result.get("$defs"), is(Map.of("name", Map.of("type", "string"))));
+    }
+
+    @Test
+    void move_the_schema_dialect_to_the_wrapper() {
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        Map<String, Object> output = Map.of("$schema", "https://json-schema.org/draft/2020-12/schema", "$id", "urn:out", "type", "string");
+        ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
+                Map.of("c", new ExtensionManifest.Command("r", "C", Map.of("type", "object"), output, null, null)), null);
+
+        Map<String, Object> schema = ExtensionTools.tools(List.of(manifest)).getFirst().outputSchema();
+
+        assertThat(schema.get("$schema"), is("https://json-schema.org/draft/2020-12/schema"));
+        assertThat(((Map<?, ?>) schema.get("properties")).get("result"), is(Map.of("$id", "urn:out", "type", "string")));
+    }
+
+    @Test
+    void skip_a_command_whose_input_schema_has_a_remote_ref() {
+        assertThat(TOOLS.stream().noneMatch(t -> t.commandName().equals("remote-search")), is(true));
+    }
+
+    @Test
+    void find_the_remote_refs_of_an_input_schema() {
+        String id = ExtensionTools.inputSchemaId("x", "c");
+
+        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "#/$defs/a", "$defs", Map.of("a", Map.of())), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$ref", id + "#/$defs/a"), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$defs", Map.of("a", Map.of("$id", "a.json"))), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "a.json", "$defs", Map.of("a", Map.of("$id", "a.json"))), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:in", "$ref", "urn:in#/x"), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("const", Map.of("$ref", "https://example.com/a.json")), id), nullValue());
+        assertThat(ExtensionTools.remoteRef(Map.of("allOf", List.of(Map.of("$ref", "https://example.com/a.json"))), id),
+                is("https://example.com/a.json"));
+        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "other.json"), id), is("other.json"));
+        assertThat(ExtensionTools.remoteRef(Map.of("$dynamicRef", "urn:other#x"), id), is("urn:other#x"));
+        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "a b:c"), id), is("a b:c"));
     }
 
     @Test
@@ -264,6 +320,37 @@ class TestExtensionToolsShould {
         ArgumentCaptor<ExtensionProxyRequest> request = ArgumentCaptor.forClass(ExtensionProxyRequest.class);
         verify(proxyService).call(same(identity), request.capture());
         assertThat(request.getValue().path(), is("/namespaces/finos/services"));
+    }
+
+    @Test
+    void return_a_reply_that_is_not_an_object_in_result() {
+        when(proxyService.call(any(), any())).thenReturn(reply(200, "[\"a\",\"b\"]"));
+
+        ToolResponse response = extensionTools.call(tool("service-names"), Map.of("namespace", "finos"));
+
+        assertThat(response.isError(), is(false));
+        assertThat(response.structuredContent(), is(Map.of("result", List.of("a", "b"))));
+        assertThat(text(response), is("{\"result\":[\"a\",\"b\"]}"));
+    }
+
+    @Test
+    void return_a_null_reply_in_result() {
+        when(proxyService.call(any(), any())).thenReturn(reply(200, "null"));
+
+        ToolResponse response = extensionTools.call(tool("service-names"), Map.of("namespace", "finos"));
+
+        assertThat(response.isError(), is(false));
+        assertThat(text(response), is("{\"result\":null}"));
+    }
+
+    @Test
+    void return_an_error_when_a_wrapped_reply_is_not_json() {
+        when(proxyService.call(any(), any())).thenReturn(reply(200, "not json"));
+
+        ToolResponse response = extensionTools.call(tool("service-names"), Map.of("namespace", "finos"));
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("not the JSON that this command declares"));
     }
 
     @Test

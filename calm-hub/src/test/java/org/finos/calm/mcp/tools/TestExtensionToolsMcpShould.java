@@ -80,7 +80,7 @@ class TestExtensionToolsMcpShould {
                 .filter(name -> name.startsWith("ext_")).toList();
 
         assertThat(names, is(List.of("ext_mcp-test_add-service", "ext_mcp-test_list-services",
-                "ext_mcp-test_remove-service", "ext_mcp-test_search")));
+                "ext_mcp-test_remove-service", "ext_mcp-test_search", "ext_mcp-test_service-names")));
         JsonObject list = find(tools, "ext_mcp-test_list-services");
         assertThat(list.getString("description"), is("List the services that a namespace owns"));
         assertThat(list.getString("title"), is("MCP test: list-services"));
@@ -91,6 +91,23 @@ class TestExtensionToolsMcpShould {
         assertThat(remove.getJsonObject("annotations").getBoolean("readOnlyHint"), is(false));
         assertThat(remove.getJsonObject("annotations").getBoolean("destructiveHint"), is(true));
         assertThat(remove.getJsonObject("outputSchema"), nullValue());
+        JsonObject wrapped = find(tools, "ext_mcp-test_service-names").getJsonObject("outputSchema");
+        assertThat(wrapped.getString("type"), is("object"));
+        assertThat(wrapped.getJsonObject("properties").getJsonObject("result").getString("type"), is("array"));
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void wrap_a_reply_that_is_not_an_object_in_result() {
+        when(mockUserAccessStore.getGrantsForUser("alice"))
+                .thenReturn(List.of(new UserAccess("alice", UserAccess.Permission.read, "finos")));
+        backend.reply(FixtureBackend.Reply.json(200, "[\"payments\"]"));
+
+        JsonObject result = callTool("ext_mcp-test_service-names", new JsonObject().put("namespace", "finos"));
+
+        assertThat(result.encode(), result.getBoolean("isError", false), is(false));
+        assertThat(result.getJsonObject("structuredContent"), is(new JsonObject().put("result", new JsonArray().add("payments"))));
+        assertThat(new JsonObject(text(result)), is(result.getJsonObject("structuredContent")));
     }
 
     @Test

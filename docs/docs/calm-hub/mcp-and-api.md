@@ -217,11 +217,13 @@ curl -s -X POST http://localhost:8080/mcp \
 CALM Hub makes one tool for each command of an enabled [extension](index.md#extensions). The tool name is `ext_<id>_<command>`, for example `ext_example-services_list-services`. These tools come after the built-in tools in `tools/list`, sorted by name.
 
 - The input and output schemas come from the manifest. CALM Hub checks the arguments against the input schema before it calls the extension.
+- MCP requires an output schema of type `object`. CALM Hub wraps any other output schema as `{"type": "object", "properties": {"result": <schema>}, "required": ["result"]}`, and returns the reply as `{"result": <reply>}`.
+- CALM Hub does not fetch a remote `$ref`. A command whose input schema has one gets no tool, and CALM Hub logs a warning.
 - `readOnlyHint` is true for a `GET` or `readOnly` route. `destructiveHint` and `idempotentHint` come from the command. With no hint, a write is destructive and not idempotent.
 - Each call goes through the extension proxy, with the same scope, read-only, audit and size rules as a REST call. CALM Hub checks the scope when the tool is called. A user sees every tool, also one that they cannot call.
 - A read-only CALM Hub makes no tool for a command whose route it cannot run.
 - Arguments that fill a `{param}` go in the path. The rest go to the query for `GET` and `DELETE`, and to the JSON body for other methods.
-- A `2xx` reply is the result: structured content if the command has an output schema, otherwise text. Any other reply is a tool error.
+- A `2xx` reply is the result: structured content and the same JSON as text if the command has an output schema, otherwise text. Any other reply is a tool error.
 
 ### Example Tool Call
 
