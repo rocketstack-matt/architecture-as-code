@@ -11,11 +11,14 @@ import com.mongodb.client.result.UpdateResult;
 import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
+import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -31,6 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
@@ -736,6 +741,7 @@ class TestMongoDecoratorStoreShould {
         int decoratorId = 1;
 
         when(namespaceStore.namespaceExists(namespace)).thenReturn(true);
+        mockNamespaceDocument(namespace, new Document("decoratorId", 1).append("decorator", new Document("type", "deployment")));
 
         UpdateResult updateResult = mock(UpdateResult.class);
         when(updateResult.getModifiedCount()).thenReturn(1L);
@@ -756,6 +762,7 @@ class TestMongoDecoratorStoreShould {
         int decoratorId = 99;
 
         when(namespaceStore.namespaceExists(namespace)).thenReturn(true);
+        mockNamespaceDocument(namespace, new Document("decoratorId", 99).append("decorator", new Document("type", "deployment")));
 
         UpdateResult updateResult = mock(UpdateResult.class);
         when(updateResult.getModifiedCount()).thenReturn(0L);
@@ -781,5 +788,158 @@ class TestMongoDecoratorStoreShould {
 
         verify(namespaceStore).namespaceExists(namespace);
         verify(decoratorCollection, never()).updateOne(any(Bson.class), any(Bson.class));
+    }
+
+    @Test
+    void should_throw_decorator_not_found_without_writing_when_delete_finds_no_decorator() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(decoratorCollection.find(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(null);
+
+        assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.deleteDecorator("finos", 1));
+
+        verify(decoratorCollection, never()).updateOne(any(Bson.class), any(Bson.class));
+    }
+
+    @Test
+    void should_delete_the_whole_history_of_a_decorator() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1), currentEntry(3, null));
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(1L);
+        ArgumentCaptor<Bson> update = ArgumentCaptor.forClass(Bson.class);
+        when(decoratorCollection.updateOne(any(Bson.class), update.capture())).thenReturn(updateResult);
+
+        decoratorStore.deleteDecorator("finos", 1);
+
+        assertEquals(List.of(2, 1), update.getValue().toBsonDocument()
+                .getDocument("$pull").getDocument("decorators").getDocument("decoratorId")
+                .getArray("$in").stream().map(value -> value.asInt32().getValue()).toList());
+    }
+
+    @Test
+    void should_require_the_authorized_head_to_still_be_current_when_deleting() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1));
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(0L);
+        ArgumentCaptor<Bson> filter = ArgumentCaptor.forClass(Bson.class);
+        when(decoratorCollection.updateOne(filter.capture(), any(Bson.class))).thenReturn(updateResult);
+
+        assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.deleteCurrentDecoratorHistory("finos", 1));
+
+        BsonDocument current = filter.getValue().toBsonDocument().getArray("$and").get(1)
+                .asDocument().getDocument("decorators").getDocument("$elemMatch");
+        assertEquals(1, current.getArray("$and").getFirst().asDocument().getInt32("decoratorId").getValue());
+        assertEquals(false, current.getArray("$and").get(1).asDocument()
+                .getDocument("supersededBy").getBoolean("$exists").getValue());
+    }
+
+    @Test
+    void should_leave_superseded_decorators_out_of_lists() throws NamespaceNotFoundException {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1));
+
+        assertEquals(List.of(2), decoratorStore.getDecoratorsForNamespace("finos", null, null));
+        assertEquals(List.of("eval-2"), decoratorStore.getDecoratorValuesForNamespace("finos", null, null).stream()
+                .map(Decorator::getUniqueId).toList());
+    }
+
+    @Test
+    void should_supersede_a_current_decorator() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(counterStore.getNextDecoratorSequenceValue()).thenReturn(5);
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(1L);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
+
+        int newId = decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}");
+
+        assertEquals(5, newId);
+        verify(decoratorCollection).updateOne(any(Bson.class), argThat((List<? extends Bson> pipeline) -> {
+            BsonDocument stage = pipeline.getFirst().toBsonDocument();
+            var arrays = stage.getDocument("$set").getDocument("decorators").getArray("$concatArrays");
+            BsonDocument pushed = arrays.get(1).asDocument().getArray("$literal").getFirst().asDocument();
+            assertEquals(5, pushed.getInt32("decoratorId").getValue());
+            assertEquals(1, pushed.getInt32("supersedes").getValue());
+            assertEquals("control-evaluation", pushed.getDocument("decorator").getString("type").getValue());
+            assertEquals(5, arrays.getFirst().asDocument().getDocument("$map").getDocument("in")
+                    .getArray("$cond").get(1).asDocument().getArray("$mergeObjects").get(1)
+                    .asDocument().getInt32("supersededBy").getValue());
+            return true;
+        }));
+    }
+
+    @Test
+    void should_throw_decorator_superseded_when_superseding_an_old_decorator() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(0L);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
+        mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1));
+
+        assertThrows(DecoratorSupersededException.class,
+                () -> decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}"));
+
+        verify(decoratorCollection, times(1)).updateOne(any(Bson.class), anyList());
+    }
+
+    @Test
+    void should_throw_decorator_not_found_when_superseding_a_missing_decorator() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(0L);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
+        mockNamespaceDocument("finos", currentEntry(2, null));
+
+        assertThrows(DecoratorNotFoundException.class,
+                () -> decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}"));
+    }
+
+    @Test
+    void should_throw_namespace_not_found_when_superseding_in_an_unknown_namespace() {
+        when(namespaceStore.namespaceExists("unknown")).thenReturn(false);
+
+        assertThrows(NamespaceNotFoundException.class,
+                () -> decoratorStore.supersedeDecorator("unknown", 1, "{}"));
+
+        verify(decoratorCollection, never()).updateOne(any(Bson.class), any(Bson.class));
+    }
+
+    @Test
+    void should_return_the_history_of_a_decorator_current_first() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1), currentEntry(3, null));
+
+        List<DecoratorHistoryEntry> history = decoratorStore.getDecoratorHistory("finos", 1);
+
+        assertEquals(List.of(2, 1), history.stream().map(DecoratorHistoryEntry::getId).toList());
+        assertEquals(1, history.get(0).getSupersedes());
+        assertEquals(2, history.get(1).getSupersededBy());
+        assertEquals("eval-1", history.get(1).getDecorator().getUniqueId());
+    }
+
+    @Test
+    void should_throw_decorator_not_found_for_the_history_of_a_missing_decorator() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(decoratorCollection.find(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(null);
+
+        assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.getDecoratorHistory("finos", 1));
+    }
+
+    private void mockNamespaceDocument(String namespace, Document... decorators) {
+        when(decoratorCollection.find(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(new Document("namespace", namespace).append("decorators", List.of(decorators)));
+    }
+
+    private static Document currentEntry(int id, Integer supersedes) {
+        Document entry = new Document("decoratorId", id)
+                .append("decorator", new Document("unique-id", "eval-" + id).append("type", "control-evaluation"));
+        return supersedes == null ? entry : entry.append("supersedes", supersedes);
+    }
+
+    private static Document supersededEntry(int id, int supersededBy) {
+        return currentEntry(id, null).append("supersededBy", supersededBy);
     }
 }
