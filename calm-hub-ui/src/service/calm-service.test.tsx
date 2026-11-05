@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AxiosMockAdapter from 'axios-mock-adapter';
 import { CalmService } from './calm-service.js';
 import axios from 'axios';
@@ -734,6 +734,44 @@ describe('CalmService', () => {
             const actual = await calmService.fetchDeploymentDecoratorsForArchitecture(namespace, '5', '2.3.1');
 
             expect(actual).toEqual([]);
+        });
+    });
+
+    describe('fetchArchitectureDecorators', () => {
+        const target = `/api/calm/namespaces/${namespace}/architectures/1/versions/1-0-0`;
+        const url = `/api/calm/namespaces/${namespace}/decorators/values?target=${encodeURIComponent(target)}`;
+
+        it('fetches the decorators of every type for the version', async () => {
+            const decorators = [
+                { uniqueId: 'dec-1', type: 'deployment', target: [target], appliesTo: ['node-a'], data: {} },
+                { uniqueId: 'dec-2', type: 'observability', target: [target], appliesTo: ['node-b'], data: {} },
+            ];
+            mock.onGet(url).reply(200, { values: decorators });
+
+            expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual(decorators);
+        });
+
+        it('returns an empty array when the response has no values', async () => {
+            mock.onGet(url).reply(200, {});
+
+            expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual([]);
+        });
+
+        it('returns an empty array without a decorator request when the slug cannot be resolved', async () => {
+            mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(200, { values: [] });
+
+            expect(await calmService.fetchArchitectureDecorators(namespace, 'unknown-slug', '1.0.0')).toEqual([]);
+            expect(mock.history.get.filter((r) => r.url?.includes('/decorators'))).toHaveLength(0);
+        });
+
+        it('rejects when the request fails', async () => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+            mock.onGet(url).reply(500);
+
+            await expect(calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).rejects.toThrow(
+                `Error fetching decorators for namespace ${namespace}:`
+            );
+            consoleError.mockRestore();
         });
     });
 

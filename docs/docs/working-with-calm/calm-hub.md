@@ -111,13 +111,16 @@ When you select an **Architecture** or **Pattern** artifact, CALM Hub renders th
 * **Pan & Zoom:** Click and drag the canvas background to pan; use your scroll wheel or the floating bottom-left controls to zoom.
 * **Minimap:** A floating overview panel in the bottom-right corner helps navigate larger diagrams.
 * **Component Search & Filtering:** Filter nodes dynamically using the search bar and type dropdown at the top right of the canvas.
-* **Details Sidebar:** Clicking any component opens a right-hand sidebar displaying its complete metadata, interfaces, and compliance controls.
+* **Details Sidebar:** Clicking any component opens a right-hand sidebar displaying its complete metadata, interfaces, and compliance controls. Its **Decorators** section lists the decorators whose `applies-to` contains the component.
 
 ### Tab Views
 
 * **Diagram Tab:** The interactive visual representation of the model.
 * **JSON Tab:** The raw, validated CALM JSON backing the diagram.
 * **Deployments Tab:** Overlays deployment decorators (environments, hosts, and instance settings) on top of the base architecture.
+* **Decorators Tab:** Lists all decorators of the architecture version, of every type. Each shows its type, `applies-to` and `data`, with links, dates, lists, tables and collapsible nested values, or as raw JSON. Filter by type. The filter is in the URL, for example `?tab=decorators&type=deployment`.
+
+An unknown `?tab=` value opens the Diagram tab.
 
 ![CALM Hub Raw JSON Viewer](/img/hub-ui/json-view.png)
 
