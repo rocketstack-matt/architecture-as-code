@@ -339,7 +339,8 @@ CALM Hub includes an experimental [Model Context Protocol](https://modelcontextp
 
 Tool providers are in `src/main/java/org/finos/calm/mcp/tools/`:  
 `ArchitectureTools`, `PatternTools`, `ControlTools`, `DomainTools`, `InterfaceTools`,  
-`NamespaceTools`, `SearchTools`, `StandardTools`, `TimelineTools`, `AdrTools`.
+`NamespaceTools`, `SearchTools`, `StandardTools`, `TimelineTools`, `AdrTools`.  
+`ExtensionTools` registers one `ext_<id>_<command>` tool for each extension command at start up, with `ToolManager`.
 
 Enable for development:
 ```bash
@@ -418,6 +419,9 @@ All four workflows:
 - `ExtensionProxyService` holds every rule of a proxied call: route match, path checks, scope, read-only,
   identity assertion, header allow-lists, limits and audit. `ExtensionProxyResource` and the MCP tools
   must both call it, because MCP does not pass through the JAX-RS filters (ADR 0011)
+- `mcp/tools/ExtensionTools` registers the command tools after `ExtensionRegistry` loads (observer priority).
+  `ToolManager` lists them after the `@Tool` methods, in registration order, so it registers them sorted.
+  The MCP server does not check arguments against `inputSchema`, so the handler does
 - `ReadOnlyRequestFilter` exempts only `^/api/calm/extensions/[^/]+/api/`, in normal form. The proxy
   then allows a non-GET method only on a `readOnly` route
 - `ExtensionIdentitySigner` signs with the JDK, not a JWT library. `ExtensionAssertionRejectingMechanism`
