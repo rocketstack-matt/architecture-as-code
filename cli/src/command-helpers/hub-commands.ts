@@ -1203,7 +1203,7 @@ async function findExtension(client: CalmHubClient, id: string): Promise<HubExte
 
 function findCommand(extension: HubExtension, name: string): { command: HubExtensionCommand, route: HubExtensionRoute } {
     const commands = extension.commands ?? {};
-    const command = Object.hasOwn(commands, name) ? commands[name] : undefined;
+    const command = Object.prototype.hasOwnProperty.call(commands, name) ? commands[name] : undefined;
     if (!command) {
         const known = Object.keys(commands);
         throw new HubCommandError(
@@ -1328,7 +1328,7 @@ function parseExtensionArgs(args: string[], request: string, format: OutputForma
  * `--arg limit=5` sends a number. A value that does not convert stays a string, and Hub rejects it.
  */
 function coerceArg(value: string, properties: unknown, key: string): unknown {
-    const schema = properties && typeof properties === 'object' && Object.hasOwn(properties, key)
+    const schema = properties && typeof properties === 'object' && Object.prototype.hasOwnProperty.call(properties, key)
         ? (properties as Record<string, { type?: unknown }>)[key]
         : undefined;
     const declared = schema?.type;

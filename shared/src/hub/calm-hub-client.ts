@@ -279,7 +279,6 @@ export class CalmHubClient {
                 data: request.body,
                 responseType: 'text',
                 transformResponse: (data: unknown) => data,
-                headers: { Accept: 'application/json, text/plain' },
             });
             const contentType = contentTypeOf(response.headers);
             return { status: response.status, contentType, data: parseReply(response.data, contentType) };
