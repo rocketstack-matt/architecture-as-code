@@ -118,8 +118,9 @@ class TestExtensionRegistryShould {
         environment.put("CALM_EXTENSIONS__TEAM_SERVICES__BACKEND_URL", "https://services.internal");
         environment.put("CALM_EXTENSIONS__TEAM_SERVICES__ORDER", "-5");
         environment.put("CALM_EXTENSIONS_ALPHA_ENABLED", "false");
+        environment.put("CALM_EXTENSIONS_DIR", tempDir.toString());
 
-        ExtensionRegistry registry = registry(dir(), NO_BUILTINS);
+        ExtensionRegistry registry = registry(Optional.empty(), NO_BUILTINS);
 
         assertThat(ids(registry), contains("team-services"));
         assertThat(registry.find("team-services").orElseThrow().order(), equalTo(-5));

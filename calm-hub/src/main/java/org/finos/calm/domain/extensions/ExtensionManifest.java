@@ -73,8 +73,9 @@ public record ExtensionManifest(
 
     /** The closed set of extension points. {@code decorator-views} have no route; the others name one by id. */
     @RegisterForReflection
-    @JsonbPropertyOrder({"screen", "designer-tab", "landing-card", "detail-panel", "action", "search-provider", "chat",
-            "decorator-views"})
+    // Yasson matches the order against Java names, not JSON names.
+    @JsonbPropertyOrder({"screen", "designerTab", "landingCard", "detailPanel", "action", "searchProvider", "chat",
+            "decoratorViews"})
     public record Contributions(
             List<RouteContribution> screen,
             @JsonProperty("designer-tab") @JsonbProperty("designer-tab") List<RouteContribution> designerTab,
@@ -135,7 +136,7 @@ public record ExtensionManifest(
 
     /** {@code status} and {@code label} are JSON Pointers into decorator data. Levels are ok, warn, error and info. */
     @RegisterForReflection
-    @JsonbPropertyOrder({"status", "map", "default", "label"})
+    @JsonbPropertyOrder({"status", "map", "defaultLevel", "label"})
     public record Overlay(
             String status,
             Map<String, String> map,

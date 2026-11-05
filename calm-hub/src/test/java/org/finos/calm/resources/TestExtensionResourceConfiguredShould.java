@@ -12,7 +12,6 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.not;
 
 @QuarkusTest
@@ -52,7 +51,10 @@ class TestExtensionResourceConfiguredShould {
                 .body("values[0].contributes.screen[0].route", equalTo("screen"))
                 .body("values[0].contributes.search-provider[0].route", equalTo("search"))
                 .body("values[0].contributes.decorator-views[0].overlay.default", equalTo("info"))
-                .body("values[0].contributes", not(hasKey("designer-tab")));
+                .body("values[0].contributes.keySet()", contains("screen", "search-provider", "decorator-views"))
+                .body("values[0].contributes.decorator-views[0].overlay.keySet()", contains("status", "map", "default", "label"))
+                .body("values[0].keySet()", contains("id", "version", "hubApi", "name", "description", "provider",
+                        "routes", "commands", "contributes"));
     }
 
     @Test
