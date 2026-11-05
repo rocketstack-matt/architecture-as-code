@@ -24,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.Principal;
@@ -32,6 +33,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Flow;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -335,6 +337,23 @@ class TestExtensionProxyServiceShould {
 
         assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(502));
         verify(auditService, never()).record(any());
+    }
+
+    @Test
+    void fail_the_capped_body_on_an_upstream_error_and_ignore_data_after_the_cap() {
+        ExtensionProxyService.CappedBodySubscriber failed = new ExtensionProxyService.CappedBodySubscriber(4);
+        failed.onError(new IOException("reset"));
+        assertThat(failed.getBody().toCompletableFuture().isCompletedExceptionally(), is(true));
+
+        ExtensionProxyService.CappedBodySubscriber capped = new ExtensionProxyService.CappedBodySubscriber(4);
+        Flow.Subscription subscription = mock(Flow.Subscription.class);
+        capped.onSubscribe(subscription);
+        capped.onNext(List.of(ByteBuffer.wrap(new byte[5])));
+        capped.onNext(List.of(ByteBuffer.wrap(new byte[1])));
+        capped.onComplete();
+
+        verify(subscription).cancel();
+        assertThat(capped.getBody().toCompletableFuture().isCompletedExceptionally(), is(true));
     }
 
     static SecurityIdentity identity(String name) {

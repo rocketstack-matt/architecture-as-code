@@ -161,6 +161,18 @@ class TestExtensionProxyResourceShould {
     }
 
     @Test
+    @TestSecurity(user = "alice")
+    void refuse_put_patch_and_delete_on_a_route_that_declares_only_get() {
+        given().contentType("application/json").body("{}").when().put(BASE + "/screen").then().statusCode(405);
+        given().contentType("application/json").body("{}").when().patch(BASE + "/screen").then().statusCode(405);
+        given().when().delete(BASE + "/screen").then().statusCode(405)
+                .header("Content-Security-Policy", CSP)
+                .body("error", equalTo("The extension route does not allow this method"));
+
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
     void return_401_when_not_authenticated() {
         given()
                 .when()
