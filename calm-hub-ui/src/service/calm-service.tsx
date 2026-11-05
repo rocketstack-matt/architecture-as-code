@@ -480,6 +480,22 @@ export class CalmService {
     }
 
     /**
+     * Fetches the decorators of every type recorded against one architecture version.
+     *
+     * Resolves a slug id to its numeric id first, and returns an empty array when the slug cannot be resolved. Unlike
+     * `fetchDecoratorValues` this rejects when the request fails, so the caller can tell a failure from no decorators.
+     */
+    public async fetchArchitectureDecorators(namespace: string, id: string, version: string): Promise<Decorator[]> {
+        const target = await this.resolveArchitectureVersionTarget(namespace, id, version);
+        if (!target) return [];
+        return this.requestDecoratorValues(namespace, target).catch((error) => {
+            const errorMessage = `Error fetching decorators for namespace ${namespace}:`;
+            console.error('%s', errorMessage, error);
+            return Promise.reject(new Error(errorMessage));
+        });
+    }
+
+    /**
      * Fetches the control-evaluation decorators recorded against one architecture version, given the target from
      * `resolveArchitectureVersionTarget`.
      *
