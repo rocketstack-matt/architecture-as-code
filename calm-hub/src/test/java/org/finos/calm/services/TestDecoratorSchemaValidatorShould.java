@@ -102,6 +102,17 @@ class TestDecoratorSchemaValidatorShould {
     }
 
     @Test
+    void validate_a_known_schema_that_contains_null_values() {
+        DecoratorSchemaValidator fixtureValidator =
+                new DecoratorSchemaValidator(List.of("9.8"), "decorator-standards-fixture/");
+        String schema = "https://calm.finos.org/standards/test/nullable.decorator.standard.json";
+
+        assertThat(fixtureValidator.isKnown(schema), is(true));
+        assertThat(fixtureValidator.validate(new JsonObject().put("$schema", schema).putNull("data")), is(empty()));
+        assertThat(fixtureValidator.validate(new JsonObject().put("$schema", schema).put("data", 42)), is(not(empty())));
+    }
+
+    @Test
     void know_nothing_when_there_is_no_standards_index() {
         DecoratorSchemaValidator emptyValidator = new DecoratorSchemaValidator(List.of(), "no-such-path/");
 
