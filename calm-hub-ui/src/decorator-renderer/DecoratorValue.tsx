@@ -64,7 +64,7 @@ function List({ items }: { items: Primitive[] }) {
 
 function Entries({ entries, depth }: { entries: [string, unknown][]; depth: number }) {
     return (
-        <dl className="grid grid-cols-[minmax(6rem,max-content)_1fr] gap-x-3 gap-y-1.5 text-xs">
+        <dl className="grid grid-cols-[minmax(4rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
             {entries.map(([key, value]) =>
                 isBranch(value) ? (
                     <div key={key} className="col-span-2">

@@ -50,9 +50,11 @@ vi.mock('../../../visualizer/components/drawer/Drawer.js', () => ({
     Drawer: ({
         data,
         onPositionsChange,
+        onDroppedFileChange,
     }: {
         data: Data;
         onPositionsChange?: (positions: { id: string; position: { x: number; y: number } }[]) => void;
+        onDroppedFileChange?: (dropped: boolean) => void;
     }) => (
         <div data-testid="drawer">
             Drawer for {data.id}
@@ -61,6 +63,7 @@ vi.mock('../../../visualizer/components/drawer/Drawer.js', () => ({
             >
                 simulate-drag-report
             </button>
+            <button onClick={() => onDroppedFileChange?.(true)}>simulate-file-drop</button>
         </div>
     ),
 }));
@@ -502,6 +505,17 @@ describe('DiagramSection', () => {
             await waitFor(() => expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, observability]));
 
             unmount();
+            expect(onDecoratorsChange).toHaveBeenLastCalledWith([]);
+        });
+
+        it('reports an empty list while a dropped file replaces the architecture', async () => {
+            const user = userEvent.setup();
+            const onDecoratorsChange = vi.fn();
+            renderArchitecture('/', { onDecoratorsChange });
+            await waitFor(() => expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, observability]));
+
+            await user.click(screen.getByText('simulate-file-drop'));
+
             expect(onDecoratorsChange).toHaveBeenLastCalledWith([]);
         });
 

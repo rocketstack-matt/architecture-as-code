@@ -150,12 +150,14 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
         () => allDecorators.filter((d): d is DeploymentDecorator => d.type === 'deployment'),
         [allDecorators]
     );
-    // Fetched results are kept with the key they were fetched for, so a result for
-    // another resource, version or comparison is never shown.
+    // A dropped file is not the loaded architecture, so the details drawer must not show its decorators.
+    const [showsDroppedFile, setShowsDroppedFile] = useState(false);
     const [compareFrom, setCompareFrom] = useState<string | null>(null);
     const [compareTo, setCompareTo] = useState<string | null>(null);
     const comparing = compareFrom !== null && compareTo !== null;
     const [versions, setVersions] = useState<string[]>([]);
+    // Fetched results are kept with the key they were fetched for, so a result for
+    // another resource, version or comparison is never shown.
     // `doc` is null when the timeline could not be loaded.
     const [loadedTimeline, setLoadedTimeline] = useState<{ key: string; doc: CalmTimelineSchema | null } | null>(null);
     const timelineResult = isArchitecture && loadedTimeline?.key === resourceKey ? loadedTimeline : null;
@@ -387,9 +389,10 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
         };
     }, [isArchitecture, calmService, data.name, data.id, resourceKey]);
 
+    const drawerDecorators = showsDroppedFile ? NO_DECORATORS : allDecorators;
     useEffect(() => {
-        onDecoratorsChange?.(allDecorators);
-    }, [allDecorators, onDecoratorsChange]);
+        onDecoratorsChange?.(drawerDecorators);
+    }, [drawerDecorators, onDecoratorsChange]);
     useEffect(() => () => onDecoratorsChange?.(NO_DECORATORS), [onDecoratorsChange]);
 
     // When an architecture has an explicit timeline, landing on the latest
@@ -452,6 +455,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
                 defaultLayout={defaultLayoutState.defaultLayout}
                 layoutEpoch={defaultLayoutState.layoutEpoch}
                 onPositionsChange={handlePositionsChange}
+                onDroppedFileChange={setShowsDroppedFile}
             />
         ),
         decorators: decoratorsState,
