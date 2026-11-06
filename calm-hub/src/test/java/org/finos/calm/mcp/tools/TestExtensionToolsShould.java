@@ -933,9 +933,17 @@ class TestExtensionToolsShould {
     @Test
     void encode_a_path_value_so_it_cannot_add_a_segment() {
         ExtensionProxyRequest request = ExtensionTools.request(tool("remove-service"),
-                new JsonObject("{\"namespace\":\"finos\",\"name\":\"../a/b?c#d é\"}"));
+                new JsonObject("{\"namespace\":\"finos\",\"name\":\"..a?c#d é\\\\\"}"));
 
-        assertThat(request.path(), is("/namespaces/finos/services/..%2Fa%2Fb%3Fc%23d%20%C3%A9"));
+        assertThat(request.path(), is("/namespaces/finos/services/..a%3Fc%23d%20%C3%A9%5C"));
+    }
+
+    @Test
+    void refuse_a_slash_in_the_path() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
+                tool("remove-service"), new JsonObject("{\"namespace\":\"finos\",\"name\":\"architectures/1\"}")));
+
+        assertThat(e.getMessage(), containsString("must not contain /"));
     }
 
     @Test
