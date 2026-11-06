@@ -70,9 +70,10 @@ function BrowseCard({ label, count, to, testId, description }: BrowseCardProps) 
 interface BrowseSectionProps {
     title: string;
     children: React.ReactNode;
+    gridClassName?: string;
 }
 
-function BrowseSection({ title, children }: BrowseSectionProps) {
+function BrowseSection({ title, children, gridClassName = 'grid-cols-2 sm:grid-cols-3' }: BrowseSectionProps) {
     return (
         <section className="w-full">
             <div
@@ -81,7 +82,9 @@ function BrowseSection({ title, children }: BrowseSectionProps) {
             >
                 {title}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{children}</div>
+            <div data-testid="browse-grid" className={`grid ${gridClassName} gap-3`}>
+                {children}
+            </div>
         </section>
     );
 }
@@ -120,7 +123,8 @@ export function IntroBrowse({ namespaceCounts, domainCounts }: IntroBrowseProps)
             )}
 
             {extensions.length > 0 && (
-                <BrowseSection title="Extensions">
+                // Wider cards than the tiles, so that the figures stay readable on a phone.
+                <BrowseSection title="Extensions" gridClassName="grid-cols-1 sm:grid-cols-2">
                     {extensions.map((extension) => (
                         <ExtensionCard key={extension.id} extension={extension} />
                     ))}

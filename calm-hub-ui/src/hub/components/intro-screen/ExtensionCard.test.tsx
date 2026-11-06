@@ -56,6 +56,21 @@ describe('ExtensionCard', () => {
         expect(call).toHaveBeenCalledTimes(1);
     });
 
+    // jsdom has no layout, so these tests check the CSS that keeps the figures readable at 375 px:
+    // one card for each row (about 295 px of content), one column for each figure, and labels that wrap.
+    it('gives each figure an equal share of the card and wraps long labels and values', async () => {
+        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({
+            hubApi: 0,
+            blocks: [{ type: 'stats', items: [{ label: 'In flight', value: 1 }, { label: 'Rolled back (30 days)', value: '2.1 days' }] }],
+        });
+        renderCard(fakeExtension(1));
+        const label = await screen.findByText('Rolled back (30 days)');
+        expect(screen.getByTestId('extension-card-figures').style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+        expect(label).not.toHaveClass('truncate');
+        expect(label).toHaveClass('break-words');
+        expect(screen.getByText('2.1 days')).not.toHaveClass('truncate');
+    });
+
     it('shows the card without figures when the request fails', async () => {
         const call = vi.spyOn(ExtensionService.prototype, 'call').mockRejectedValue(new Error('down'));
         renderCard(fakeExtension(1));
@@ -81,6 +96,24 @@ describe('IntroBrowse extensions', () => {
         const titles = screen.getAllByText(/^(Namespaces|Extensions)$/).map((el) => el.textContent);
         expect(titles).toEqual(['Namespaces', 'Extensions']);
         expect(screen.getAllByTestId('browse-extension')).toHaveLength(10);
+    });
+
+    it('puts the extension cards in one column on a phone, and keeps the tile grid for namespaces', () => {
+        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+        render(
+            <MemoryRouter>
+                <ExtensionsContext.Provider value={fakeExtensions(3)}>
+                    <IntroBrowse
+                        namespaceCounts={[{ namespace: 'demo', architectures: 1, patterns: 0, flows: 0, standards: 0, adrs: 0, interfaces: 0, total: 1 }]}
+                        domainCounts={[]}
+                    />
+                </ExtensionsContext.Provider>
+            </MemoryRouter>
+        );
+        const [namespaces, extensions] = screen.getAllByTestId('browse-grid');
+        expect(namespaces).toHaveClass('grid-cols-2', 'sm:grid-cols-3');
+        expect(extensions).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
+        expect(extensions).not.toHaveClass('grid-cols-2');
     });
 
     it('shows extensions on an empty catalogue', () => {

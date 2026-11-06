@@ -36,13 +36,18 @@ function Headline({ headline }: { headline: CardHeadline }) {
         );
     }
     return (
-        <dl className="grid grid-cols-3 gap-2 m-0">
+        // Wrap rather than truncate: a tooltip does not help on a touch screen.
+        <dl
+            data-testid="extension-card-figures"
+            className="grid gap-2 m-0"
+            style={{ gridTemplateColumns: `repeat(${headline.items.length}, minmax(0, 1fr))` }}
+        >
             {headline.items.map((item, index) => (
                 <div key={index} className="min-w-0 flex flex-col">
-                    <dt className="text-[11px] truncate" style={{ color: colors.redesign.muted }} title={item.label}>
+                    <dt className="text-[11px] leading-tight break-words line-clamp-2" style={{ color: colors.redesign.muted }} title={item.label}>
                         {item.label}
                     </dt>
-                    <dd className="m-0 text-[15px] font-semibold truncate" style={{ color: colors.redesign.bodyStrong }}>
+                    <dd className="m-0 text-[15px] font-semibold leading-tight break-words" style={{ color: colors.redesign.bodyStrong }}>
                         {item.value}
                     </dd>
                 </div>
