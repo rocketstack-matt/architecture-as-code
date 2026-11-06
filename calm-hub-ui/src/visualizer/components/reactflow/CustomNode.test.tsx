@@ -9,6 +9,8 @@ import { mockOffsetSize } from '../../../test-support/layout-mocks.js';
 import { THEME, getRiskLevelColor, getNodeTypeColor } from './theme.js';
 import { EvaluationOverlayProvider } from '../../../test-support/evaluation-overlay.js';
 import { DecisionOverlayContext } from '../../context/DecisionOverlayContext.js';
+import { DecoratorOverlayContext } from '../../context/DecoratorOverlayContext.js';
+import { fakeElement, fakeView } from '../../../test-support/fake-overlays.js';
 import type { ElementEvaluation, ControlEvaluationDecorator } from '../../contracts/contracts.js';
 
 const { storeNodes } = vi.hoisted(() => ({ storeNodes: new Map<string, object>() }));
@@ -511,5 +513,23 @@ describe('decision overlay', () => {
         unmount();
         renderOverlay(true, notMet(), true);
         expect(screen.getByTestId('decision-callout').style.fontSize).toBe('16px');
+    });
+});
+
+describe('extension overlays', () => {
+    it('draws one badge for each extension when two extensions use the same view id', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const overlays = ['ext-a', 'ext-b'].map((extension) => ({
+            view: fakeView(extension, 'risk'),
+            elements: new Map([['node-1', fakeElement('warn')]]),
+        }));
+        render(
+            <DecoratorOverlayContext.Provider value={{ overlays, hiddenViews: new Set(), toggleView: vi.fn() }}>
+                <CustomNode {...makeNodeProps(undefined, { 'unique-id': 'node-1' })} />
+            </DecoratorOverlayContext.Provider>
+        );
+        expect(screen.getAllByTestId('overlay-badge')).toHaveLength(2);
+        expect(error.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+        error.mockRestore();
     });
 });

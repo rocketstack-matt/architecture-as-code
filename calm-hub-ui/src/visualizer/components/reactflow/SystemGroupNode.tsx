@@ -5,7 +5,7 @@ import { usePresentationMode } from '../../../theme/usePresentationMode.js';
 import { useElementEvaluation, useElementOverlays } from '../../context/DecoratorOverlayContext.js';
 import { OverlayBadge } from './overlay/OverlayBadge.js';
 import { overlayOutline } from './overlay/overlayStyle.js';
-import { worstStatus } from '../../overlay/overlayEngine.js';
+import { viewKey, worstStatus } from '../../overlay/overlayEngine.js';
 import { useDecisionOverlay } from '../../context/DecisionOverlayContext.js';
 import { decisionSummary } from './utils/decisionSummary.js';
 import { DecisionCallout } from './DecisionCallout.js';
@@ -55,7 +55,7 @@ function SystemGroupNodeComponent({ id, data }: NodeProps) {
         }}
       >
         <span>{data.label}</span>
-        {overlays.map((shown) => <OverlayBadge key={shown.view.id} shown={shown} presenting={presenting} />)}
+        {overlays.map((shown) => <OverlayBadge key={viewKey(shown.view)} shown={shown} presenting={presenting} />)}
       </div>
       {/* Below the container, as below a node, so the callout does not cover the nodes inside it. */}
       {summary && <DecisionCallout nodeId={id} summary={summary} presenting={presenting} width={presenting ? 320 : 220} />}
