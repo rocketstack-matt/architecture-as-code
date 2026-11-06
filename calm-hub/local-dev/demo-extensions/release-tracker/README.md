@@ -23,5 +23,6 @@ The detail panel has data for the nodes `web-app`, `api-gateway`, `user-service`
 `database` and `message-queue`. To see the overlay, add a decorator of type `release-risk` with
 `data.risk` set to `low`, `medium` or `high`, and `data.summary` set to a short text.
 
-Set `PORT` or `CALM_HUB_URL` (where the backend gets the JWKS) to change the defaults. The backend
+Test the backend with `node --test local-dev/demo-extensions/release-tracker/server.test.mjs`, from
+`calm-hub/`. Set `PORT` or `CALM_HUB_URL` (where the backend gets the JWKS) to change the defaults. The backend
 accepts only the issuer `http://localhost:8080`; see the [demo-extensions README](../README.md).

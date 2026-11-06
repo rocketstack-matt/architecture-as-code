@@ -118,7 +118,14 @@ createServer(async (req, res) => {
     let body = {};
     let text = '';
     for await (const chunk of req) text += chunk;
-    if (text) body = JSON.parse(text);
+    try {
+        if (text) body = JSON.parse(text);
+    } catch {
+        console.warn(`rejected ${req.method} ${url.pathname}: the body is not valid JSON`);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'the body is not valid JSON' }));
+        return;
+    }
     const reply = route(req.method, url, body);
     console.log(`${req.method} ${url.pathname}${url.search} for ${claims.sub}: ${reply ? 200 : 404}`);
     res.writeHead(reply ? 200 : 404, { 'Content-Type': 'application/json' });
