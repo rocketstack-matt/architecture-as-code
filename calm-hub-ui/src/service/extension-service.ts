@@ -10,7 +10,8 @@ export function extensionRequest(id: string, route: ExtensionRoute, context: Ext
     const values: Record<string, string | undefined> = { ...context };
     const path = route.path.replace(/\{([^}]+)\}/g, (_, key: string) => {
         const value = values[key];
-        if (typeof value !== 'string' || !value) throw new Error(`Missing extension context: ${key}`);
+        // Hub refuses %2F in a path (ADR 0011), so a value with a slash is not encoded but missing.
+        if (typeof value !== 'string' || !value || value.includes('/')) throw new Error(`Missing extension context: ${key}`);
         return encodeURIComponent(value);
     });
     if (!path.startsWith('/') || path.split('/').some((part) => part === '.' || part === '..')) {
