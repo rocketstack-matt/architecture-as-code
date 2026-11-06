@@ -29,7 +29,6 @@ class TestExtensionResourceConfiguredShould {
             return Map.of(
                     "calm.extensions.dir", "local-dev/extensions",
                     "calm.extensions.\"example-services\".backend-url", BACKEND_URL,
-                    "calm.extensions.release-tracker.enabled", "false",
                     // The static settings must not clash with the settings of each extension.
                     "calm.extensions.identity.private-key-location", KEYS.privateKey().toString(),
                     "calm.extensions.identity.public-key-locations", KEYS.publicKey().toString(),

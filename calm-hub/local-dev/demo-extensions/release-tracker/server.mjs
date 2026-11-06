@@ -1,10 +1,10 @@
 // Demo backend for the release-tracker extension. It answers only requests that carry a valid
 // CALM Hub identity assertion, and returns Hub "blocks" for each contribution.
 import { createServer } from 'node:http';
-import { createVerifier } from '../example-services/identity.mjs';
+import { createVerifier } from '../../extensions/example-services/identity.mjs';
 
 const PORT = Number(process.env.PORT ?? 8092);
-const HUB_URL = process.env.CALM_HUB_URL ?? 'http://127.0.0.1:8080';
+const HUB_URL = process.env.CALM_HUB_URL ?? 'http://localhost:8080';
 const ISSUER = process.env.CALM_HUB_ISSUER ?? HUB_URL;
 
 const verifyAssertion = createVerifier({

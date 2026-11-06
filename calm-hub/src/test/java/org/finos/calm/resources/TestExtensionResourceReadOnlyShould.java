@@ -25,7 +25,6 @@ class TestExtensionResourceReadOnlyShould {
                     "calm.readonly", "true",
                     "calm.extensions.dir", "local-dev/extensions",
                     "calm.extensions.example-services.backend-url", "http://localhost:8091",
-                    "calm.extensions.release-tracker.enabled", "false",
                     "calm.extensions.identity.private-key-location", KEYS.privateKey().toString(),
                     "calm.extensions.identity.public-key-locations", KEYS.publicKey().toString());
         }

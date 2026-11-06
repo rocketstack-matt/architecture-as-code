@@ -307,7 +307,7 @@ class TestExtensionManifestLoaderShould {
     void load_the_example_manifest_for_local_development() {
         List<ExtensionManifest> manifests = loader.loadDirectory(Path.of("local-dev/extensions"));
 
-        assertThat(manifests.stream().map(ExtensionManifest::id).toList(), contains("example-services", "release-tracker"));
+        assertThat(manifests.stream().map(ExtensionManifest::id).toList(), contains("example-services"));
     }
 
     @Test
