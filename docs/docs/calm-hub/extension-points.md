@@ -45,12 +45,16 @@ contribution, but the call fails.
 ### Context
 
 The UI sends the context as query parameters. A route path can also use these names as
-placeholders, for example `/namespaces/{namespace}/releases`.
+placeholders, for example `/namespaces/{namespace}/{resourceType}/{resourceId}`. A placeholder
+value cannot contain a slash, because CALM Hub refuses `%2F` in a path. Thus use `resource` only as
+a query parameter.
 
 | Parameter | Value | Sent to |
 |---|---|---|
 | `namespace` | The namespace of the open resource | `designer-tab`, `detail-panel`, `action` |
-| `resource` | `<type>/<id>`, for example `architectures/1` or `patterns/2` | `designer-tab`, `detail-panel`, `action` |
+| `resource` | `<type>/<id>`, for example `architectures/1` or `patterns/2`. Not for a path | `designer-tab`, `detail-panel`, `action` |
+| `resourceType` | `architectures` or `patterns` | `designer-tab`, `detail-panel`, `action` |
+| `resourceId` | The resource id, for example `1` | `designer-tab`, `detail-panel`, `action` |
 | `version` | The version on screen, for example `1.0.0` | `designer-tab`, `detail-panel`, `action` |
 | `selectedElement` | The `unique-id` of the selected node | `detail-panel`, and `designer-tab` and `action` when a node is selected |
 

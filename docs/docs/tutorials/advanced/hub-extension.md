@@ -71,7 +71,8 @@ at start-up. The folder name must equal the `id`.
 ```
 
 This is a part of the demo manifest. The full file also declares the designer tab, detail panel,
-action and decorator view.
+action and decorator view. The designer tab route is `/tab/{resourceType}/{resourceId}`: a path
+parameter cannot contain a slash, so the route cannot use `{resource}` (`architectures/1`).
 
 | Field | Purpose |
 |---|---|
@@ -220,7 +221,8 @@ docker run --rm --network host \
 
 The read-only images sign `iss` with `https://hub.calm.finos.org`, so start the backend with
 `CALM_HUB_ISSUER=https://hub.calm.finos.org`. A read-only Hub leaves out the routes that change
-data and are not `readOnly`, so the **Request release review** action does not show. If the backend
+data and are not `readOnly`, so the **Request release review** action does not show, and a direct
+`POST` to its route gets `405`. If the backend
 is on another host, use `https`, or set `calm.extensions."<id>".allow-http=true` for a trusted
 internal network.
 
@@ -266,7 +268,8 @@ curl -X POST http://localhost:8080/api/calm/namespaces/demo/decorators \
   -d '{"unique-id":"risk-order-service","type":"release-risk","target":["/api/calm/namespaces/demo/architectures/1/versions/1-0-0"],"target-type":["architecture"],"applies-to":["order-service"],"data":{"risk":"high","summary":"2.4.0 is rolling out"}}'
 ```
 
-The decorator `target` writes the version with `-`, not `.`.
+The decorator `target` writes the version with `-`, not `.`. Do not send `creationDateTime` or
+`updateDateTime`: CALM Hub sets them, and refuses a decorator that has them with `400`.
 
 | Where | What you see |
 |---|---|
@@ -276,7 +279,9 @@ The decorator `target` writes the version with `-`, not `.`.
 | Click the `order-service` node | The **Extensions** section of the node details, with the owner, last release and risk |
 | Diagram | A red **High** badge on `order-service`, and a **Release risk · Release tracker** row in the legend |
 
-The backend log shows each call, for example `GET /tab?namespace=demo&resource=architectures/1&version=1.0.0 for no-auth: 200`.
+The backend log shows each call, for example
+`GET /tab/architectures/1?namespace=demo&resource=architectures%2F1&resourceId=1&resourceType=architectures&version=1.0.0 for no-auth: 200`.
+CALM Hub sorts the query parameters by name.
 
 ## Step 7: Run the Command
 

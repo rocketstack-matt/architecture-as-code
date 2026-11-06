@@ -42,7 +42,8 @@ manifest.
 | `overlay.key` | No | A JSON Pointer. With `time`, only the newest decorator of each key counts, for example one result for each control |
 
 The pointers read fields in `data`. For example, `/risk` reads `data.risk`, and
-`/control/unique-id` reads `data.control["unique-id"]`.
+`/control/unique-id` reads `data.control["unique-id"]`. Thus `overlay.time` cannot read the
+Hub-owned `creationDateTime` or `updateDateTime`: put the time of the result in `data`.
 
 A view without `overlay` is valid, but the UI draws nothing for it yet.
 
@@ -80,7 +81,9 @@ off, set `calm.extensions."deployment".enabled=false`, or the same for `control-
 
 1. Write decorators with your own service account, as in
    [Show your decorators in Hub](index.md#show-your-decorators-in-hub). Use a stable `type`, and put
-   the status in `data`.
+   the status in `data`. Do not send `creationDateTime` or `updateDateTime`: Hub sets them, and
+   refuses a decorator that has them with `400` (see
+   [Decorator write rules](mcp-and-api.md#decorator-write-rules)).
 2. Put a manifest with only `decorator-views` at `<calm.extensions.dir>/<id>/extension.json`:
 
    ```json

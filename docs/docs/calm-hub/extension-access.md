@@ -28,7 +28,10 @@ MCP or any other client, with the same rules as for its own resources (see
 - CALM Hub takes the namespace and the domain only from the path, never from the query or the body.
 - A signed-out caller gets `401`. A signed-in caller without the scope gets `403`. CALM Hub does not
   call the backend.
-- On a read-only Hub, only `GET` and `readOnly` routes run.
+- On a read-only Hub, only `GET` and `readOnly` routes run. Any other call gets `405`, also when its
+  path is not valid.
+- CALM Hub refuses an encoded slash (`%2F`, also double-encoded) in a route path with `400`, and does
+  not call the backend.
 - `GET /api/calm/extensions` and the blocks schema also need a signed-in user.
   `GET /api/calm/auth/jwks` is public.
 
