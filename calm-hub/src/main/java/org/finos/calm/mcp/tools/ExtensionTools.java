@@ -83,6 +83,8 @@ public class ExtensionTools {
             "$recursiveAnchor", "$recursiveRef");
     // Ajv in the SDK overflows its stack on a schema nested about 350 deep.
     static final int MAX_SCHEMA_DEPTH = 64;
+    // The input check takes time in proportion to the argument size times the pattern size, so Hub limits both.
+    static final int MAX_ARGUMENTS_BYTES = 1024 * 1024;
     private static final String META_SCHEMA_BASE = "https://json-schema.org/draft/2020-12/";
     private static final String META_SCHEMA = META_SCHEMA_BASE + "schema";
     // Bundled in vertx-json-schema under this classpath folder.
@@ -680,6 +682,9 @@ public class ExtensionTools {
         if (err.isPresent()) return err.get();
 
         JsonObject input = new JsonObject(args == null ? new LinkedHashMap<>() : new LinkedHashMap<>(args)).copy();
+        if (input.toBuffer().length() > MAX_ARGUMENTS_BYTES) {
+            return ToolResponse.error("Error: The arguments are larger than " + MAX_ARGUMENTS_BYTES + " bytes of JSON.");
+        }
         ExtensionProxyRequest request;
         try {
             request = request(tool, input);

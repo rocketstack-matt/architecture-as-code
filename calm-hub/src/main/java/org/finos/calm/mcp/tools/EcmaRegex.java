@@ -24,7 +24,7 @@ final class EcmaRegex {
     static final int MAX_DEPTH = 64;
     // RE2J's time is the input length times the size of the compiled program, and nested repeats multiply
     // that size. Hub limits it before RE2J compiles, as RE2 C++ limits nested repeats.
-    static final int MAX_EXPANDED_SIZE = 1000;
+    static final int MAX_EXPANDED_SIZE = 100;
 
     private static final String SYNTAX_CHARACTERS = "^$\\.*+?()[]{}|";
     private static final Set<String> GENERAL_CATEGORIES = Set.of("C", "Other", "Cc", "Control", "cntrl", "Cf", "Format",
@@ -154,7 +154,8 @@ final class EcmaRegex {
         while (!atEnd() && peek() != '|' && peek() != ')') {
             size = capped(size + term());
         }
-        return size;
+        // RE2J compiles an empty alternative or group to an instruction too.
+        return Math.max(size, 1);
     }
 
     private static long capped(long size) {

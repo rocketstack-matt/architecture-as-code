@@ -69,24 +69,28 @@ class TestEcmaRegexShould {
     @ParameterizedTest
     @ValueSource(strings = {"(?=a)", "(?!a)", "(?<=a)", "(?<!a)", "(a)\\1", "(?<x>a)\\k<x>", "[\\S]", "\\p{ASCII}",
             "\\p{Any}", "\\p{sc=Grek}", "\\p{scx=Greek}", "\\p{LC}", "\\p{Cn}", "\\p{C}", "\\p{Letter}", "\\P{L}",
-            "[\\p{sc=Latin}\\d]", "a{1001}", "(?i)a", "(?:a{1000}){1000}", "(?:a{30}){34}", "a{1000}b",
-            "(?:(?:a{1000}){1000}){1000}", "(?:a{1000}){1000000000}", "(?:a{500}|b{501})"})
+            "[\\p{sc=Latin}\\d]", "a{101}", "(?i)a", "(?:a{1000}){1000}", "(?:a{10}){11}", "a{100}b", "(?:){101}",
+            "(?:(?:a{1000}){1000}){1000}", "(?:a{1000}){1000000000}", "(?:a{50}|b{51})", "(?:|){51}", "(?:(?:){1000}){1000}",
+            "(?:(?:(?:){1000}){1000}){1000}"})
     void refuse_a_pattern_that_has_no_linear_time_form(String pattern) {
         assertThat(pattern, EcmaRegex.linearError(pattern), notNullValue());
     }
 
     @Test
     void refuse_nested_repeats_before_they_are_expanded() {
-        assertThat(EcmaRegex.linearError("(?:a{1000}){1000}"), is("its repeats expand it to more than 1000 terms"));
-        assertThat(EcmaRegex.linearError("(?:(?:a{1000}){1000}){1000}"), is("its repeats expand it to more than 1000 terms"));
-        assertThat(EcmaRegex.linearError("a{1000}"), nullValue());
-        assertThat(EcmaRegex.linearError("(?:a{10}){100}"), nullValue());
-        assertThat(EcmaRegex.linearError("(?:a{10,}|b*){90}c"), nullValue());
+        assertThat(EcmaRegex.linearError("(?:a{1000}){1000}"), is("its repeats expand it to more than 100 terms"));
+        assertThat(EcmaRegex.linearError("(?:(?:a{1000}){1000}){1000}"), is("its repeats expand it to more than 100 terms"));
+        assertThat(EcmaRegex.linearError("a{100}"), nullValue());
+        assertThat(EcmaRegex.linearError("(?:a{10}){10}"), nullValue());
+        assertThat(EcmaRegex.linearError("(?:a{10,}|b*){9}c"), nullValue());
+        assertThat(EcmaRegex.linearError("(?:(?:){1000}){1000}"), is("its repeats expand it to more than 100 terms"));
+        assertThat(EcmaRegex.linearError("(?:(?:(?:){1000}){1000}){1000}"), is("its repeats expand it to more than 100 terms"));
+        assertThat(EcmaRegex.linearError("(?:|){50}"), nullValue());
     }
 
     @Test
     void match_an_accepted_pattern_of_the_largest_size_in_linear_time() {
-        com.google.re2j.Pattern largest = EcmaRegex.linear("^(?:[a-z]{0,10}x){90}$");
+        com.google.re2j.Pattern largest = EcmaRegex.linear("^(?:[a-z]{0,10}x){9}$");
         long small = time(() -> largest.matcher("a".repeat(100_000) + "!").find());
         long large = time(() -> largest.matcher("a".repeat(1_000_000) + "!").find());
 

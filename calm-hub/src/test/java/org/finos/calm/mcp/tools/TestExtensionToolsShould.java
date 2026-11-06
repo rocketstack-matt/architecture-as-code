@@ -15,6 +15,8 @@ import org.finos.calm.extensions.ExtensionRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -537,13 +539,46 @@ class TestExtensionToolsShould {
 
         when(proxyService.call(any(), any())).thenReturn(reply(200, "{}"));
 
-        ToolResponse ok = extensionTools.call(command, Map.of("text", "ab".repeat(1_000_000)));
-        ToolResponse refused = extensionTools.call(command, Map.of("text", "ab".repeat(1_000_000) + "c"));
+        ToolResponse ok = extensionTools.call(command, Map.of("text", "ab".repeat(500_000)));
+        ToolResponse refused = extensionTools.call(command, Map.of("text", "ab".repeat(500_000) + "c"));
 
         assertThat(ok.isError(), is(false));
         assertThat(text(refused), containsString("/text: String does not match pattern"));
     }
 
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a{99}b", "(?:\\s?){99}x", "(?:a{10,}|b*){9}c"})
+    void check_a_one_megabyte_argument_against_the_largest_accepted_patterns_in_less_than_five_seconds(String pattern) {
+        ExtensionTools.ExtensionTool command = textCommand(pattern);
+
+        long start = System.nanoTime();
+        ToolResponse response = extensionTools.call(command, Map.of("text", "a".repeat(ExtensionTools.MAX_ARGUMENTS_BYTES - 20)));
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("/text: String does not match pattern"));
+        assertThat(Duration.ofNanos(System.nanoTime() - start).toMillis() < 5_000, is(true));
+    }
+
+    @Test
+    void refuse_arguments_larger_than_one_megabyte_before_the_input_check() {
+        ExtensionTools.ExtensionTool command = textCommand("^a*$");
+
+        ToolResponse response = extensionTools.call(command, Map.of("text", "a".repeat(ExtensionTools.MAX_ARGUMENTS_BYTES)));
+
+        assertThat(text(response), is("Error: The arguments are larger than 1048576 bytes of JSON."));
+        verify(proxyService, never()).checkAccess(any(), any());
+        verify(proxyService, never()).call(any(), any());
+    }
+
+    private static ExtensionTools.ExtensionTool textCommand(String pattern) {
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        Map<String, Object> input = Map.of("type", "object",
+                "properties", Map.of("text", Map.of("type", "string", "pattern", pattern)));
+        ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
+                Map.of("c", new ExtensionManifest.Command("r", "C", input, null, null, null)), null);
+        return ExtensionTools.tools(List.of(manifest)).getFirst();
+    }
     @Test
     void check_the_scope_before_the_input() {
         doThrow(new ExtensionProxyException(403, "You do not have the scope that this extension route needs"))
@@ -668,9 +703,9 @@ class TestExtensionToolsShould {
         assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "(?<=a)b")), containsString("it has a lookbehind"));
         assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "[\\S]")), containsString("\\S in a character class"));
         assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "\\p{ASCII}")), containsString("the Unicode property \\p{ASCII}"));
-        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "a{1001}")), containsString("expand it to more than 1000"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "a{101}")), containsString("expand it to more than 100 "));
         assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "(?:(?:a{1000}){1000}){1000}")),
-                containsString("expand it to more than 1000"));
+                containsString("expand it to more than 100 "));
         assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "(?i)a")), containsString("not an ECMA-262"));
         // Output schemas keep the ECMA-262 rules.
         assertThat(ExtensionTools.schemaError(Map.of("pattern", lookahead)), nullValue());
