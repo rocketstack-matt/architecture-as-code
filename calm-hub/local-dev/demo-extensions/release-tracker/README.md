@@ -3,7 +3,9 @@
 A demo extension for local development. It uses every UI extension point: a screen, a landing card,
 an action, a designer tab, a detail panel and a decorator view. Use it to check the CALM Hub UI
 layout. `server.mjs` is its backend: it has no dependencies, and it uses the identity verifier of
-[example-services](../../extensions/example-services/identity.mjs). The data is made up.
+[example-services](../../extensions/example-services/identity.mjs). The data is made up. The designer tab
+route uses `{resourceType}/{resourceId}`, because CALM Hub refuses `%2F` in a path. Test the routes
+with `node --test calm-hub/local-dev/demo-extensions/release-tracker/routes.test.mjs`.
 
 It is not in `local-dev/extensions`, because it has routes: a Hub that loads it without its backend
 URL does not start, and the UI then shows "CalmHub failed to load".
