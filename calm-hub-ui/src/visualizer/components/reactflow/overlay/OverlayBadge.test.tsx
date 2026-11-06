@@ -4,6 +4,7 @@ import { DecoratorOverlayContext } from '../../../context/DecoratorOverlayContex
 import { fakeDecorator, fakeView } from '../../../../test-support/fake-overlays.js';
 import { extensionMarkerColour } from '../../../../extensions/extensionIdentity.js';
 import { OverlayBadge, OverlayEdgeBadge } from './OverlayBadge.js';
+import { detailsPosition } from './OverlayBadgeDetails.js';
 import { OVERLAY_STYLES, overlayOutline } from './overlayStyle.js';
 import { BUILTIN_DECORATOR_VIEWS } from '../../../../test-support/decorator-views.js';
 import type { OverlayDecoratorView, OverlayStatus } from '../../../contracts/contracts.js';
@@ -121,10 +122,55 @@ describe('OverlayBadge details', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
+    it('returns focus to the badge on Escape and on the view link, but not on a press outside', () => {
+        renderBadge();
+        const badge = screen.getByTestId('overlay-badge');
+        fireEvent.click(badge);
+        expect(screen.getByRole('dialog')).toHaveFocus();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(badge).toHaveFocus();
+
+        fireEvent.click(badge);
+        fireEvent.click(screen.getByRole('button', { name: 'View all View release-risk' }));
+        expect(badge).toHaveFocus();
+
+        fireEvent.click(badge);
+        fireEvent.pointerDown(document.body);
+        expect(badge).not.toHaveFocus();
+    });
+
+    it('opens above a badge near the bottom of a phone screen, inside the viewport', () => {
+        Object.defineProperty(window, 'innerHeight', { configurable: true, value: 667 });
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 });
+        renderBadge();
+        const badge = screen.getByTestId('overlay-badge');
+        vi.spyOn(badge, 'getBoundingClientRect').mockReturnValue(new DOMRect(300, 600, 60, 20));
+        fireEvent.click(badge);
+        const details = screen.getByRole('dialog');
+        expect(details.style.top).toBe('');
+        expect(details.style.bottom).toBe(`${667 - 600 + 6}px`);
+        expect(details.style.maxHeight).toBe(`${600 - 6 - 8}px`);
+        expect(details.style.left).toBe(`${375 - 288 - 8}px`);
+    });
+
     it('marks a built-in view in the details', () => {
         const builtIn = { ...riskShown, view: fakeView('deployment', 'deployment', 'Deployments') };
         render(<OverlayBadge shown={builtIn} presenting={false} />);
         fireEvent.click(screen.getByTestId('overlay-badge'));
         expect(screen.getByRole('dialog')).toHaveTextContent('Built-in (Deployments)');
+    });
+});
+
+describe('detailsPosition', () => {
+    it('opens below the badge when there is room, and fits the rest of the screen', () => {
+        expect(detailsPosition(new DOMRect(100, 100, 60, 20), 1024, 768)).toEqual({ left: 100, top: 126, maxHeight: 768 - 126 - 8 });
+    });
+
+    it('opens above when there is little room below and more above', () => {
+        expect(detailsPosition(new DOMRect(100, 700, 60, 20), 1024, 768)).toEqual({ left: 100, bottom: 74, maxHeight: 686 });
+    });
+
+    it('stays below on a short screen when there is more room below than above', () => {
+        expect(detailsPosition(new DOMRect(8, 20, 60, 20), 375, 300)).toEqual({ left: 8, top: 46, maxHeight: 246 });
     });
 });

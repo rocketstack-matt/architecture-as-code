@@ -24,8 +24,11 @@ export function OverlayBadge({ shown, presenting }: { shown: ShownOverlay; prese
     const label = statusText(overlay.value);
     const icon = presenting ? '18px' : '12px';
     const [anchor, setAnchor] = useState<DOMRect | null>(null);
-    const close = useCallback(() => setAnchor(null), []);
     const button = useRef<HTMLButtonElement>(null);
+    const close = useCallback((restoreFocus: boolean) => {
+        setAnchor(null);
+        if (restoreFocus) button.current?.focus();
+    }, []);
     const toggle = (event: MouseEvent<HTMLButtonElement>) => {
         // The node must not take the click as a selection.
         event.stopPropagation();
