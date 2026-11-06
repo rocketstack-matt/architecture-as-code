@@ -144,7 +144,7 @@ CALM_UI_ITEMS_1__VALUE=2026.10.1
 
 An extension adds features to CALM Hub without a fork. It is an HTTP service that CALM Hub calls. The operator installs it with a manifest. CALM Hub reads the manifests at start up. No API adds an extension.
 
-> Work in progress: CALM Hub proxies extension routes. The UI, the CLI and MCP do not use them yet.
+> Work in progress: CALM Hub proxies extension routes. The Hub UI shows the contributions; see [Hub extension blocks](../working-with-calm/hub-extension-blocks.md).
 
 Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`. Hub skips hidden folders and warns about folders without a manifest. Settings for unknown extension ids also produce a warning.
 
@@ -341,7 +341,14 @@ set. `hide` lists statuses that suppress an older result without drawing a badge
 The registry returns enabled manifests in operator order, then by id. Set
 `calm.extensions."scanner".order` to change the order, or `.enabled=false` to hide
 its views. The built-in `control-evaluation` and `deployment` views use the same
-mechanism. If the registry cannot load in the browser, overlays stay off and the
+mechanism.
+
+Each extension gets a colour marker, derived from its id. Its badges and legend rows carry the
+marker, and each legend row reads `<view label> · <extension name>`. Built-in views say
+`Built-in`. The legend switches each view, and all the views of one extension, on or off. When
+no choice is stored, only the first three views are on. The browser keeps the choices. Click a
+badge to see the extension, the view, each status and its mapped value, the label and the time,
+with a link to the list of the view. If the registry cannot load in the browser, overlays stay off and the
 Decorators tab still renders the stored data.
 
 
