@@ -189,6 +189,23 @@ Evaluations panel read control-evaluation fields, so they stay tied to that view
 open the global auth or outage page. The shared `extensionService` loads the registry one time for
 `ExtensionsProvider` and `useDecoratorViews()`. After a failed load, the next call tries again.
 
+### Extension UI layout
+
+Each contribution kind has one place (see `docs/docs/working-with-calm/hub-extension-blocks.md`). Do not add a
+per-extension toolbar button or tab: it does not scale to many extensions.
+
+- Home: `IntroBrowse` shows an `ExtensionCard` per extension with a `landing-card` or a `screen`.
+  `cardHeadline()` (`extensions/landingCard.ts`) picks what the card shows.
+- Menu: `ExtensionMenuGroup` in the navbar drawer.
+- Architecture: one `extensions` tab in `DIAGRAM_TABS`, hidden (not unknown) until the registry loads, so a link
+  to it keeps the tab. `resourceExtensions()` decides if it shows.
+- Node details: `ExtensionDetailPanels`.
+- Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
+  closed section renders nothing, so it sends no request.
+- Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
+  `view.id` alone: two extensions can use the same view id. `extensionMarkerColour()` gives the marker colour.
+  `useOverlayVisibility` switches on the first 3 views when there is no stored choice.
+
 ### Operator UI config
 
 `UiConfigProvider` (`components/ui-config/`) loads `GET /api/calm/ui/config` one time.

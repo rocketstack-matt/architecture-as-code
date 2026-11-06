@@ -424,7 +424,8 @@ All four workflows:
   refuses a bearer token with `typ: calm-ext+jwt` in every auth mode
 - Tests generate key pairs at run time (`ExtensionTestKeys`); `*.pem` is git-ignored. `FixtureBackend` is a
   loopback backend for proxy tests
-- Try it: see `local-dev/extensions/example-services/README.md`
+- Try it: see `local-dev/extensions/example-services/README.md`. `local-dev/extensions/release-tracker/` is a demo
+  that uses every UI extension point. The tests that load `local-dev/extensions` disable it, because it has routes
 
 ### Read-Only Deployment Mode
 - `calm.readonly=true` opens Nitrite with `readOnly(true)` and installs

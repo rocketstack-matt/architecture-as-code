@@ -14,6 +14,7 @@ openssl pkey -in ../sandbox/keys/hub-private.pem -pubout -out ../sandbox/keys/hu
 ../mvnw quarkus:dev -Pstandalone,server-only \
   -Dcalm.extensions.dir=local-dev/extensions \
   -Dcalm.extensions.example-services.backend-url=http://localhost:8091 \
+  -Dcalm.extensions.release-tracker.enabled=false \
   -Dcalm.extensions.identity.private-key-location=../sandbox/keys/hub-private.pem \
   -Dcalm.extensions.identity.public-key-locations=../sandbox/keys/hub-public.pem \
   -Dcalm.extensions.allow-without-auth=true
@@ -22,6 +23,9 @@ openssl pkey -in ../sandbox/keys/hub-private.pem -pubout -out ../sandbox/keys/hu
 node local-dev/extensions/example-services/server.mjs
 curl http://localhost:8080/api/calm/extensions/example-services/api/namespaces/finos/services
 ```
+
+The folder also holds the [release-tracker](../release-tracker/README.md) demo. It has routes, so CALM Hub
+does not start unless it has a backend URL or is disabled, as above.
 
 The standalone profile has auth off, so `allow-without-auth` is needed and every caller is the
 `no-auth` principal. Set `PORT`, `CALM_HUB_URL` or `CALM_HUB_ISSUER` to change the defaults.
