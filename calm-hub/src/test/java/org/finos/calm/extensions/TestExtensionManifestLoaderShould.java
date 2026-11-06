@@ -30,6 +30,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -308,6 +309,15 @@ class TestExtensionManifestLoaderShould {
         List<ExtensionManifest> manifests = loader.loadDirectory(Path.of("local-dev/extensions"));
 
         assertThat(manifests.stream().map(ExtensionManifest::id).toList(), contains("example-services"));
+    }
+
+    @Test
+    void load_the_demo_manifest_with_a_resource_route() {
+        List<ExtensionManifest> manifests = loader.loadDirectory(Path.of("local-dev/demo-extensions"));
+
+        assertThat(manifests.stream().map(ExtensionManifest::id).toList(), contains("release-tracker"));
+        assertThat(manifests.get(0).routes().stream().filter(r -> r.id().equals("tab")).findFirst().orElseThrow().path(),
+                is("/tab/{resourceType}/{resourceId}"));
     }
 
     @Test

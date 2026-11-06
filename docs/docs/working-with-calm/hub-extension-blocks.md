@@ -36,8 +36,10 @@ Markdown ignores raw HTML. Links accept an external HTTP(S) `href`, or a `hub` o
 
 The same contract supports `designer-tab`, `landing-card`, and node `detail-panel` contributions.
 Block routes must use GET. Hub calls `/api/calm/extensions/{id}/api/...` and
-passes available `namespace`, `resource` (`type/id`), `version`, and `selectedElement` (element ID)
-as request parameters. Route placeholders can use these names. Global screens and landing cards
+passes available `namespace`, `resource` (`type/id`), `resourceType` (`architectures`, `patterns`, …),
+`resourceId`, `version`, and `selectedElement` (element ID) as request parameters. Route placeholders
+can use these names, but Hub refuses a slash in a path, so use `{resourceType}/{resourceId}` in a
+route path and `resource` only as a parameter. Global screens and landing cards
 have no selected resource. No token contains this UI context.
 
 ## Where Hub shows each contribution

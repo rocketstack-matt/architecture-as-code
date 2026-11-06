@@ -9,11 +9,12 @@ import java.util.Locale;
 /**
  * Checks a caller-supplied path and query and builds the backend URI from them (ADR 0011). Each
  * check works on the raw, percent-encoded form, so that an encoded or double-encoded form cannot
- * hide a dot segment or user info. Encoded slashes stay encoded within a route parameter.
+ * hide a dot segment, an extra segment or user info. An encoded slash is not allowed, because a
+ * backend that decodes it before routing sees a path other than the one that Hub matched.
  */
-final class ExtensionPaths {
+public final class ExtensionPaths {
 
-    private static final List<String> FORBIDDEN = List.of("..", "%2e", "%5c", "%25", "%40", "\\", "//", "@");
+    private static final List<String> FORBIDDEN = List.of("..", "%2e", "%2f", "%5c", "%25", "%40", "\\", "//", "@");
 
     private ExtensionPaths() {
     }
@@ -23,8 +24,7 @@ final class ExtensionPaths {
         if (rawPath == null || !rawPath.startsWith("/") || !printableAscii(rawPath, "?#")) {
             throw badRequest();
         }
-        String lower = rawPath.toLowerCase(Locale.ROOT);
-        if (FORBIDDEN.stream().anyMatch(lower::contains) || encodesControlCharacter(lower)) {
+        if (hasForbiddenPart(rawPath) || encodesControlCharacter(rawPath.toLowerCase(Locale.ROOT))) {
             throw badRequest();
         }
         for (String segment : rawPath.split("/", -1)) {
@@ -40,6 +40,15 @@ final class ExtensionPaths {
             throw badRequest();
         }
         return normalise(rawPath);
+    }
+
+    /**
+     * The one list of forbidden parts. The proxy and the read-only filter both use it, so that they
+     * cannot accept different paths. "%25" also covers each double-encoded form.
+     */
+    public static boolean hasForbiddenPart(String path) {
+        String lower = path.toLowerCase(Locale.ROOT);
+        return FORBIDDEN.stream().anyMatch(lower::contains);
     }
 
     private static String normalise(String path) {

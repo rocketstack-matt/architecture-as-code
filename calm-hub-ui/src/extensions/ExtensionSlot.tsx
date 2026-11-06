@@ -20,13 +20,13 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
     const [busy, setBusy] = useState(false);
     const actionRequest = useRef<AbortController | null>(null);
     useEffect(() => () => actionRequest.current?.abort(), []);
-    const { namespace, resource, version, selectedElement } = context;
+    const { namespace, resource, resourceType, resourceId, version, selectedElement } = context;
     useEffect(() => {
         if (action || !route) return;
         if (route.method !== 'GET') return;
         const controller = new AbortController();
         service
-            .call(extension.id, route, { namespace, resource, version, selectedElement }, controller.signal)
+            .call(extension.id, route, { namespace, resource, resourceType, resourceId, version, selectedElement }, controller.signal)
             .then((reply) => {
                 if (!isBlocksReply(reply, extension.hubApi)) throw new Error('Invalid blocks reply');
                 if (!controller.signal.aborted) setResult(reply);
@@ -35,7 +35,7 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
                 if (!controller.signal.aborted) setError(true);
             });
         return () => controller.abort();
-    }, [service, extension.id, extension.hubApi, route, action, namespace, resource, version, selectedElement]);
+    }, [service, extension.id, extension.hubApi, route, action, namespace, resource, resourceType, resourceId, version, selectedElement]);
     if (!route) return <p role="alert">Extension route unavailable.</p>;
     if (action)
         return (

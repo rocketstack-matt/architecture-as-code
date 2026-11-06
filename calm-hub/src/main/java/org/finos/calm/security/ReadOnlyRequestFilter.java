@@ -9,12 +9,11 @@ import jakarta.ws.rs.container.PreMatching;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.finos.calm.extensions.ExtensionPaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -55,7 +54,6 @@ public class ReadOnlyRequestFilter implements ContainerRequestFilter {
     private static final String ALLOW_HEADER = "Allow";
     private static final String ALLOWED_METHODS = "GET, HEAD, OPTIONS";
     private static final Pattern EXTENSION_PROXY_PATH = Pattern.compile("^/?api/calm/extensions/[^/]+/api/");
-    private static final List<String> UNSAFE_PATH_PARTS = List.of("..", "%2e", "%2f", "%5c", "\\", "//");
 
     // Resolved once at runtime startup via @PostConstruct (see init()).  We deliberately
     // avoid @ConfigProperty here: in native image, @ConfigProperty values on CDI beans
@@ -104,11 +102,7 @@ public class ReadOnlyRequestFilter implements ContainerRequestFilter {
         }
         URI requestUri = requestContext.getUriInfo().getRequestUri();
         String rawPath = requestUri == null ? null : requestUri.getRawPath();
-        return rawPath != null && isSafe(path) && isSafe(rawPath) && rawPath.contains("/api/calm/extensions/");
-    }
-
-    private static boolean isSafe(String path) {
-        String lower = path.toLowerCase(Locale.ROOT);
-        return UNSAFE_PATH_PARTS.stream().noneMatch(lower::contains);
+        return rawPath != null && !ExtensionPaths.hasForbiddenPart(path) && !ExtensionPaths.hasForbiddenPart(rawPath)
+                && rawPath.contains("/api/calm/extensions/");
     }
 }

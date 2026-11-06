@@ -751,6 +751,11 @@ public class ExtensionTools {
                 throw new IllegalArgumentException("Input property '" + name + "' must not be . or .., because it fills "
                         + "the path " + route.path());
             }
+            if (text.contains("/")) {
+                // Encoded, it is %2F, which the proxy refuses (ADR 0011).
+                throw new IllegalArgumentException("Input property '" + name + "' must not contain /, because it fills "
+                        + "the path " + route.path());
+            }
             rest.remove(name);
             matcher.appendReplacement(path, Matcher.quoteReplacement(encode(text)));
         }

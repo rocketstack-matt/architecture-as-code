@@ -69,13 +69,13 @@ describe('ExtensionService', () => {
         expect(await service.fetchExtensions()).toEqual([{ id: 'test' }]);
     });
     it('sends context through the proxy with auth', async () => {
-        mock.onGet('/api/calm/extensions/test/api/summary/a%2Fb').reply((config) => {
-            expect(config.params).toEqual({ namespace: 'a/b', resource: 'architectures/1', version: '1', selectedElement: 'node' });
+        mock.onGet('/api/calm/extensions/test/api/summary/a%20b').reply((config) => {
+            expect(config.params).toEqual({ namespace: 'a b', resource: 'architectures/1', version: '1', selectedElement: 'node' });
             expect(config.headers?.Authorization).toBe('test');
             return [200, { hubApi: 0, blocks: [] }];
         });
         expect(
-            await new ExtensionService(ax).call('test', route, { namespace: 'a/b', resource: 'architectures/1', version: '1', selectedElement: 'node' })
+            await new ExtensionService(ax).call('test', route, { namespace: 'a b', resource: 'architectures/1', version: '1', selectedElement: 'node' })
         ).toEqual({ hubApi: 0, blocks: [] });
     });
     it('sends write context in the body', async () => {
@@ -104,6 +104,16 @@ describe('ExtensionService', () => {
     });
     it('rejects missing route context', () => {
         expect(() => extensionRequest('test', route, {})).toThrow('Missing extension context');
+    });
+    it('treats a path value with a slash as missing, and keeps it in the query', () => {
+        const typed = { ...route, path: '/releases/{resourceType}/{resourceId}' };
+        const context = { resource: 'architectures/1', resourceType: 'architectures', resourceId: '1' };
+        expect(extensionRequest('test', typed, context)).toEqual({
+            url: '/api/calm/extensions/test/api/releases/architectures/1',
+            params: context,
+        });
+        expect(() => extensionRequest('test', { ...route, path: '/releases/{resource}' }, context)).toThrow('Missing extension context: resource');
+        expect(() => extensionRequest('test', typed, { ...context, resourceId: 'a/b' })).toThrow('Missing extension context: resourceId');
     });
     it('rejects traversal paths', () => {
         expect(() => extensionRequest('test', { ...route, path: '/../x' }, {})).toThrow('Invalid extension route');

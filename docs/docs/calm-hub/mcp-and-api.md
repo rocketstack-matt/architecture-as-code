@@ -111,6 +111,7 @@ The decorator endpoints (`/api/calm/namespaces/{namespace}/decorators`) and the 
 |:-----|:-----|:-------|
 | Reserved type | The old or new decorator `type` is reserved, and the caller is not one of its writers. Applies to create, update and delete | `403` |
 | Schema check | The decorator `$schema` is one that Hub knows, and the decorator does not match it. The body lists each error with its `location` (a JSON Pointer) | `400` |
+| Hub-owned times | The decorator has a top-level `creationDateTime` or `updateDateTime`. Hub sets these fields | `400` |
 
 Hub knows the calm-schema decorator Standards that it bundles (`deployment`, `kubernetes`, `control-evaluation`) and the base decorator definition (`https://calm.finos.org/release/<version>/meta/decorators.json#/defs/decorator`). Hub accepts a decorator with any other `$schema` without a check.
 
@@ -129,11 +130,21 @@ A reserved type is also append-only. An update of a reserved-type decorator does
 |:--------|:-------|
 | `GET .../decorators`, `GET .../decorators/values` | Lists only current decorators |
 | `GET .../decorators/{id}` | Returns the decorator, current or superseded |
-| `GET .../decorators/{id}/history` | Returns the history that contains `{id}`, current first. Each entry has `id`, `supersedes`, `supersededBy` and `decorator` |
+| `GET .../decorators/{id}/history` | Returns the history that contains `{id}`, current first. Each entry has `id`, `supersedes`, `supersededBy`, `supersededDateTime` and `decorator` |
 | `PUT .../decorators/{id}` on a superseded decorator | `409 Conflict`. Update the current decorator |
 | `DELETE .../decorators/{id}` | Deletes the whole history. The caller must be a writer for every reserved type in it |
 
 The MCP tool `getDecoratorHistory` returns the same history.
+
+Hub records when it writes each decorator. Every read returns the times: `GET .../decorators/{id}`, `.../decorators/values`, each `decorator` in a history, and the MCP decorator tools.
+
+| Field | Set when |
+|:------|:---------|
+| `creationDateTime` | Hub stores the decorator. A decorator that supersedes another gets a new time |
+| `updateDateTime` | Hub stores the decorator, and on each in-place update |
+| `supersededDateTime` (history entry) | A newer decorator supersedes this one. The old decorator keeps its own `updateDateTime`, so that time stays the time its content was last written |
+
+The times are UTC ISO-8601 strings with milliseconds, for example `2026-11-06T10:15:30.123Z`. Hub stores them in its own storage fields, not in the decorator. A decorator that Hub stored before it recorded times has no times: the fields are not in the response, and `supersededDateTime` is `null`. Hub does not add times to old decorators.
 
 ### Access Control
 

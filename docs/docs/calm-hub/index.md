@@ -187,7 +187,7 @@ CALM_EXTENSIONS__TEAM_SERVICES__ORDER=10
 The manifest declares:
 
 - `id`, `version`, `hubApi` (now `0`), `name`, and optional `description` and `provider`.
-- `routes`: every call that the extension can receive, each with an `id`, `method`, `path`, `scope` and optional `readOnly`. A `read`, `write` or `admin` scope needs a `{namespace}` in the path. A `domain_*` scope needs a `{domain}`.
+- `routes`: every call that the extension can receive, each with an `id`, `method`, `path`, `scope` and optional `readOnly`. A `read`, `write` or `admin` scope needs a `{namespace}` in the path. A `domain_*` scope needs a `{domain}`. A path parameter cannot contain a slash, so a route for a CALM Hub resource uses `{resourceType}/{resourceId}`, not `{resource}`.
 - `commands`: CLI and MCP commands, keyed by name. Each names a route by `id`.
 - `contributes`: the UI extension points `screen`, `designer-tab`, `landing-card`, `detail-panel`, `action`, `search-provider` and `chat`, which name a route by `id`, and `decorator-views`, which CALM Hub draws from decorators with no route.
 
@@ -200,7 +200,7 @@ The JSON Schema is `META-INF/calm-extensions/schema/0/extension.schema.json` in 
 
 CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route path>`. For each call, CALM Hub:
 
-- preserves encoded slashes (`%2F`) within path parameters, without decoding them into route separators
+- refuses an encoded slash (`%2F`, in any case, or double-encoded) with `400`, and does not call the backend. A backend that decodes `%2F` before routing would see a path other than the one CALM Hub checked
 - decodes percent-encoded unreserved characters and uppercases other escapes before matching and forwarding. Percent-encoding in a matched literal segment gets `400`
 - matches the path against the declared routes only, and refuses `..`, `%2e`, `\`, `//`, `@` and their encoded forms
 - checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path

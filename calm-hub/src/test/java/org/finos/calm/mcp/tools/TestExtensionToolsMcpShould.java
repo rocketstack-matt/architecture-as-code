@@ -261,11 +261,19 @@ class TestExtensionToolsMcpShould {
     @Test
     @TestSecurity(user = "alice")
     void refuse_encoded_and_dot_segment_parameter_values_as_the_rest_proxy_does() {
-        for (String value : new String[]{"%61dmin", "a/../b", "%2e%2e"}) {
+        for (String value : new String[]{"%61dmin", "%2e%2e", "%2F"}) {
             JsonObject result = callTool("ext_mcp-test_get-service", new JsonObject().put("service", value));
 
             assertThat(value, result.getBoolean("isError"), is(true));
             assertThat(value, text(result), is("Error: The extension path or query is not allowed"));
+            given().urlEncodingEnabled(false)
+                    .when().get("/api/calm/extensions/mcp-test/api/services/" + ExtensionTools.encode(value))
+                    .then().statusCode(400).body("error", is("The extension path or query is not allowed"));
+        }
+        for (String value : new String[]{"a/../b", "architectures/1"}) {
+            JsonObject slash = callTool("ext_mcp-test_get-service", new JsonObject().put("service", value));
+            assertThat(value, slash.getBoolean("isError"), is(true));
+            assertThat(value, text(slash), containsString("must not contain /"));
             given().urlEncodingEnabled(false)
                     .when().get("/api/calm/extensions/mcp-test/api/services/" + ExtensionTools.encode(value))
                     .then().statusCode(400).body("error", is("The extension path or query is not allowed"));

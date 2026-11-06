@@ -13,6 +13,7 @@ import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
+import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.security.CalmHubScopes;
@@ -79,6 +80,7 @@ public class DecoratorTools {
                 sb.append("- unique-id: ").append(dec.getUniqueId())
                   .append(", type: ").append(dec.getType())
                   .append(", target: ").append(dec.getTarget())
+                  .append(times(dec, ", "))
                   .append("\n");
             }
             return ToolResponse.success(sb.toString());
@@ -110,7 +112,7 @@ public class DecoratorTools {
                     "  type: " + dec.getType() + "\n" +
                     "  target: " + dec.getTarget() + "\n" +
                     "  target-type: " + dec.getTargetType() + "\n" +
-                    "  applies-to: " + dec.getAppliesTo() + "\n" +
+                    "  applies-to: " + dec.getAppliesTo() + times(dec, "\n  ") + "\n" +
                     "  data: " + dec.getData());
         } catch (NamespaceNotFoundException e) {
             logger.warn("Namespace not found [{}]", namespace, e);
@@ -119,7 +121,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards).")
+    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards). Hub sets creationDateTime and updateDateTime; a decorator that sends either is refused.")
     public ToolResponse createDecorator(
             @ToolArg(description = "The namespace to create the decorator in") String namespace,
             @ToolArg(description = "The decorator JSON payload (must include $schema, unique-id, type, target, target-type, applies-to, and data fields)") String decoratorJson) {
@@ -138,6 +140,8 @@ public class DecoratorTools {
         } catch (NamespaceNotFoundException e) {
             logger.warn("Namespace not found [{}]", namespace, e);
             return ToolResponse.error("Error: Namespace '" + namespace + "' not found.");
+        } catch (HubOwnedDecoratorFieldException e) {
+            return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {
             return reservedTypeError(e);
         } catch (DecoratorSchemaValidationException e) {
@@ -146,7 +150,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows. A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
+    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows, or sends the Hub-owned creationDateTime or updateDateTime. A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
     public ToolResponse updateDecorator(
             @ToolArg(description = "The namespace containing the decorator") String namespace,
             @ToolArg(description = "The decorator numeric ID to update (positive integer)") int decoratorId,
@@ -176,7 +180,7 @@ public class DecoratorTools {
             return ToolResponse.success(outcome + "\n" +
                     "  unique-id: " + dec.getUniqueId() + "\n" +
                     "  type: " + dec.getType() + "\n" +
-                    "  target: " + dec.getTarget() + "\n" +
+                    "  target: " + dec.getTarget() + times(dec, "\n  ") + "\n" +
                     "  data: " + dec.getData());
         } catch (NamespaceNotFoundException e) {
             logger.warn("Namespace not found [{}]", namespace, e);
@@ -187,6 +191,8 @@ public class DecoratorTools {
         } catch (DecoratorSupersededException e) {
             logger.warn("Decorator [{}] in namespace [{}] has been superseded", decoratorId, namespace);
             return ToolResponse.error("Error: Decorator " + decoratorId + " has been superseded. Use getDecoratorHistory to find the current decorator.");
+        } catch (HubOwnedDecoratorFieldException e) {
+            return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {
             return reservedTypeError(e);
         } catch (DecoratorSchemaValidationException e) {
@@ -211,7 +217,8 @@ public class DecoratorTools {
                 Decorator dec = entry.getDecorator();
                 sb.append("- id: ").append(entry.getId())
                   .append(entry.getSupersededBy() == null ? " (current)" : ", superseded by: " + entry.getSupersededBy())
-                  .append(dec == null ? "" : ", unique-id: " + dec.getUniqueId() + ", type: " + dec.getType() + ", data: " + dec.getData())
+                  .append(entry.getSupersededDateTime() == null ? "" : ", supersededDateTime: " + entry.getSupersededDateTime())
+                  .append(dec == null ? "" : ", unique-id: " + dec.getUniqueId() + ", type: " + dec.getType() + times(dec, ", ") + ", data: " + dec.getData())
                   .append("\n");
             }
             return ToolResponse.success(sb.toString());
@@ -222,6 +229,12 @@ public class DecoratorTools {
             logger.warn("Decorator [{}] not found in namespace [{}]", decoratorId, namespace, e);
             return ToolResponse.error("Error: Decorator " + decoratorId + " not found in namespace '" + namespace + "'.");
         }
+    }
+
+    // A decorator stored before Hub recorded times has none.
+    private static String times(Decorator dec, String prefix) {
+        return (dec.getCreationDateTime() == null ? "" : prefix + "creationDateTime: " + dec.getCreationDateTime())
+                + (dec.getUpdateDateTime() == null ? "" : prefix + "updateDateTime: " + dec.getUpdateDateTime());
     }
 
     private static ToolResponse reservedTypeError(ReservedDecoratorTypeException e) {

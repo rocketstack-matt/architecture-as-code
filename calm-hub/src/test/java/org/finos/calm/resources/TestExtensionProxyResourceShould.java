@@ -115,21 +115,29 @@ class TestExtensionProxyResourceShould {
 
     @Test
     @TestSecurity(user = "alice")
-    void preserve_an_encoded_slash_in_a_path_parameter() throws Exception {
-        for (String value : new String[]{"team%2Fservice", "team%2fservice"}) {
-            backend.reset();
+    void refuse_an_encoded_slash_in_a_path_parameter() {
+        for (String value : new String[]{"team%2Fservice", "team%2fservice", "team%252Fservice", "team%25252fservice"}) {
             given().urlEncodingEnabled(false)
                     .when().get(BASE + "/services/" + value)
-                    .then().statusCode(200);
-
-            FixtureBackend.Received received = backend.received();
-            assertThat(received.pathAndQuery(), is("/base/services/" + value.replace("%2f", "%2F")));
-            String payload = received.header("X-Calm-Hub-Identity").split("\\.")[1];
-            JsonNode claims = new ObjectMapper()
-                    .readTree(Base64.getUrlDecoder().decode(payload));
-            assertThat(claims.get("route").asText(), is("service"));
-            assertThat(claims.get("htp").asText(), is("/services/" + value.replace("%2f", "%2F")));
+                    .then().statusCode(400);
         }
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void forward_an_encoded_parameter_and_bind_it_in_the_assertion() throws Exception {
+        given().urlEncodingEnabled(false)
+                .when().get(BASE + "/services/team%3Aservice")
+                .then().statusCode(200);
+
+        FixtureBackend.Received received = backend.received();
+        assertThat(received.pathAndQuery(), is("/base/services/team%3Aservice"));
+        String payload = received.header("X-Calm-Hub-Identity").split("\\.")[1];
+        JsonNode claims = new ObjectMapper()
+                .readTree(Base64.getUrlDecoder().decode(payload));
+        assertThat(claims.get("route").asText(), is("service"));
+        assertThat(claims.get("htp").asText(), is("/services/team%3Aservice"));
     }
 
     @Test

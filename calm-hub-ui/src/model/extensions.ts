@@ -22,7 +22,10 @@ export interface ExtensionSummary {
 }
 export interface ExtensionContext {
     namespace?: string;
+    /** `type/id`, for a query or a body only: a path placeholder cannot take a slash. */
     resource?: string;
+    resourceType?: string;
+    resourceId?: string;
     version?: string;
     selectedElement?: string;
 }
