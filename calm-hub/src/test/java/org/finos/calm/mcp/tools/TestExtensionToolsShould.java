@@ -376,6 +376,14 @@ class TestExtensionToolsShould {
     }
 
     @Test
+    void name_the_input_schema_when_it_cannot_be_read() {
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> ExtensionTools.InputSchema.of("x", "c", Map.of("type", new Object())));
+
+        assertThat(e.getMessage(), startsWith("CALM Hub cannot read its input schema: "));
+    }
+
+    @Test
     void mark_a_get_or_read_only_route_as_read_only() {
         ToolManager.ToolAnnotations list = ExtensionTools.annotations(tool("list-services"));
         ToolManager.ToolAnnotations search = ExtensionTools.annotations(tool("search"));
