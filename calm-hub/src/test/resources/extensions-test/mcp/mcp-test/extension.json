@@ -41,8 +41,9 @@
       "description": "Search the services",
       "input": {
         "type": "object",
-        "properties": { "text": { "type": "string" } },
-        "required": ["text"]
+        "properties": { "text": { "type": "string" }, "code": { "$ref": "#code" } },
+        "required": ["text"],
+        "$defs": { "code": { "$anchor": "code", "type": "string", "pattern": "^(?<area>[A-Z]{2})-\\d+$" } }
       }
     },
     "list-services": {
@@ -113,6 +114,39 @@
       "route": "search",
       "description": "Search with a keyword value that is not valid JSON Schema",
       "input": { "type": "object", "properties": { "limit": { "type": "integer", "minimum": "1" } } }
+    },
+    "dangling-input": {
+      "route": "search",
+      "description": "Search with a filter from a definition that does not exist",
+      "input": { "type": "object", "properties": { "filter": { "$ref": "#/$defs/missing" } }, "$defs": { "filter": {} } }
+    },
+    "dangling-output": {
+      "route": "search",
+      "description": "Search with a result from an anchor that does not exist",
+      "input": { "type": "object" },
+      "output": { "type": "object", "properties": { "hits": { "$ref": "#hits" } } }
+    },
+    "ref-loop-output": {
+      "route": "search",
+      "description": "Search with a result whose $ref points to itself",
+      "input": { "type": "object" },
+      "output": { "type": "object", "properties": { "hits": { "$ref": "#/properties/hits" } } }
+    },
+    "java-pattern-input": {
+      "route": "search",
+      "description": "Search with a pattern that only Java accepts",
+      "input": { "type": "object", "properties": { "text": { "type": "string", "pattern": "(?i)abc" } } }
+    },
+    "java-pattern-output": {
+      "route": "search",
+      "description": "Search with a result pattern that only Java accepts",
+      "input": { "type": "object" },
+      "output": { "type": "object", "patternProperties": { "\\Ahit": { "type": "string", "pattern": "a++" } } }
+    },
+    "draft-07": {
+      "route": "search",
+      "description": "Search with a draft-07 input schema",
+      "input": { "$schema": "http://json-schema.org/draft-07/schema#", "type": "object" }
     },
     "remote-output": {
       "route": "search",

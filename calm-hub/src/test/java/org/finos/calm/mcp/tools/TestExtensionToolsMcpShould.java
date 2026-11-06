@@ -211,6 +211,21 @@ class TestExtensionToolsMcpShould {
 
     @Test
     @TestSecurity(user = "alice")
+    void check_input_against_an_anchor_ref_with_an_ecma_262_pattern() {
+        JsonObject refused = callTool("ext_mcp-test_search", new JsonObject().put("text", "pay").put("code", "ab-1"));
+
+        assertThat(refused.getBoolean("isError"), is(true));
+        assertThat(text(refused), containsString("/code"));
+        assertThat(backend.received(), nullValue());
+
+        backend.reply(FixtureBackend.Reply.json(200, "{}"));
+        JsonObject accepted = callTool("ext_mcp-test_search", new JsonObject().put("text", "pay").put("code", "AB-1"));
+
+        assertThat(accepted.encode(), accepted.getBoolean("isError", false), is(false));
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
     void refuse_encoded_and_dot_segment_parameter_values_as_the_rest_proxy_does() {
         for (String value : new String[]{"%61dmin", "a/../b", "%2e%2e"}) {
             JsonObject result = callTool("ext_mcp-test_get-service", new JsonObject().put("service", value));
@@ -281,6 +296,12 @@ class TestExtensionToolsMcpShould {
         assertThat(names.contains("ext_mcp-test_typo-input"), is(false));
         assertThat(names.contains("ext_mcp-test_typo-output"), is(false));
         assertThat(names.contains("ext_mcp-test_bad-keyword"), is(false));
+        assertThat(names.contains("ext_mcp-test_dangling-input"), is(false));
+        assertThat(names.contains("ext_mcp-test_dangling-output"), is(false));
+        assertThat(names.contains("ext_mcp-test_ref-loop-output"), is(false));
+        assertThat(names.contains("ext_mcp-test_java-pattern-input"), is(false));
+        assertThat(names.contains("ext_mcp-test_java-pattern-output"), is(false));
+        assertThat(names.contains("ext_mcp-test_draft-07"), is(false));
     }
 
     @Test

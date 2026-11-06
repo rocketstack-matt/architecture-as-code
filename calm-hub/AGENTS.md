@@ -344,8 +344,8 @@ Tool providers are in `src/main/java/org/finos/calm/mcp/tools/`:
 It wraps an output schema that is not an object in `result`, and skips a command whose input or output schema has a remote `$ref`.
 It moves a `$ref` beside an `$id` into `allOf`, because Ajv (in the MCP TypeScript SDK) overflows its stack on that.
 It publishes boolean subschemas as objects (not `additionalProperties`/`unevaluatedProperties`): the Quarkus MCP header observer and the SDK `ToolSchema` require an object for each property.
-It skips a command whose schema is not valid JSON Schema 2020-12 (meta-schemas bundled in vertx-json-schema), or has a property schema that is not an object or a boolean.
-A command that it cannot register is skipped with a warning, so a manifest never stops Hub. `ToolManager` adds a tool before its `ToolAdded` observers run, so a failed tool is removed again.
+It skips a command whose schema is not valid JSON Schema 2020-12 (meta-schemas bundled in vertx-json-schema), declares another `$schema`, has a property schema that is not an object or a boolean, a `pattern` that is not ECMA-262 (`EcmaRegex`; vertx checks `format: regex` with java.util.regex), or a local `$ref` that does not resolve or only reaches a loop of `$ref`s (Ajv overflows its stack on one). If the meta-schemas do not load, it registers no extension tools.
+A command that it cannot register is skipped with a warning, so a manifest never stops Hub. `ToolManager` adds a tool before its `ToolAdded` observers run, so a failed tool is removed again. It never registers over, or removes, a tool that has the same name.
 
 Enable for development:
 ```bash

@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -220,6 +221,109 @@ class TestExtensionToolsShould {
     }
 
     @Test
+    void skip_a_command_whose_schema_has_a_dangling_ref_a_java_only_pattern_or_another_dialect() {
+        List<String> names = TOOLS.stream().map(ExtensionTools.ExtensionTool::commandName).toList();
+
+        assertThat(names.stream().noneMatch(n -> n.startsWith("dangling-") || n.equals("ref-loop-output") || n.startsWith("java-pattern-")
+                || n.equals("draft-07")), is(true));
+        assertThat(names.contains("search"), is(true));
+    }
+
+    @Test
+    void name_a_pattern_that_is_not_ecma_262() {
+        assertThat(ExtensionTools.schemaError(Map.of("properties", Map.of("a", Map.of("type", "string", "pattern", "(?i)abc")))),
+                startsWith("/properties/a/pattern: '(?i)abc' is not an ECMA-262 regular expression: "));
+        assertThat(ExtensionTools.schemaError(Map.of("items", Map.of("patternProperties", Map.of("\\Aa", Map.of())))),
+                startsWith("/items/patternProperties: the key '\\Aa' is not an ECMA-262 regular expression: "));
+        assertThat(ExtensionTools.schemaError(Map.of("pattern", "^(?<a>[a-z]+)\\d{2,}$",
+                "patternProperties", Map.of("^x-", Map.of()))), nullValue());
+    }
+
+    @Test
+    void refuse_a_schema_of_another_dialect() {
+        assertThat(ExtensionTools.schemaError(Map.of("$schema", "http://json-schema.org/draft-07/schema#", "type", "object")),
+                is("/: it declares the $schema 'http://json-schema.org/draft-07/schema#', but CALM Hub supports only "
+                        + "JSON Schema 2020-12 (https://json-schema.org/draft/2020-12/schema)"));
+        assertThat(ExtensionTools.schemaError(Map.of("$defs", Map.of("d", Map.of("$id", "urn:d",
+                "$schema", "https://json-schema.org/draft/2019-09/schema")))), startsWith("/$defs/d: it declares the $schema "));
+        assertThat(ExtensionTools.schemaError(Map.of("$schema", "https://json-schema.org/draft/2020-12/schema")), nullValue());
+        assertThat(ExtensionTools.schemaError(Map.of("$schema", "https://json-schema.org/draft/2020-12/schema#")), nullValue());
+    }
+
+    @Test
+    void refuse_every_schema_when_the_meta_schemas_cannot_be_loaded() {
+        assertThat(ExtensionTools.META_SCHEMAS, notNullValue());
+        assertThat(ExtensionTools.metaSchemas("no-such-folder/"), nullValue());
+        assertThat(ExtensionTools.schemaError(Map.of("type", "object"), null),
+                is("CALM Hub cannot load the JSON Schema 2020-12 meta-schema"));
+    }
+
+    @Test
+    void register_no_tools_when_the_meta_schemas_cannot_be_loaded() {
+        extensionTools.metaSchemas = null;
+
+        extensionTools.register();
+
+        verifyNoInteractions(toolManager, registry);
+    }
+
+    @Test
+    void find_the_local_refs_that_point_to_nothing() {
+        String id = ExtensionTools.inputSchemaId("x", "c");
+        Map<String, Object> defs = Map.of("a", Map.of("type", "string", "$anchor", "a"), "b", true,
+                "l", Map.of("anyOf", List.of(Map.of(), true)), "e~/x", Map.of());
+
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/a", "$defs", defs), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/b", "$defs", defs), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/l/anyOf/1", "$defs", defs), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/e~0~1x", "$defs", defs), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#a", "$defs", defs), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("type", "object", "properties", Map.of("p", Map.of("$ref", "#"))), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("type", "object", "properties", Map.of("p", Map.of("$ref", ""))), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$dynamicRef", "#meta", "$dynamicAnchor", "meta"), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$id", "urn:in", "$ref", "urn:in#/$defs/a", "$defs", defs), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "urn:e#/$defs/a",
+                "$defs", Map.of("e", Map.of("$id", "urn:e", "$defs", defs))), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "urn:e#a",
+                "$defs", Map.of("e", Map.of("$id", "urn:e", "$defs", defs))), id), nullValue());
+
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/missing", "$defs", defs), id), is("#/$defs/missing"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#nope", "$defs", defs), id), is("#nope"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/a/type", "$defs", defs), id), is("#/$defs/a/type"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/l/anyOf/2", "$defs", defs), id), is("#/$defs/l/anyOf/2"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/l/anyOf/x", "$defs", defs), id), is("#/$defs/l/anyOf/x"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#$defs/a", "$defs", defs), id), is("#$defs/a"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$id", "urn:in", "$ref", "urn:in#/x"), id), is("urn:in#/x"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("p", Map.of("$ref", "#/$defs/a"))), id),
+                is("#/$defs/a"));
+        // An anchor belongs to its schema resource: the root cannot use one of an embedded resource with #a.
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#a",
+                "$defs", Map.of("e", Map.of("$id", "urn:e", "$defs", defs))), id), is("#a"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$dynamicRef", "#meta"), id), is("#meta"));
+    }
+
+    @Test
+    void find_the_refs_that_point_only_to_a_loop_of_refs() {
+        String id = ExtensionTools.inputSchemaId("x", "c");
+        Map<String, Object> node = Map.of("type", "object",
+                "properties", Map.of("kids", Map.of("type", "array", "items", Map.of("$ref", "#/$defs/node"))));
+
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/node", "$defs", Map.of("node", node)), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
+                "$defs", Map.of("b", Map.of("$ref", "#/$defs/c"), "c", Map.of("type", "string"))), id), nullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "urn:e#/$defs/b", "$defs", Map.of("e", Map.of("$id", "urn:e",
+                "$defs", Map.of("b", Map.of("$ref", "#/$defs/c"), "c", Map.of())))), id), nullValue());
+
+        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("x", Map.of("$ref", "#/properties/x"))), id),
+                is("#/properties/x"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
+                "$defs", Map.of("b", Map.of("$ref", "#/$defs/c"), "c", Map.of("$ref", "#/$defs/b"))), id), notNullValue());
+        assertThat(ExtensionTools.unresolvedRef(Map.of("type", "object", "$ref", "#"), id), is("#"));
+        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
+                "$defs", Map.of("b", Map.of("$ref", "#/$defs/missing"))), id), notNullValue());
+    }
+
+    @Test
     void find_the_remote_refs_of_a_schema() {
         String id = ExtensionTools.inputSchemaId("x", "c");
 
@@ -349,6 +453,19 @@ class TestExtensionToolsShould {
         verify(definition, times(7)).register();
         verify(toolManager).removeTool(TOOLS.get(0).name());
         verify(toolManager, times(1)).removeTool(anyString());
+    }
+
+    @Test
+    void not_register_or_remove_a_tool_whose_name_is_already_taken() {
+        when(toolManager.getTool("ext_mcp-test_search")).thenReturn(mock(ToolManager.ToolInfo.class));
+        when(toolManager.newTool(anyString())).thenReturn(definition);
+
+        extensionTools.register(List.of(tool("search"), tool("annotate")));
+
+        verify(toolManager, never()).newTool("ext_mcp-test_search");
+        verify(toolManager).newTool("ext_mcp-test_annotate");
+        verify(definition, times(1)).register();
+        verify(toolManager, never()).removeTool(anyString());
     }
 
     @Test
