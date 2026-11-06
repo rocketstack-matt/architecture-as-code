@@ -625,6 +625,37 @@ class TestExtensionToolsShould {
     }
 
     @Test
+    void refuse_an_input_format_that_hub_has_not_timed_as_linear() {
+        for (String format : List.of("url", "uri", "uri-reference", "uri-template", "regex", "byte", "json-pointer",
+                "relative-json-pointer", "json-pointer-uri-fragment", "idn-hostname", "idn-email", "custom")) {
+            assertThat(format, ExtensionTools.inputSchemaError(Map.of("properties", Map.of("a", Map.of("format", format)))),
+                    is("/properties/a/format: '" + format + "' cannot be in an input schema: CALM Hub can check only date, "
+                            + "date-time, duration, email, hostname, ipv4, ipv6, time, uuid in linear time"));
+        }
+        for (String format : ExtensionTools.LINEAR_FORMATS) {
+            assertThat(format, ExtensionTools.inputSchemaError(Map.of("format", format)), nullValue());
+        }
+        assertThat(ExtensionTools.schemaError(Map.of("format", "url")), nullValue());
+    }
+
+    @Test
+    void check_each_allowed_format_in_linear_time_on_1_mb() {
+        List<String> units = List.of("a", "0", "a.", "0.", "a-", "-", ":", "0:", "::", "a@", "@", ".", "1-1-", "P1Y", "T1H",
+                "aa:", "0.0.", "a-a.", "f:", "1Z", "%", "a b", "\\", "\"", "[", "x@a.", "0-", "01:01:", "+00:00");
+        for (String format : ExtensionTools.LINEAR_FORMATS) {
+            ExtensionTools.InputSchema schema = ExtensionTools.InputSchema.of("x", "c",
+                    Map.of("properties", Map.of("v", Map.of("type", "string", "format", format))));
+            for (String unit : units) {
+                String text = unit.repeat(1_000_000 / unit.length()) + "!";
+                long start = System.nanoTime();
+                schema.validate(new JsonObject().put("v", text));
+                long millis = Duration.ofNanos(System.nanoTime() - start).toMillis();
+                assertThat(format + " on " + unit + " took " + millis + " ms", millis < 2_000, is(true));
+            }
+        }
+    }
+
+    @Test
     void refuse_an_input_pattern_that_has_no_linear_time_form() {
         String lookahead = "(?:|)".repeat(40) + "(?!)";
 
@@ -636,8 +667,10 @@ class TestExtensionToolsShould {
                         + "CALM Hub cannot match in linear time"));
         assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "(?<=a)b")), containsString("it has a lookbehind"));
         assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "[\\S]")), containsString("\\S in a character class"));
-        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "\\p{ASCII}")), containsString("the property \\p{ASCII}"));
-        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "a{1001}")), containsString("invalid repeat count"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "\\p{ASCII}")), containsString("the Unicode property \\p{ASCII}"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "a{1001}")), containsString("expand it to more than 1000"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "(?:(?:a{1000}){1000}){1000}")),
+                containsString("expand it to more than 1000"));
         assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "(?i)a")), containsString("not an ECMA-262"));
         // Output schemas keep the ECMA-262 rules.
         assertThat(ExtensionTools.schemaError(Map.of("pattern", lookahead)), nullValue());

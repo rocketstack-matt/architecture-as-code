@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -317,9 +318,18 @@ public class ExtensionTools {
         return error != null ? error : linearPatternError(schema);
     }
 
+    // vertx checks these formats with java.util.regex in linear time; TestExtensionToolsShould times each on 1 MB.
+    // The others can backtrack (url) or compile caller input (regex).
+    static final Set<String> LINEAR_FORMATS = Set.of("date", "time", "date-time", "duration", "email", "hostname",
+            "ipv4", "ipv6", "uuid");
+
     private static String linearPatternError(Map<String, Object> root) {
         boolean[] patternProperties = {false};
         String error = firstError(root, "", (subschema, pointer) -> {
+            if (subschema.get("format") instanceof String format && !LINEAR_FORMATS.contains(format)) {
+                return pointer + "/format: '" + shortened(format) + "' cannot be in an input schema: CALM Hub can check only "
+                        + String.join(", ", new TreeSet<>(LINEAR_FORMATS)) + " in linear time";
+            }
             if (subschema.get("pattern") instanceof String pattern) {
                 String reason = EcmaRegex.linearError(pattern);
                 if (reason != null) {

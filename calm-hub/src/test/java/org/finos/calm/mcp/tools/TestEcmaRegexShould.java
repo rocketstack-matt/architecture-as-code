@@ -57,8 +57,7 @@ class TestEcmaRegexShould {
             "^a.c$|abc|true", "a.c|\"a\nc\"|false", "a.c|a\u2028c|false", "a.c|a😀c|true", "^a$|\"a\n\"|false",
             "\\s|\"\u00A0\"|true", "\\s|\"\uFEFF\"|true", "[\\s]|\"\u3000\"|true", "\\S|\"\u00A0\"|false", "\\d|٣|false", "\\w|é|false",
             "\\bb|a b|true", "[]|a|false", "[^]|\"\n\"|true", "\\u{1F600}|😀|true", "\\uD83D\\uDE00|😀|true",
-            "[\\-\\/\\]]|]|true", "(?<year>\\d{4})|2026|true", "\\p{Letter}|é|true", "\\P{L}|é|false",
-            "\\p{Script=Greek}|α|true", "[\\p{sc=Latin}\\d]|a|true", "\\cJ|\"\n\"|true", "\\0|\"\u0000\"|true",
+            "[\\-\\/\\]]|]|true", "(?<year>\\d{4})|2026|true", "\\cJ|\"\n\"|true", "\\0|\"\u0000\"|true",
             "a{2,3}?b|aab|true", "\"^(a|b)*$\"|abab|true", "x*|b|true", "(?:)|b|true", "\\x41|A|true", "[a-c]|b|true",
             "^[^a-c]$|d|true", "^[^a-c]$|b|false", "\\^\\$\\.|^$.|true"
     })
@@ -69,9 +68,36 @@ class TestEcmaRegexShould {
 
     @ParameterizedTest
     @ValueSource(strings = {"(?=a)", "(?!a)", "(?<=a)", "(?<!a)", "(a)\\1", "(?<x>a)\\k<x>", "[\\S]", "\\p{ASCII}",
-            "\\p{Any}", "\\p{sc=Grek}", "\\p{scx=Greek}", "\\p{LC}", "\\p{Cn}", "\\p{C}", "a{1001}", "(?i)a"})
+            "\\p{Any}", "\\p{sc=Grek}", "\\p{scx=Greek}", "\\p{LC}", "\\p{Cn}", "\\p{C}", "\\p{Letter}", "\\P{L}",
+            "[\\p{sc=Latin}\\d]", "a{1001}", "(?i)a", "(?:a{1000}){1000}", "(?:a{30}){34}", "a{1000}b",
+            "(?:(?:a{1000}){1000}){1000}", "(?:a{1000}){1000000000}", "(?:a{500}|b{501})"})
     void refuse_a_pattern_that_has_no_linear_time_form(String pattern) {
         assertThat(pattern, EcmaRegex.linearError(pattern), notNullValue());
+    }
+
+    @Test
+    void refuse_nested_repeats_before_they_are_expanded() {
+        assertThat(EcmaRegex.linearError("(?:a{1000}){1000}"), is("its repeats expand it to more than 1000 terms"));
+        assertThat(EcmaRegex.linearError("(?:(?:a{1000}){1000}){1000}"), is("its repeats expand it to more than 1000 terms"));
+        assertThat(EcmaRegex.linearError("a{1000}"), nullValue());
+        assertThat(EcmaRegex.linearError("(?:a{10}){100}"), nullValue());
+        assertThat(EcmaRegex.linearError("(?:a{10,}|b*){90}c"), nullValue());
+    }
+
+    @Test
+    void match_an_accepted_pattern_of_the_largest_size_in_linear_time() {
+        com.google.re2j.Pattern largest = EcmaRegex.linear("^(?:[a-z]{0,10}x){90}$");
+        long small = time(() -> largest.matcher("a".repeat(100_000) + "!").find());
+        long large = time(() -> largest.matcher("a".repeat(1_000_000) + "!").find());
+
+        assertThat(large < 20 * Math.max(small, 50), is(true));
+        assertThat(large < 10_000, is(true));
+    }
+
+    private static long time(Runnable run) {
+        long start = System.nanoTime();
+        run.run();
+        return Duration.ofNanos(System.nanoTime() - start).toMillis();
     }
 
     @Test
