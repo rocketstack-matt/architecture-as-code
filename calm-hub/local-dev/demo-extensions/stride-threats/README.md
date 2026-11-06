@@ -27,7 +27,8 @@ To write example decorators for each node of an architecture version, run from `
 node local-dev/demo-extensions/stride-threats/seed-decorators.mjs demo 1 1.0.0
 ```
 
-The arguments are the namespace, the numeric architecture id and the version (these are the
+The architecture must be in Hub: start Hub with the command in the [demo-extensions README](../README.md),
+which seeds the `demo` namespace. The arguments are the namespace, the numeric architecture id and the version (these are the
 defaults). The script reads the nodes from Hub and skips a decorator that is already there. Set
 `CALM_HUB_URL` for another Hub, and `CALM_HUB_TOKEN` to send a bearer token.
 
@@ -36,5 +37,6 @@ have a fixed set of threats. Any other node gets one generated threat, and the d
 same threats as the overlay.
 
 Test the routes and the seed decorators with
-`node --test local-dev/demo-extensions/stride-threats/routes.test.mjs`. Set `PORT`, `CALM_HUB_URL`
+`node --test local-dev/demo-extensions/stride-threats/*.test.mjs`. `server.test.mjs` starts the backend
+with a fake Hub JWKS. Set `PORT`, `CALM_HUB_URL`
 (where the backend gets the JWKS) or `CALM_HUB_ISSUER` to change the backend defaults.

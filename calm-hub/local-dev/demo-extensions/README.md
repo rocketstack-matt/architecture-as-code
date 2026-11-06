@@ -14,6 +14,7 @@ Hub loads every manifest in this folder, and does not start if one has no backen
 
 ```bash
 ../mvnw quarkus:dev -Pstandalone,server-only \
+  -Dcalm.standalone.seed-demo-data=true \
   -Dcalm.extensions.dir=local-dev/demo-extensions \
   -Dcalm.extensions.release-tracker.backend-url=http://localhost:8092 \
   -Dcalm.extensions.stride-threats.backend-url=http://localhost:8093 \
@@ -25,6 +26,10 @@ Hub loads every manifest in this folder, and does not start if one has no backen
 node local-dev/demo-extensions/release-tracker/server.mjs
 node local-dev/demo-extensions/stride-threats/server.mjs
 ```
+
+`calm.standalone.seed-demo-data=true` adds the `demo` namespace and its architectures, which the demo
+screen links and the stride-threats seed script use. It seeds only a database with no namespaces: to
+start again, delete the data directory (`~/.calm-hub/data` by default).
 
 To run one demo only, add `-Dcalm.extensions.<id>.enabled=false` for the other.
 
