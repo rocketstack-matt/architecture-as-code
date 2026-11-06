@@ -8,6 +8,7 @@ describe('extension contributions', () => {
         const scoped = { ...extension, routes: extension.routes.map((r) => (r.id === 'run' ? { ...r, path: '/run/{namespace}/{selectedElement}' } : r)) };
         expect(actionContributions(scoped, {})).toEqual([]);
         expect(actionContributions(scoped, { namespace: 'ns', selectedElement: 'node' })).toHaveLength(1);
+        expect(actionContributions(scoped, { namespace: 'ns', selectedElement: 'a/b' })).toEqual([]);
     });
 
     it('drops an action whose route is missing', () => {

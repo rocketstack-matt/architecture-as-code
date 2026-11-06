@@ -407,7 +407,8 @@ class TestExtensionProxyServiceShould {
 
     @ParameterizedTest
     @ValueSource(strings = {"/services/%61dmin", "/services/%61%64%6Din",
-            "/%73ervices/admin", "/services/%2561dmin", "/services/admin%252Fsecret"})
+            "/%73ervices/admin", "/services/%2561dmin", "/services/admin%252Fsecret",
+            "/services/bob%2Fteam", "/services/bob%2fteam"})
     void reject_encoded_literals_without_calling_the_backend(String path) {
         register_service_routes();
         assertThat(status(request("GET", path, null, null)), is(400));
@@ -424,11 +425,11 @@ class TestExtensionProxyServiceShould {
     @Test
     void forward_the_normalised_parameter_and_bind_it_in_the_assertion() throws IOException {
         register_service_routes();
-        service.call(alice, request("GET", "/services/%62ob%3a%2fteam", null, null));
-        assertThat(backend.received().pathAndQuery(), is("/base/services/bob%3A%2Fteam"));
+        service.call(alice, request("GET", "/services/%62ob%3ateam", null, null));
+        assertThat(backend.received().pathAndQuery(), is("/base/services/bob%3Ateam"));
         JsonNode assertion = claims(backend.received().header("X-Calm-Hub-Identity"));
         assertThat(assertion.get("route").asText(), is("service"));
-        assertThat(assertion.get("htp").asText(), is("/services/bob%3A%2Fteam"));
+        assertThat(assertion.get("htp").asText(), is("/services/bob%3Ateam"));
     }
 
     private void register_service_routes() {

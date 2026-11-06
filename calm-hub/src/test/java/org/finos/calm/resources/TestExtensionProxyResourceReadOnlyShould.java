@@ -70,6 +70,21 @@ class TestExtensionProxyResourceReadOnlyShould {
 
     @Test
     @TestSecurity(user = "alice")
+    void apply_the_same_path_rule_as_a_hub_that_is_not_read_only() {
+        given().when().get(BASE + "/services/architectures")
+                .then().statusCode(200);
+        backend.reset();
+        for (String value : new String[]{"architectures%2F1", "architectures%2f1", "architectures%252F1"}) {
+            given().urlEncodingEnabled(false)
+                    .when().get(BASE + "/services/" + value)
+                    .then().statusCode(400);
+        }
+
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
     void refuse_a_write_route_and_every_other_write() {
         given().contentType("application/json").body("{}")
                 .when().post(BASE + "/namespaces/finos/services")

@@ -7,7 +7,7 @@
   "provider": "Demo",
   "routes": [
     { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated" },
-    { "id": "tab", "method": "GET", "path": "/tab", "scope": "authenticated" },
+    { "id": "tab", "method": "GET", "path": "/tab/{resourceType}/{resourceId}", "scope": "authenticated" },
     { "id": "card", "method": "GET", "path": "/card", "scope": "authenticated" },
     { "id": "element", "method": "GET", "path": "/element", "scope": "authenticated" },
     { "id": "request-review", "method": "POST", "path": "/reviews", "scope": "authenticated" },

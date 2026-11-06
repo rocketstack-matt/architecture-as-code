@@ -346,6 +346,12 @@ describe('CalmHubClient', () => {
             await expect(client.callExtension('example', getRoute, {})).rejects.toThrow('Input property \'namespace\'');
             expect(mock.history.get).toHaveLength(0);
         });
+
+        it('throws before any call when a path parameter has a slash', async () => {
+            await expect(client.callExtension('example', getRoute, { namespace: 'finos/payments' }))
+                .rejects.toMatchObject({ status: 0, error: expect.stringContaining('must not contain /') });
+            expect(mock.history.get).toHaveLength(0);
+        });
     });
 
     // ── auth plugin ──────────────────────────────────────────────────────────

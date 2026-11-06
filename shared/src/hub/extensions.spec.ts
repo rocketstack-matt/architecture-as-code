@@ -51,15 +51,20 @@ describe('buildExtensionRequest', () => {
         expect(request.body).toEqual({});
     });
 
-    it('encodes path parameter values, so that a value cannot add path segments', () => {
-        const request = buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: '../admin?x=1' });
+    it('encodes path parameter values', () => {
+        const request = buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: '..admin?x=1 é' });
 
-        expect(request.path).toBe('/api/calm/extensions/ext/api/namespaces/..%2Fadmin%3Fx%3D1');
+        expect(request.path).toBe('/api/calm/extensions/ext/api/namespaces/..admin%3Fx%3D1%20%C3%A9');
     });
 
     it.each(['.', '..'])('fails when a path parameter is the dot segment %s', (value) => {
         expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
             .toThrow('Input property \'namespace\' must not be . or ..');
+    });
+
+    it.each(['architectures/1', '/', '../admin'])('fails when a path parameter has a slash: %s', (value) => {
+        expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
+            .toThrow('Input property \'namespace\' must not contain /, because it fills the path /namespaces/{namespace}');
     });
 
     it('fills a parameter that the path uses twice', () => {

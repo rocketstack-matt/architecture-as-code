@@ -18,12 +18,17 @@ export const DIAGRAM_TAB_REDIRECTS: Readonly<Record<string, Record<string, strin
 
 export const EXTENSIONS_TAB_ID = 'extensions';
 
-export const extensionContext = (data: Data, selectedElement?: string): ExtensionContext => ({
-    namespace: data.name,
-    resource: `${data.calmType.toLowerCase()}/${data.id}`,
-    version: data.version,
-    selectedElement,
-});
+export const extensionContext = (data: Data, selectedElement?: string): ExtensionContext => {
+    const resourceType = data.calmType.toLowerCase();
+    return {
+        namespace: data.name,
+        resource: `${resourceType}/${data.id}`,
+        resourceType,
+        resourceId: data.id,
+        version: data.version,
+        selectedElement,
+    };
+};
 
 /** The tabs of the diagram section, in display order. */
 export const DIAGRAM_TABS: readonly DiagramTab[] = [

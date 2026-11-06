@@ -627,6 +627,12 @@ describe('DiagramSection', () => {
             expect(screen.getByRole('tab', { name: 'Extensions' }).className).toContain('tab-active');
             expect(screen.queryByTestId('drawer')).not.toBeInTheDocument();
             expect((call.mock.calls[0][3] as AbortSignal).aborted).toBe(false);
+            expect(call.mock.calls[0][2]).toMatchObject({
+                namespace: 'arch-namespace',
+                resource: 'architectures/test-arch',
+                resourceType: 'architectures',
+                resourceId: 'test-arch',
+            });
             call.mockRestore();
         });
 
