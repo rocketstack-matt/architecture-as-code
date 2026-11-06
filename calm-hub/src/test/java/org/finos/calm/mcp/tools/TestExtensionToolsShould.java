@@ -188,6 +188,38 @@ class TestExtensionToolsShould {
     }
 
     @Test
+    void skip_a_command_whose_input_or_output_schema_is_not_valid_json_schema() {
+        assertThat(TOOLS.stream().noneMatch(t -> t.commandName().startsWith("typo-") || t.commandName().equals("bad-keyword")),
+                is(true));
+    }
+
+    @Test
+    void accept_a_valid_schema() {
+        assertThat(ExtensionTools.schemaError(Map.of("type", "object",
+                "properties", Map.of("a", true, "b", Map.of("type", "integer", "minimum", 1)),
+                "dependencies", Map.of("a", List.of("b")),
+                "$defs", Map.of("d", Map.of("type", "string")))), nullValue());
+    }
+
+    @Test
+    void name_a_property_schema_that_is_not_an_object_or_a_boolean() {
+        assertThat(ExtensionTools.schemaError(Map.of("type", "object", "properties", Map.of("limit", "integer"))),
+                is("/properties/limit: the value must be a schema (an object or a boolean)"));
+        assertThat(ExtensionTools.schemaError(Map.of("items", Map.of("properties", Map.of("a/b", 1)))),
+                is("/items/properties/a~1b: the value must be a schema (an object or a boolean)"));
+        assertThat(ExtensionTools.schemaError(Map.of("allOf", List.of(Map.of(), "x"))),
+                is("/allOf/1: the value must be a schema (an object or a boolean)"));
+    }
+
+    @Test
+    void check_a_schema_against_the_meta_schema() {
+        assertThat(ExtensionTools.schemaError(Map.of("type", "objekt")), startsWith("/type: "));
+        assertThat(ExtensionTools.schemaError(Map.of("properties", Map.of("n", Map.of("minimum", "1")))),
+                startsWith("/properties/n/minimum: "));
+        assertThat(ExtensionTools.schemaError(Map.of("required", "name")), startsWith("/required: "));
+    }
+
+    @Test
     void find_the_remote_refs_of_a_schema() {
         String id = ExtensionTools.inputSchemaId("x", "c");
 
@@ -315,6 +347,19 @@ class TestExtensionToolsShould {
         extensionTools.register();
 
         verify(definition, times(7)).register();
+        verify(toolManager).removeTool(TOOLS.get(0).name());
+        verify(toolManager, times(1)).removeTool(anyString());
+    }
+
+    @Test
+    void register_the_other_tools_when_a_failed_tool_cannot_be_removed() {
+        when(toolManager.newTool(anyString())).thenReturn(definition);
+        when(definition.register()).thenThrow(new ClassCastException("not a JsonObject")).thenReturn(null);
+        when(toolManager.removeTool(anyString())).thenThrow(new IllegalStateException("gone"));
+
+        extensionTools.register(List.of(tool("search"), tool("annotate")));
+
+        verify(definition, times(2)).register();
     }
 
     @Test

@@ -1,5 +1,6 @@
 package org.finos.calm.mcp.tools;
 
+import io.quarkiverse.mcp.server.ToolManager;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -8,10 +9,12 @@ import io.quarkus.test.security.TestSecurity;
 import io.restassured.response.Response;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.finos.calm.domain.UserAccess;
 import org.finos.calm.domain.audit.AuditLogEntry;
 import org.finos.calm.domain.audit.AuditOutcome;
+import org.finos.calm.domain.extensions.ExtensionManifest;
 import org.finos.calm.extensions.ExtensionTestKeys;
 import org.finos.calm.extensions.FixtureBackend;
 import org.finos.calm.security.AuditService;
@@ -44,6 +47,12 @@ class TestExtensionToolsMcpShould {
 
     private static final AtomicInteger IDS = new AtomicInteger();
     private static FixtureBackend backend;
+
+    @Inject
+    ExtensionTools extensionTools;
+
+    @Inject
+    ToolManager toolManager;
 
     @InjectMock
     UserAccessStore mockUserAccessStore;
@@ -262,6 +271,31 @@ class TestExtensionToolsMcpShould {
         verify(mockAuditService).record(entry.capture());
         assertThat(entry.getValue().getOutcome(), is(AuditOutcome.SUCCESS));
         assertThat(entry.getValue().getJti(), notNullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void not_list_the_tools_of_commands_whose_schemas_are_not_valid() {
+        List<String> names = listTools().stream().map(t -> ((JsonObject) t).getString("name")).toList();
+
+        assertThat(names.contains("ext_mcp-test_typo-input"), is(false));
+        assertThat(names.contains("ext_mcp-test_typo-output"), is(false));
+        assertThat(names.contains("ext_mcp-test_bad-keyword"), is(false));
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void remove_a_tool_that_quarkus_refuses_after_it_is_added() {
+        ExtensionManifest.Route route = new ExtensionManifest.Route("search", "POST", "/search", "authenticated", true);
+        ExtensionManifest.Command command = new ExtensionManifest.Command("search", "Typo",
+                Map.of("type", "object", "properties", Map.of("limit", "integer")), null, null, null);
+
+        extensionTools.register(List.of(new ExtensionTools.ExtensionTool("ext_mcp-test_refused", "mcp-test", "MCP test",
+                "refused", command, route, null)));
+
+        assertThat(toolManager.getTool("ext_mcp-test_refused"), nullValue());
+        assertThat(listTools().stream().map(t -> ((JsonObject) t).getString("name")).toList()
+                .contains("ext_mcp-test_refused"), is(false));
     }
 
     private static JsonArray listTools() {

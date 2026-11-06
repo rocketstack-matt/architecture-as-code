@@ -98,6 +98,22 @@
         }
       }
     },
+    "typo-input": {
+      "route": "search",
+      "description": "Search with a property schema that is not a schema",
+      "input": { "type": "object", "properties": { "limit": "integer" } }
+    },
+    "typo-output": {
+      "route": "search",
+      "description": "Search with an output property schema that is not a schema",
+      "input": { "type": "object" },
+      "output": { "type": "object", "properties": { "count": "integer" } }
+    },
+    "bad-keyword": {
+      "route": "search",
+      "description": "Search with a keyword value that is not valid JSON Schema",
+      "input": { "type": "object", "properties": { "limit": { "type": "integer", "minimum": "1" } } }
+    },
     "remote-output": {
       "route": "search",
       "description": "Search with a result from a remote schema",

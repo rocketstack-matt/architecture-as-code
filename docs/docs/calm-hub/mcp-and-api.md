@@ -217,6 +217,7 @@ curl -s -X POST http://localhost:8080/mcp \
 CALM Hub makes one tool for each command of an enabled [extension](index.md#extensions) when `calm.mcp.enabled` is true. The tool name is `ext_<id>_<command>`, for example `ext_example-services_list-services`. These tools come after the built-in tools in `tools/list`, sorted by name.
 
 - The input and output schemas come from the manifest. CALM Hub checks the arguments against the input schema before it calls the extension.
+- Each input and output schema must be valid JSON Schema 2020-12, and each property schema must be an object or a boolean. A command with an invalid schema gets no tool, and CALM Hub logs a warning with the first error. One invalid schema in the tool list makes TypeScript MCP SDK clients lose every tool.
 - MCP requires an output schema of type `object`. CALM Hub wraps any other output schema as `{"type": "object", "properties": {"result": <schema>}, "required": ["result"]}`, and returns the reply as `{"result": <reply>}`.
 - CALM Hub and MCP clients do not fetch a remote `$ref`. A command whose input or output schema has one gets no tool, and CALM Hub logs a warning. A `$ref` that starts with `#` is local, also in a schema with a `urn:` or `tag:` `$id`.
 - The TypeScript MCP SDK cannot compile a subschema that has both `$id` and `$ref`. CALM Hub moves such a `$ref` into `allOf`, which has the same meaning.

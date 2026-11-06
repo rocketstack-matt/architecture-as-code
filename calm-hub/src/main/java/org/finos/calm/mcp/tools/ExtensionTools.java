@@ -32,6 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -68,6 +70,17 @@ public class ExtensionTools {
     // Keywords whose value maps names to schemas.
     private static final Set<String> SCHEMA_MAPS = Set.of("properties", "patternProperties", "$defs", "definitions",
             "dependentSchemas", "dependencies");
+    private static final String META_SCHEMA_BASE = "https://json-schema.org/draft/2020-12/";
+    private static final String META_SCHEMA = META_SCHEMA_BASE + "schema";
+    // Bundled in vertx-json-schema under this classpath folder.
+    private static final String META_SCHEMA_PATH = "json-schema.org/draft/2020-12/";
+    private static final List<String> META_SCHEMA_FILES = List.of("schema", "meta/core", "meta/applicator",
+            "meta/unevaluated", "meta/validation", "meta/meta-data", "meta/format-annotation", "meta/content");
+    private static final JsonSchemaOptions META_SCHEMA_OPTIONS = new JsonSchemaOptions()
+            .setDraft(Draft.DRAFT202012)
+            .setBaseUri(META_SCHEMA)
+            .setOutputFormat(OutputFormat.Basic);
+    private static final SchemaRepository META_SCHEMAS = metaSchemas();
 
     /** One command with what its handler needs. */
     record ExtensionTool(String name, String extensionId, String extensionName, String commandName,
@@ -130,8 +143,12 @@ public class ExtensionTools {
         if (!mcpEnabled) {
             return;
         }
+        register(tools(registry.available()));
+    }
+
+    void register(List<ExtensionTool> tools) {
         List<String> registered = new ArrayList<>();
-        for (ExtensionTool tool : tools(registry.available())) {
+        for (ExtensionTool tool : tools) {
             // A manifest must never stop Hub.
             try {
                 ExtensionManifest.Command command = tool.command();
@@ -149,10 +166,20 @@ public class ExtensionTools {
             } catch (RuntimeException e) {
                 logger.warn("Extension {} command '{}' has no MCP tool: CALM Hub cannot register it: {}",
                         tool.extensionId(), tool.commandName(), e.toString());
+                remove(tool);
             }
         }
         if (!registered.isEmpty()) {
             logger.info("Registered MCP tools for extension commands: {}", registered);
+        }
+    }
+
+    // ToolManager adds the tool before its ToolAdded observers run, so a tool that an observer refuses stays listed.
+    private void remove(ExtensionTool tool) {
+        try {
+            toolManager.removeTool(tool.name());
+        } catch (RuntimeException e) {
+            logger.error("MCP tool {} may still be listed: CALM Hub cannot remove it: {}", tool.name(), e.toString());
         }
     }
 
@@ -168,7 +195,9 @@ public class ExtensionTools {
                     ExtensionManifest.Route route = manifest.route(command.route())
                             .orElseThrow(() -> new IllegalStateException("it names route '" + command.route()
                                     + "', which is not declared"));
-                    if (hasRemoteRef(manifest.id(), name, "input", command.input(), inputSchemaId(manifest.id(), name))
+                    if (isInvalid(manifest.id(), name, "input", command.input())
+                            || isInvalid(manifest.id(), name, "output", command.output())
+                            || hasRemoteRef(manifest.id(), name, "input", command.input(), inputSchemaId(manifest.id(), name))
                             || hasRemoteRef(manifest.id(), name, "output", command.output(), outputSchemaId(manifest.id(), name))) {
                         return;
                     }
@@ -182,6 +211,106 @@ public class ExtensionTools {
         }
         tools.sort(Comparator.comparing(ExtensionTool::name));
         return tools;
+    }
+
+    private static boolean isInvalid(String extensionId, String commandName, String kind, Map<String, Object> schema) {
+        String error = schema == null ? null : schemaError(schema);
+        if (error != null) {
+            logger.warn("Extension {} command '{}' has no MCP tool: its {} schema is not valid JSON Schema 2020-12: {}",
+                    extensionId, commandName, kind, error);
+        }
+        return error != null;
+    }
+
+    /**
+     * The first error of a command schema, or null. The Quarkus MCP server and the SDK clients fail on
+     * a property schema that is not an object or a boolean, and the manifest check does not check schemas.
+     */
+    static String schemaError(Map<String, Object> schema) {
+        String error = subschemaError(schema, "");
+        if (error != null || META_SCHEMAS == null) {
+            return error;
+        }
+        OutputUnit result;
+        try {
+            result = META_SCHEMAS.validator(META_SCHEMA, META_SCHEMA_OPTIONS)
+                    .validate(new JsonObject(new LinkedHashMap<>(schema)).copy());
+        } catch (RuntimeException e) {
+            return "CALM Hub cannot check it: " + e;
+        }
+        if (Boolean.TRUE.equals(result.getValid())) {
+            return null;
+        }
+        // The deepest error names the value to fix. The others say only that a parent does not match.
+        OutputUnit deepest = result.getErrors() == null ? result : result.getErrors().stream()
+                .max(Comparator.comparingInt(unit -> location(unit).length()))
+                .orElse(result);
+        String location = location(deepest);
+        return (location.isEmpty() ? "/" : location) + ": " + deepest.getError();
+    }
+
+    private static String location(OutputUnit error) {
+        return error.getInstanceLocation() == null ? "" : error.getInstanceLocation().replaceFirst("^#", "");
+    }
+
+    // Also the check if the meta-schemas cannot be loaded.
+    @SuppressWarnings("unchecked")
+    private static String subschemaError(Object value, String pointer) {
+        if (value instanceof Boolean) {
+            return null;
+        }
+        if (!(value instanceof Map<?, ?> map)) {
+            return (pointer.isEmpty() ? "/" : pointer) + ": the value must be a schema (an object or a boolean)";
+        }
+        for (Map.Entry<String, Object> entry : ((Map<String, Object>) map).entrySet()) {
+            String keyword = entry.getKey();
+            String here = pointer + "/" + escape(keyword);
+            String error = null;
+            // A dependencies value can also be a list of names.
+            if (SCHEMA_MAPS.contains(keyword) && entry.getValue() instanceof Map<?, ?> named) {
+                for (Map.Entry<?, ?> subschema : named.entrySet()) {
+                    if (error == null && !(keyword.equals("dependencies") && subschema.getValue() instanceof List)) {
+                        error = subschemaError(subschema.getValue(), here + "/" + escape(String.valueOf(subschema.getKey())));
+                    }
+                }
+            } else if (SCHEMA_KEYWORDS.contains(keyword) && entry.getValue() instanceof List<?> list) {
+                for (int i = 0; i < list.size() && error == null; i++) {
+                    error = subschemaError(list.get(i), here + "/" + i);
+                }
+            } else if (SCHEMA_KEYWORDS.contains(keyword)) {
+                error = subschemaError(entry.getValue(), here);
+            }
+            if (error != null) {
+                return error;
+            }
+        }
+        return null;
+    }
+
+    private static String escape(String token) {
+        return token.replace("~", "~0").replace("/", "~1");
+    }
+
+    // Null if the meta-schemas that vertx-json-schema bundles cannot be loaded. Hub must still start.
+    private static SchemaRepository metaSchemas() {
+        try {
+            SchemaRepository repository = SchemaRepository.create(META_SCHEMA_OPTIONS);
+            ClassLoader loader = ExtensionTools.class.getClassLoader();
+            for (String file : META_SCHEMA_FILES) {
+                try (InputStream in = loader.getResourceAsStream(META_SCHEMA_PATH + file)) {
+                    if (in == null) {
+                        throw new IOException("there is no resource " + META_SCHEMA_PATH + file);
+                    }
+                    repository.dereference(META_SCHEMA_BASE + file,
+                            JsonSchema.of(new JsonObject(new String(in.readAllBytes(), StandardCharsets.UTF_8))));
+                }
+            }
+            return repository;
+        } catch (IOException | RuntimeException e) {
+            logger.warn("Extension command schemas are not checked against the JSON Schema 2020-12 meta-schema: {}",
+                    e.toString());
+            return null;
+        }
     }
 
     private static boolean hasRemoteRef(String extensionId, String commandName, String kind,
@@ -508,8 +637,7 @@ public class ExtensionTools {
                 repository.dereference(id, JsonSchema.of(schema));
                 return new InputSchema(repository, id, options);
             } catch (RuntimeException e) {
-                throw new IllegalStateException("Extension " + extensionId + " command '" + commandName
-                        + "' has an input schema that CALM Hub cannot read: " + e.getMessage(), e);
+                throw new IllegalStateException("CALM Hub cannot read its input schema: " + e.getMessage(), e);
             }
         }
 
