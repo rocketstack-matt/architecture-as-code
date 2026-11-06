@@ -23,6 +23,19 @@
         "required": ["service"]
       }
     },
+    "annotate": {
+      "route": "search",
+      "description": "Annotate with schemas that have boolean subschemas",
+      "input": {
+        "type": "object",
+        "properties": { "text": { "type": "string", "x-example": { "$ref": "https://example.com/a.json" } }, "note": true, "never": false },
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": { "hits": true, "tags": { "type": "array", "items": true, "uniqueItems": true } }
+      }
+    },
     "search": {
       "route": "search",
       "description": "Search the services",

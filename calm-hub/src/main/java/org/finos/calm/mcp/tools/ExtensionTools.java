@@ -59,15 +59,19 @@ public class ExtensionTools {
     private static final Pattern PATH_PARAM = Pattern.compile("\\{([^}]+)}");
     private static final String SCHEMA_BASE = "https://calm.finos.org/calm-hub/extensions/";
     private static final String RESULT = "result";
-    // Values of these keywords are data, not schemas.
-    private static final Set<String> DATA_KEYWORDS = Set.of("const", "enum", "default", "examples");
-    // Values of these keywords map names to schemas.
+    // Keywords whose value is a schema or a list of schemas. Other keywords, also unknown ones such as x-example, are data.
+    private static final Set<String> SCHEMA_KEYWORDS = Set.of("additionalProperties", "additionalItems", "items",
+            "prefixItems", "contains", "propertyNames", "not", "if", "then", "else", "allOf", "anyOf", "oneOf",
+            "unevaluatedItems", "unevaluatedProperties", "contentSchema");
+    // Hub keeps these as booleans: clients read them, and some, such as strict function calling, require false.
+    private static final Set<String> BOOLEAN_KEYWORDS = Set.of("additionalProperties", "unevaluatedProperties");
+    // Keywords whose value maps names to schemas.
     private static final Set<String> SCHEMA_MAPS = Set.of("properties", "patternProperties", "$defs", "definitions",
             "dependentSchemas", "dependencies");
 
     /** One command with what its handler needs. */
     record ExtensionTool(String name, String extensionId, String extensionName, String commandName,
-                         ExtensionManifest.Command command, ExtensionManifest.Route route, InputSchema inputSchema) {
+                         ExtensionManifest.Command command, ExtensionManifest.Route route, InputSchema inputValidator) {
 
         boolean readOnly() {
             return "GET".equals(route.method()) || route.readOnly();
@@ -78,9 +82,13 @@ public class ExtensionTools {
             return command.output() != null && !"object".equals(command.output().get("type"));
         }
 
+        Map<String, Object> inputSchema() {
+            return published(command.input());
+        }
+
         Map<String, Object> outputSchema() {
             if (!wrapsOutput()) {
-                return refsBesideIdsInAllOf(command.output());
+                return published(command.output());
             }
             Map<String, Object> result = new LinkedHashMap<>(command.output());
             Map<String, Object> schema = new LinkedHashMap<>();
@@ -93,7 +101,7 @@ public class ExtensionTools {
             result.putIfAbsent("$id", outputSchemaId(extensionId, commandName));
             schema.put("properties", Map.of(RESULT, result));
             schema.put("required", List.of(RESULT));
-            return refsBesideIdsInAllOf(schema);
+            return published(schema);
         }
     }
 
@@ -119,22 +127,32 @@ public class ExtensionTools {
     }
 
     void register() {
-        List<ExtensionTool> tools = tools(registry.available());
-        for (ExtensionTool tool : tools) {
-            ExtensionManifest.Command command = tool.command();
-            ToolManager.ToolDefinition definition = toolManager.newTool(tool.name())
-                    .setTitle(tool.extensionName() + ": " + tool.commandName())
-                    .setDescription(command.description())
-                    .setInputSchema(command.input())
-                    .setAnnotations(annotations(tool))
-                    .setHandler(args -> call(tool, args.args()));
-            if (command.output() != null) {
-                definition.setOutputSchema(tool.outputSchema());
-            }
-            definition.register();
+        if (!mcpEnabled) {
+            return;
         }
-        if (!tools.isEmpty()) {
-            logger.info("Registered MCP tools for extension commands: {}", tools.stream().map(ExtensionTool::name).toList());
+        List<String> registered = new ArrayList<>();
+        for (ExtensionTool tool : tools(registry.available())) {
+            // A manifest must never stop Hub.
+            try {
+                ExtensionManifest.Command command = tool.command();
+                ToolManager.ToolDefinition definition = toolManager.newTool(tool.name())
+                        .setTitle(tool.extensionName() + ": " + tool.commandName())
+                        .setDescription(command.description())
+                        .setInputSchema(tool.inputSchema())
+                        .setAnnotations(annotations(tool))
+                        .setHandler(args -> call(tool, args.args()));
+                if (command.output() != null) {
+                    definition.setOutputSchema(tool.outputSchema());
+                }
+                definition.register();
+                registered.add(tool.name());
+            } catch (RuntimeException e) {
+                logger.warn("Extension {} command '{}' has no MCP tool: CALM Hub cannot register it: {}",
+                        tool.extensionId(), tool.commandName(), e.toString());
+            }
+        }
+        if (!registered.isEmpty()) {
+            logger.info("Registered MCP tools for extension commands: {}", registered);
         }
     }
 
@@ -146,15 +164,20 @@ public class ExtensionTools {
         List<ExtensionTool> tools = new ArrayList<>();
         for (ExtensionManifest manifest : manifests) {
             manifest.commands().forEach((name, command) -> {
-                ExtensionManifest.Route route = manifest.route(command.route())
-                        .orElseThrow(() -> new IllegalStateException("Extension " + manifest.id() + " command '"
-                                + name + "' names route '" + command.route() + "', which is not declared"));
-                if (hasRemoteRef(manifest.id(), name, "input", command.input(), inputSchemaId(manifest.id(), name))
-                        || hasRemoteRef(manifest.id(), name, "output", command.output(), outputSchemaId(manifest.id(), name))) {
-                    return;
+                try {
+                    ExtensionManifest.Route route = manifest.route(command.route())
+                            .orElseThrow(() -> new IllegalStateException("it names route '" + command.route()
+                                    + "', which is not declared"));
+                    if (hasRemoteRef(manifest.id(), name, "input", command.input(), inputSchemaId(manifest.id(), name))
+                            || hasRemoteRef(manifest.id(), name, "output", command.output(), outputSchemaId(manifest.id(), name))) {
+                        return;
+                    }
+                    tools.add(new ExtensionTool(ExtensionManifestLoader.toolName(manifest.id(), name), manifest.id(),
+                            manifest.name(), name, command, route,
+                            InputSchema.of(manifest.id(), name, published(command.input()))));
+                } catch (RuntimeException e) {
+                    logger.warn("Extension {} command '{}' has no MCP tool: {}", manifest.id(), name, e.getMessage());
                 }
-                tools.add(new ExtensionTool(ExtensionManifestLoader.toolName(manifest.id(), name), manifest.id(),
-                        manifest.name(), name, command, route, InputSchema.of(manifest.id(), name, command.input())));
             });
         }
         tools.sort(Comparator.comparing(ExtensionTool::name));
@@ -206,7 +229,7 @@ public class ExtensionTools {
     private static String validate(ExtensionTool tool, JsonObject input) {
         OutputUnit result;
         try {
-            result = tool.inputSchema().validate(input);
+            result = tool.inputValidator().validate(input);
         } catch (RuntimeException e) {
             // vertx-json-schema throws on some valid schemas, such as a pattern with \p{..}.
             logger.warn("Cannot check the input of MCP tool {}: {}", tool.name(), e.toString());
@@ -378,11 +401,13 @@ public class ExtensionTools {
     }
 
     /**
-     * Ajv, which the MCP TypeScript SDK uses to compile output schemas, overflows its stack on a
-     * subschema with both {@code $id} and {@code $ref}. The same ref in {@code allOf} compiles.
+     * The schema that Hub publishes, with the same meaning. Boolean subschemas become objects: the
+     * Quarkus MCP server and the SDK clients require an object for each property. Ajv, which the MCP
+     * TypeScript SDK uses to compile output schemas, overflows its stack on a subschema with both
+     * {@code $id} and {@code $ref}. The same ref in {@code allOf} compiles.
      */
-    static Map<String, Object> refsBesideIdsInAllOf(Map<String, Object> schema) {
-        Map<String, Object> copy = mapSubschemas(schema, ExtensionTools::refsBesideIdsInAllOf);
+    static Map<String, Object> published(Map<String, Object> schema) {
+        Map<String, Object> copy = mapSubschemas(schema, ExtensionTools::published);
         if (!copy.containsKey("$id")) {
             return copy;
         }
@@ -402,30 +427,37 @@ public class ExtensionTools {
         return copy;
     }
 
-    /** A copy of a schema with {@code f} applied to each direct subschema. Keyword values that are data stay as they are. */
+    /**
+     * A copy of a schema with {@code f} applied to each direct subschema, a boolean one in its object
+     * form, except for {@link #BOOLEAN_KEYWORDS}. The values of other keywords, also unknown ones, are
+     * data and stay as they are.
+     */
     private static Map<String, Object> mapSubschemas(Map<String, Object> schema, UnaryOperator<Map<String, Object>> f) {
         Map<String, Object> copy = new LinkedHashMap<>();
         schema.forEach((keyword, value) -> {
-            if (DATA_KEYWORDS.contains(keyword)) {
-                copy.put(keyword, value);
-            } else if (SCHEMA_MAPS.contains(keyword) && value instanceof Map<?, ?> named) {
+            if (SCHEMA_MAPS.contains(keyword) && value instanceof Map<?, ?> named) {
                 Map<String, Object> mapped = new LinkedHashMap<>();
                 named.forEach((name, subschema) -> mapped.put(String.valueOf(name), mapSubschema(subschema, f)));
                 copy.put(keyword, mapped);
+            } else if (SCHEMA_KEYWORDS.contains(keyword) && !(value instanceof Boolean && BOOLEAN_KEYWORDS.contains(keyword))) {
+                copy.put(keyword, value instanceof List<?> list
+                        ? list.stream().map(item -> mapSubschema(item, f)).toList()
+                        : mapSubschema(value, f));
             } else {
-                copy.put(keyword, mapSubschema(value, f));
+                copy.put(keyword, value);
             }
         });
         return copy;
     }
 
+    // A boolean schema and its object form have the same meaning.
     @SuppressWarnings("unchecked")
     private static Object mapSubschema(Object value, UnaryOperator<Map<String, Object>> f) {
+        if (value instanceof Boolean accept) {
+            return f.apply(accept ? Map.of() : Map.of("not", Map.of()));
+        }
         if (value instanceof Map<?, ?> map) {
             return f.apply((Map<String, Object>) map);
-        }
-        if (value instanceof List<?> list) {
-            return list.stream().map(item -> mapSubschema(item, f)).toList();
         }
         return value;
     }
@@ -460,7 +492,7 @@ public class ExtensionTools {
 
     /**
      * MCP servers do not check arguments against the input schema, so Hub does. Local {@code $ref}s
-     * resolve only once the schema is in a repository. A schema that cannot be read stops Hub.
+     * resolve only once the schema is in a repository.
      */
     record InputSchema(SchemaRepository repository, String id, JsonSchemaOptions options) {
 

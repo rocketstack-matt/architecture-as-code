@@ -30,6 +30,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -95,7 +96,7 @@ class TestExtensionToolsShould {
     @Test
     void name_the_tools_after_the_extension_and_command_sorted_by_name() {
         assertThat(TOOLS.stream().map(ExtensionTools.ExtensionTool::name).toList(),
-                contains("ext_mcp-test_add-service", "ext_mcp-test_get-service", "ext_mcp-test_list-services", "ext_mcp-test_remove-service",
+                contains("ext_mcp-test_add-service", "ext_mcp-test_annotate", "ext_mcp-test_get-service", "ext_mcp-test_list-services", "ext_mcp-test_remove-service",
                         "ext_mcp-test_search", "ext_mcp-test_service-names"));
     }
 
@@ -120,14 +121,14 @@ class TestExtensionToolsShould {
         extensionTools.register();
 
         ArgumentCaptor<String> names = ArgumentCaptor.forClass(String.class);
-        verify(toolManager, times(6)).newTool(names.capture());
+        verify(toolManager, times(7)).newTool(names.capture());
         assertThat(names.getAllValues().getFirst(), is("ext_mcp-test_add-service"));
         verify(definition).setDescription("List the services that a namespace owns");
         verify(definition).setTitle("MCP test: list-services");
         verify(definition).setInputSchema(tool("list-services").command().input());
         verify(definition).setOutputSchema(tool("list-services").command().output());
         verify(definition).setOutputSchema(tool("service-names").outputSchema());
-        verify(definition, times(6)).register();
+        verify(definition, times(7)).register();
     }
 
     @Test
@@ -159,7 +160,7 @@ class TestExtensionToolsShould {
                 "$defs", Map.of("d", Map.of("$id", "urn:d", "$dynamicRef", "#m")),
                 "default", Map.of("$id", "data", "$ref", "data"));
 
-        Map<String, Object> moved = ExtensionTools.refsBesideIdsInAllOf(schema);
+        Map<String, Object> moved = ExtensionTools.published(schema);
 
         assertThat(moved.get("$ref"), is("#/$defs/top"));
         assertThat(((Map<?, ?>) moved.get("properties")).get("$id"),
@@ -237,6 +238,57 @@ class TestExtensionToolsShould {
     }
 
     @Test
+    void not_check_the_refs_in_unknown_keywords() {
+        String id = ExtensionTools.inputSchemaId("x", "c");
+
+        assertThat(ExtensionTools.remoteRef(Map.of("type", "string", "x-example", Map.of("$ref", "https://example.com/a.json"),
+                "example", Map.of("$ref", "https://example.com/b.json")), id), nullValue());
+        assertThat(tool("annotate"), notNullValue());
+    }
+
+    @Test
+    void publish_boolean_subschemas_as_objects() {
+        Map<String, Object> never = Map.of("not", Map.of());
+        Map<String, Object> schema = Map.of(
+                "type", "object",
+                "properties", Map.of("a", true, "b", false, "c", Map.of("type", "array", "items", true, "uniqueItems", true)),
+                "additionalProperties", false,
+                "unevaluatedItems", false,
+                "allOf", List.of(true, Map.of("not", false)),
+                "$defs", Map.of("d", true),
+                "dependencies", Map.of("a", List.of("b")),
+                "readOnly", true,
+                "x-flag", true,
+                "const", true);
+
+        Map<String, Object> published = ExtensionTools.published(schema);
+
+        assertThat(published.get("properties"), is(Map.of("a", Map.of(), "b", never,
+                "c", Map.of("type", "array", "items", Map.of(), "uniqueItems", true))));
+        assertThat(published.get("additionalProperties"), is(false));
+        assertThat(published.get("unevaluatedItems"), is(never));
+        assertThat(published.get("allOf"), is(List.of(Map.of(), Map.of("not", never))));
+        assertThat(published.get("$defs"), is(Map.of("d", Map.of())));
+        assertThat(published.get("dependencies"), is(Map.of("a", List.of("b"))));
+        assertThat(published.get("readOnly"), is(true));
+        assertThat(published.get("x-flag"), is(true));
+        assertThat(published.get("const"), is(true));
+    }
+
+    @Test
+    void publish_and_check_a_command_with_boolean_subschemas() {
+        ExtensionTools.ExtensionTool annotate = tool("annotate");
+
+        assertThat(((Map<?, ?>) annotate.inputSchema().get("properties")).get("note"), is(Map.of()));
+        assertThat(((Map<?, ?>) annotate.inputSchema().get("properties")).get("never"), is(Map.of("not", Map.of())));
+        assertThat(((Map<?, ?>) annotate.outputSchema().get("properties")).get("hits"), is(Map.of()));
+        ToolResponse response = extensionTools.call(annotate, Map.of("text", "a", "note", 1, "never", 2));
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("/never"));
+        verifyNoInteractions(proxyService);
+    }
+
+    @Test
     void register_no_tools_with_no_extensions() {
         when(registry.available()).thenReturn(List.of());
 
@@ -246,13 +298,36 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void stop_hub_for_an_input_schema_that_cannot_be_read() {
-        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
-        ExtensionManifest manifest = new ExtensionManifest("bad", "1.0.0", 0, "B", "B", "B", List.of(route),
-                Map.of("c", new ExtensionManifest.Command("r", "C", Map.of("type", "object", "$id", 5), null, null, null)), null);
+    void register_no_tools_when_mcp_is_disabled() {
+        extensionTools.mcpEnabled = false;
 
-        IllegalStateException e = assertThrows(IllegalStateException.class, () -> ExtensionTools.tools(List.of(manifest)));
-        assertThat(e.getMessage(), containsString("Extension bad command 'c' has an input schema"));
+        extensionTools.register();
+
+        verifyNoInteractions(toolManager, registry);
+    }
+
+    @Test
+    void register_the_other_tools_when_one_cannot_be_registered() {
+        when(registry.available()).thenReturn(MANIFESTS);
+        when(toolManager.newTool(anyString())).thenReturn(definition);
+        when(definition.register()).thenThrow(new ClassCastException("not a JsonObject")).thenReturn(null);
+
+        extensionTools.register();
+
+        verify(definition, times(7)).register();
+    }
+
+    @Test
+    void skip_a_command_whose_input_schema_cannot_be_read_or_whose_route_is_not_declared() {
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        Map<String, Object> input = Map.of("type", "object");
+        ExtensionManifest manifest = new ExtensionManifest("bad", "1.0.0", 0, "B", "B", "B", List.of(route), Map.of(
+                "unreadable", new ExtensionManifest.Command("r", "C", Map.of("type", "object", "$id", 5), null, null, null),
+                "no-route", new ExtensionManifest.Command("missing", "C", input, null, null, null),
+                "good", new ExtensionManifest.Command("r", "C", input, null, null, null)), null);
+
+        assertThat(ExtensionTools.tools(List.of(manifest)).stream().map(ExtensionTools.ExtensionTool::name).toList(),
+                contains("ext_bad_good"));
     }
 
     @Test
@@ -487,7 +562,7 @@ class TestExtensionToolsShould {
 
         assertThat(response.isError(), is(true));
         assertThat(text(response), containsString("/p"));
-        assertThat(Boolean.TRUE.equals(urnTool.inputSchema().validate(new JsonObject().put("p", "s")).getValid()), is(true));
+        assertThat(Boolean.TRUE.equals(urnTool.inputValidator().validate(new JsonObject().put("p", "s")).getValid()), is(true));
     }
 
     @Test

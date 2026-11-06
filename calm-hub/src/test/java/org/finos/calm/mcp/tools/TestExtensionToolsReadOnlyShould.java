@@ -38,6 +38,7 @@ class TestExtensionToolsReadOnlyShould {
 
     @Test
     void register_only_the_commands_that_a_read_only_hub_can_run() {
+        assertThat(toolManager.getTool("ext_mcp-test_annotate"), notNullValue());
         assertThat(toolManager.getTool("ext_mcp-test_get-service"), notNullValue());
         assertThat(toolManager.getTool("ext_mcp-test_list-services"), notNullValue());
         assertThat(toolManager.getTool("ext_mcp-test_search"), notNullValue());

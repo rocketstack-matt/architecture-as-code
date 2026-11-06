@@ -340,9 +340,11 @@ CALM Hub includes an experimental [Model Context Protocol](https://modelcontextp
 Tool providers are in `src/main/java/org/finos/calm/mcp/tools/`:  
 `ArchitectureTools`, `PatternTools`, `ControlTools`, `DomainTools`, `InterfaceTools`,  
 `NamespaceTools`, `SearchTools`, `StandardTools`, `TimelineTools`, `AdrTools`.  
-`ExtensionTools` registers one `ext_<id>_<command>` tool for each extension command at start up, with `ToolManager`.
+`ExtensionTools` registers one `ext_<id>_<command>` tool for each extension command at start up, with `ToolManager`, only when MCP is on.
 It wraps an output schema that is not an object in `result`, and skips a command whose input or output schema has a remote `$ref`.
-In output schemas it moves a `$ref` beside an `$id` into `allOf`, because Ajv (in the MCP TypeScript SDK) overflows its stack on that.
+It moves a `$ref` beside an `$id` into `allOf`, because Ajv (in the MCP TypeScript SDK) overflows its stack on that.
+It publishes boolean subschemas as objects (not `additionalProperties`/`unevaluatedProperties`): the Quarkus MCP header observer and the SDK `ToolSchema` require an object for each property.
+A command that it cannot register is skipped with a warning, so a manifest never stops Hub.
 
 Enable for development:
 ```bash

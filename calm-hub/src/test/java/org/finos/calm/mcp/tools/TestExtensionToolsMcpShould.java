@@ -88,7 +88,7 @@ class TestExtensionToolsMcpShould {
         List<String> names = tools.stream().map(t -> ((JsonObject) t).getString("name"))
                 .filter(name -> name.startsWith("ext_")).toList();
 
-        assertThat(names, is(List.of("ext_mcp-test_add-service", "ext_mcp-test_get-service", "ext_mcp-test_list-services",
+        assertThat(names, is(List.of("ext_mcp-test_add-service", "ext_mcp-test_annotate", "ext_mcp-test_get-service", "ext_mcp-test_list-services",
                 "ext_mcp-test_remove-service", "ext_mcp-test_search", "ext_mcp-test_service-names")));
         JsonObject list = find(tools, "ext_mcp-test_list-services");
         assertThat(list.getString("description"), is("List the services that a namespace owns"));
@@ -105,6 +105,19 @@ class TestExtensionToolsMcpShould {
         JsonObject result = wrapped.getJsonObject("properties").getJsonObject("result");
         assertThat(result.containsKey("$ref"), is(false));
         assertThat(result.getJsonArray("allOf"), is(new JsonArray().add(new JsonObject().put("$ref", "#/$defs/names"))));
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void list_boolean_subschemas_as_objects() {
+        JsonObject annotate = find(listTools(), "ext_mcp-test_annotate");
+
+        JsonObject input = annotate.getJsonObject("inputSchema").getJsonObject("properties");
+        assertThat(input.getJsonObject("note"), is(new JsonObject()));
+        assertThat(input.getJsonObject("never"), is(new JsonObject().put("not", new JsonObject())));
+        JsonObject output = annotate.getJsonObject("outputSchema").getJsonObject("properties");
+        assertThat(output.getJsonObject("hits"), is(new JsonObject()));
+        assertThat(output.getJsonObject("tags").getJsonObject("items"), is(new JsonObject()));
     }
 
     @Test

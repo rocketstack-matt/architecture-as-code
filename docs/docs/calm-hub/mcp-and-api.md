@@ -214,12 +214,14 @@ curl -s -X POST http://localhost:8080/mcp \
 
 ### Extension Tools
 
-CALM Hub makes one tool for each command of an enabled [extension](index.md#extensions). The tool name is `ext_<id>_<command>`, for example `ext_example-services_list-services`. These tools come after the built-in tools in `tools/list`, sorted by name.
+CALM Hub makes one tool for each command of an enabled [extension](index.md#extensions) when `calm.mcp.enabled` is true. The tool name is `ext_<id>_<command>`, for example `ext_example-services_list-services`. These tools come after the built-in tools in `tools/list`, sorted by name.
 
 - The input and output schemas come from the manifest. CALM Hub checks the arguments against the input schema before it calls the extension.
 - MCP requires an output schema of type `object`. CALM Hub wraps any other output schema as `{"type": "object", "properties": {"result": <schema>}, "required": ["result"]}`, and returns the reply as `{"result": <reply>}`.
 - CALM Hub and MCP clients do not fetch a remote `$ref`. A command whose input or output schema has one gets no tool, and CALM Hub logs a warning. A `$ref` that starts with `#` is local, also in a schema with a `urn:` or `tag:` `$id`.
-- The TypeScript MCP SDK cannot compile a subschema that has both `$id` and `$ref`. In output schemas, CALM Hub moves such a `$ref` into `allOf`, which has the same meaning.
+- The TypeScript MCP SDK cannot compile a subschema that has both `$id` and `$ref`. CALM Hub moves such a `$ref` into `allOf`, which has the same meaning.
+- MCP servers and clients need an object for each property schema. CALM Hub publishes a boolean subschema as `{}` (`true`) or `{"not": {}}` (`false`). `additionalProperties` and `unevaluatedProperties` stay booleans.
+- A command that CALM Hub cannot make a tool for gets no tool, and CALM Hub logs a warning. An extension never stops CALM Hub from starting.
 - `readOnlyHint` is true for a `GET` or `readOnly` route. `destructiveHint` and `idempotentHint` come from the command. With no hint, a write is destructive and not idempotent.
 - Each call goes through the extension proxy, with the same scope, read-only, audit and size rules as a REST call. CALM Hub checks the scope when the tool is called. A user sees every tool, also one that they cannot call.
 - A read-only CALM Hub makes no tool for a command whose route it cannot run.
