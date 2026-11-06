@@ -223,8 +223,8 @@ Selecting a control from a **Control Domain** (e.g. `security` or `ai-governance
 
 ## Extensions
 
-An operator can install extensions (see [Extensions](../calm-hub/index.md#extensions)). The UI groups
-what they add:
+An operator can install extensions (see [Extensions](../calm-hub/index.md#extensions), and the
+[extension tutorial](../tutorials/advanced/hub-extension.md)). The UI groups what they add:
 
 * **Home page:** an **Extensions** section under **Namespaces**, with one card per extension. A card shows the extension name, its provider and up to three figures. Click a card to open the extension screen.
 * **Side menu:** an **Extensions** group with one entry per extension screen.
