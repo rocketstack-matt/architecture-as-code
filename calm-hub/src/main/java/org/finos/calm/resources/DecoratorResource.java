@@ -16,6 +16,7 @@ import org.finos.calm.domain.ValueWrapper;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
+import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.security.CalmHubScopes;
@@ -196,6 +197,9 @@ public class DecoratorResource {
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when creating decorator", namespace, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
+        } catch (HubOwnedDecoratorFieldException e) {
+            logger.warn("Refused a Hub-owned decorator field [{}] in namespace [{}]", e.getField(), namespace);
+            return CalmResourceErrorResponses.hubOwnedDecoratorFieldResponse(e.getField());
         } catch (ReservedDecoratorTypeException e) {
             logger.warn("Refused a reserved decorator type when creating a decorator in namespace [{}]", namespace);
             return CalmResourceErrorResponses.reservedDecoratorTypeResponse(e.getType());
@@ -249,6 +253,9 @@ public class DecoratorResource {
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when updating decorator [{}]", namespace, id, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
+        } catch (HubOwnedDecoratorFieldException e) {
+            logger.warn("Refused a Hub-owned decorator field [{}] in namespace [{}]", e.getField(), namespace);
+            return CalmResourceErrorResponses.hubOwnedDecoratorFieldResponse(e.getField());
         } catch (ReservedDecoratorTypeException e) {
             logger.warn("Refused a reserved decorator type when updating decorator [{}] in namespace [{}]", id, namespace);
             return CalmResourceErrorResponses.reservedDecoratorTypeResponse(e.getType());
