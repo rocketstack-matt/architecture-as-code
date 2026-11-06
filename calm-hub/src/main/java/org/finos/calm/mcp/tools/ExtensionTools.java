@@ -681,15 +681,19 @@ public class ExtensionTools {
                 () -> McpValidationHelper.checkEnabled(mcpEnabled));
         if (err.isPresent()) return err.get();
 
-        JsonObject input = new JsonObject(args == null ? new LinkedHashMap<>() : new LinkedHashMap<>(args)).copy();
-        if (input.toBuffer().length() > MAX_ARGUMENTS_BYTES) {
-            return ToolResponse.error("Error: The arguments are larger than " + MAX_ARGUMENTS_BYTES + " bytes of JSON.");
-        }
+        JsonObject input;
         ExtensionProxyRequest request;
         try {
+            input = new JsonObject(args == null ? new LinkedHashMap<>() : new LinkedHashMap<>(args)).copy();
+            if (input.toBuffer().length() > MAX_ARGUMENTS_BYTES) {
+                return ToolResponse.error("Error: The arguments are larger than " + MAX_ARGUMENTS_BYTES + " bytes of JSON.");
+            }
             request = request(tool, input);
         } catch (IllegalArgumentException e) {
             return ToolResponse.error("Error: " + e.getMessage());
+        } catch (StackOverflowError e) {
+            // The copy, the size check and the request recurse for each level of the arguments.
+            return ToolResponse.error("Error: The arguments are nested too deeply.");
         }
         try {
             // The input check can be slow, so a caller with no scope must not reach it.

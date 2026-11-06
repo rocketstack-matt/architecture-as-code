@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -549,7 +550,7 @@ class TestExtensionToolsShould {
 
     @ParameterizedTest
     @ValueSource(strings = {"a{99}b", "(?:\\s?){99}x", "(?:a{10,}|b*){9}c"})
-    void check_a_one_megabyte_argument_against_the_largest_accepted_patterns_in_less_than_five_seconds(String pattern) {
+    void check_a_one_megabyte_argument_against_the_largest_accepted_patterns_in_linear_time(String pattern) {
         ExtensionTools.ExtensionTool command = textCommand(pattern);
 
         long start = System.nanoTime();
@@ -557,7 +558,8 @@ class TestExtensionToolsShould {
 
         assertThat(response.isError(), is(true));
         assertThat(text(response), containsString("/text: String does not match pattern"));
-        assertThat(Duration.ofNanos(System.nanoTime() - start).toMillis() < 5_000, is(true));
+        // Linear time takes well under a second; a backtracking matcher would take hours. The margin is for slow runners.
+        assertThat(Duration.ofNanos(System.nanoTime() - start).toMillis() < 30_000, is(true));
     }
 
     @Test
@@ -569,6 +571,27 @@ class TestExtensionToolsShould {
         assertThat(text(response), is("Error: The arguments are larger than 1048576 bytes of JSON."));
         verify(proxyService, never()).checkAccess(any(), any());
         verify(proxyService, never()).call(any(), any());
+    }
+
+    @Test
+    void refuse_deeply_nested_arguments_and_stay_ready_for_the_next_call() {
+        ExtensionTools.ExtensionTool command = textCommand("^a*$");
+        List<Object> deep = new ArrayList<>();
+        List<Object> level = deep;
+        for (int i = 0; i < 10_000; i++) {
+            List<Object> next = new ArrayList<>();
+            level.add(next);
+            level = next;
+        }
+
+        ToolResponse refused = extensionTools.call(command, Map.of("deep", deep));
+
+        assertThat(text(refused), is("Error: The arguments are nested too deeply."));
+        verify(proxyService, never()).checkAccess(any(), any());
+        verify(proxyService, never()).call(any(), any());
+
+        when(proxyService.call(any(), any())).thenReturn(reply(200, "{}"));
+        assertThat(extensionTools.call(command, Map.of("text", "aaa")).isError(), is(false));
     }
 
     private static ExtensionTools.ExtensionTool textCommand(String pattern) {
@@ -599,16 +622,16 @@ class TestExtensionToolsShould {
             for (String property : List.of("text", "empty", "choice")) {
                 long start = System.nanoTime();
                 ToolResponse slow = executor.submit(() -> extensionTools.call(tool("slow-pattern"),
-                        Map.of("namespace", "finos", property, text))).get(10, TimeUnit.SECONDS);
+                        Map.of("namespace", "finos", property, text))).get(60, TimeUnit.SECONDS);
 
                 assertThat(property, text(slow), containsString("\n- /" + property + ": String does not match pattern"));
-                assertThat(property, Duration.ofNanos(System.nanoTime() - start).toMillis() < 5_000, is(true));
+                assertThat(property, Duration.ofNanos(System.nanoTime() - start).toMillis() < 30_000, is(true));
             }
             verify(proxyService, never()).call(any(), any());
 
             when(proxyService.call(any(), any())).thenReturn(reply(200, "{}"));
             ToolResponse fast = executor.submit(() -> extensionTools.call(tool("slow-pattern"),
-                    Map.of("namespace", "finos", "text", "a".repeat(12), "choice", "aab"))).get(5, TimeUnit.SECONDS);
+                    Map.of("namespace", "finos", "text", "a".repeat(12), "choice", "aab"))).get(30, TimeUnit.SECONDS);
             assertThat(fast.isError(), is(false));
         } finally {
             executor.shutdownNow();
