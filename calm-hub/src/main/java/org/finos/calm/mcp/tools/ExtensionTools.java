@@ -37,13 +37,18 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -72,9 +77,16 @@ public class ExtensionTools {
     // Keywords whose value maps names to schemas.
     private static final Set<String> SCHEMA_MAPS = Set.of("properties", "patternProperties", "$defs", "definitions",
             "dependentSchemas", "dependencies");
-    // Refused in command schemas. The $recursive keywords are 2019-09.
+    // Refused in each object of a command schema, at any depth. Ajv in the SDK reads ids also under unknown keywords.
+    // The $recursive keywords are 2019-09.
     private static final List<String> IDENTIFIER_KEYWORDS = List.of("$id", "$anchor", "$dynamicAnchor", "$dynamicRef",
             "$recursiveAnchor", "$recursiveRef");
+    // Ajv in the SDK overflows its stack on a schema nested about 350 deep.
+    static final int MAX_SCHEMA_DEPTH = 64;
+    // Limits for matching the input against the patterns of the input schema. java.util.regex can take hours on
+    // some valid patterns, such as ^(.*a){12}$.
+    static final Duration MATCH_TIME = Duration.ofMillis(100);
+    static final Duration CALL_MATCH_TIME = Duration.ofSeconds(1);
     private static final String META_SCHEMA_BASE = "https://json-schema.org/draft/2020-12/";
     private static final String META_SCHEMA = META_SCHEMA_BASE + "schema";
     // Bundled in vertx-json-schema under this classpath folder.
@@ -186,6 +198,7 @@ public class ExtensionTools {
                 definition.register();
                 registered.add(tool.name());
             } catch (RuntimeException | Error e) {
+                rethrowIfFatal(e);
                 logger.warn("Extension {} command '{}' has no MCP tool: CALM Hub cannot register it: {}",
                         tool.extensionId(), tool.commandName(), e.toString());
                 remove(tool);
@@ -202,7 +215,16 @@ public class ExtensionTools {
         try {
             toolManager.removeTool(tool.name());
         } catch (RuntimeException | Error e) {
+            rethrowIfFatal(e);
             logger.error("MCP tool {} may still be listed: CALM Hub cannot remove it: {}", tool.name(), e.toString());
+        }
+    }
+
+    // A StackOverflowError comes from the command and leaves a clean stack. Other VM errors, such as an
+    // OutOfMemoryError, are about the JVM, so Hub must not start as if it were healthy.
+    static void rethrowIfFatal(Throwable e) {
+        if (e instanceof VirtualMachineError fatal && !(e instanceof StackOverflowError)) {
+            throw fatal;
         }
     }
 
@@ -229,6 +251,7 @@ public class ExtensionTools {
                     logger.warn("Extension {} command '{}' has no MCP tool: {}", manifest.id(), name, e.getMessage());
                 } catch (Error e) {
                     // Such as a StackOverflowError on a deep schema. One command must not stop Hub or skip the others.
+                    rethrowIfFatal(e);
                     logger.warn("Extension {} command '{}' has no MCP tool: CALM Hub cannot check it: {}", manifest.id(), name,
                             e.toString());
                 }
@@ -255,14 +278,14 @@ public class ExtensionTools {
     /**
      * The error of a command schema that names the value to fix, or null. The manifest check does not
      * check command schemas. One schema that an MCP client cannot compile makes TypeScript SDK clients
-     * lose every tool, so Hub accepts only a subset of 2020-12: no schema identifiers, only local JSON
-     * Pointer refs, and patterns that are valid in both ECMA-262 and Java.
+     * lose every tool, so Hub accepts only a subset of 2020-12: a limited depth, no schema identifiers,
+     * only local JSON Pointer refs, and patterns that are valid in both ECMA-262 and Java.
      */
     static String schemaError(Map<String, Object> schema, SchemaRepository metaSchemas) {
         // Before the meta-schema check, which compiles each pattern with java.util.regex.
-        String error = firstError(schema, "", (subschema, pointer) -> {
+        String error = structureError(schema, "", 1);
+        error = error != null ? error : firstError(schema, "", (subschema, pointer) -> {
             String own = dialectError(subschema, pointer);
-            own = own != null ? own : identifierError(subschema, pointer);
             return own != null ? own : patternError(subschema, pointer);
         });
         if (error != null) {
@@ -306,12 +329,39 @@ public class ExtensionTools {
                 + META_SCHEMA + ")";
     }
 
-    // Each kind of $id or anchor that the SDK could not compile broke every client, so Hub refuses them all.
-    private static String identifierError(Map<String, Object> schema, String pointer) {
-        for (String keyword : IDENTIFIER_KEYWORDS) {
-            if (schema.containsKey(keyword)) {
-                return pointer + "/" + keyword + ": CALM Hub does not support " + keyword
-                        + " in command schemas. Use a $ref with a JSON Pointer, such as #/$defs/name";
+    /**
+     * The error of a value nested deeper than {@link #MAX_SCHEMA_DEPTH} objects and arrays, or of an
+     * identifier keyword as a key of any object. This walks all values, also those of unknown keywords,
+     * {@code const} and {@code enum}, and the property maps, because Ajv reads ids in some of them. Each
+     * kind of {@code $id} or anchor that the SDK could not compile broke every client.
+     */
+    private static String structureError(Object value, String pointer, int depth) {
+        if (!(value instanceof Map || value instanceof List)) {
+            return null;
+        }
+        if (depth > MAX_SCHEMA_DEPTH) {
+            return at(pointer) + ": the schema is nested more than " + MAX_SCHEMA_DEPTH
+                    + " objects and arrays deep, which CALM Hub does not support";
+        }
+        if (value instanceof List<?> list) {
+            for (int i = 0; i < list.size(); i++) {
+                String error = structureError(list.get(i), pointer + "/" + i, depth + 1);
+                if (error != null) {
+                    return error;
+                }
+            }
+            return null;
+        }
+        for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+            String key = String.valueOf(entry.getKey());
+            String here = pointer + "/" + escape(key);
+            if (IDENTIFIER_KEYWORDS.contains(key)) {
+                return here + ": CALM Hub does not support " + key + " in command schemas, at any depth or under any "
+                        + "keyword. Use a $ref with a JSON Pointer, such as #/$defs/name";
+            }
+            String error = structureError(entry.getValue(), here, depth + 1);
+            if (error != null) {
+                return error;
             }
         }
         return null;
@@ -321,6 +371,11 @@ public class ExtensionTools {
     private static String refError(Map<String, Object> root, Map<String, Object> schema, String pointer) {
         if (!(schema.get("$ref") instanceof String ref)) {
             return null;
+        }
+        // Java decodes the fragment before it splits it, and Ajv after. Ajv also throws on bad UTF-8.
+        if (ref.contains("%")) {
+            return pointer + "/$ref: '" + shortened(ref) + "' has a %, which CALM Hub does not support in a $ref. "
+                    + "Use $defs names that need no percent-encoding";
         }
         String fragment = localPointer(ref);
         if (fragment == null) {
@@ -339,7 +394,7 @@ public class ExtensionTools {
         return target == null ? pointer + "/$ref: '" + shortened(ref) + "' points to no subschema" : null;
     }
 
-    // The decoded JSON Pointer of a ref such as #/$defs/a%20b, or null.
+    // The JSON Pointer of a ref such as #/$defs/name, or null.
     private static String localPointer(String ref) {
         try {
             String fragment = ref.startsWith("#") ? new URI(ref).getFragment() : null;
@@ -494,10 +549,6 @@ public class ExtensionTools {
         if (err.isPresent()) return err.get();
 
         JsonObject input = new JsonObject(args == null ? new LinkedHashMap<>() : new LinkedHashMap<>(args)).copy();
-        String inputError = validate(tool, input);
-        if (inputError != null) {
-            return ToolResponse.error(inputError);
-        }
         ExtensionProxyRequest request;
         try {
             request = request(tool, input);
@@ -505,6 +556,12 @@ public class ExtensionTools {
             return ToolResponse.error("Error: " + e.getMessage());
         }
         try {
+            // The input check can be slow, so a caller with no scope must not reach it.
+            proxyService.checkAccess(identity, request);
+            String inputError = validate(tool, input);
+            if (inputError != null) {
+                return ToolResponse.error(inputError);
+            }
             return response(tool, proxyService.call(identity, request));
         } catch (ExtensionProxyException e) {
             return ToolResponse.error("Error: " + e.getMessage());
@@ -514,6 +571,13 @@ public class ExtensionTools {
     private static String validate(ExtensionTool tool, JsonObject input) {
         OutputUnit result;
         try {
+            // vertx has no time limit on a pattern. A match that is in time here is in time there too.
+            if (!tool.inputValidator().matchesInTime(input)) {
+                logger.warn("Cannot check the input of MCP tool {}: a pattern match took more than {} ms", tool.name(),
+                        MATCH_TIME.toMillis());
+                return "Error: CALM Hub cannot check the input in time: a pattern of this command takes too long to "
+                        + "match the input.";
+            }
             result = tool.inputValidator().validate(input);
         } catch (RuntimeException | StackOverflowError e) {
             // vertx-json-schema throws on some valid schemas, such as a pattern with \p{..}. java.util.regex
@@ -692,7 +756,7 @@ public class ExtensionTools {
      * MCP servers do not check arguments against the input schema, so Hub does. Local {@code $ref}s
      * resolve only once the schema is in a repository.
      */
-    record InputSchema(SchemaRepository repository, String id, JsonSchemaOptions options) {
+    record InputSchema(SchemaRepository repository, String id, JsonSchemaOptions options, List<Pattern> patterns) {
 
         static InputSchema of(String extensionId, String commandName, Map<String, Object> input) {
             try {
@@ -704,14 +768,117 @@ public class ExtensionTools {
                         .setOutputFormat(OutputFormat.Basic);
                 SchemaRepository repository = SchemaRepository.create(options);
                 repository.dereference(id, JsonSchema.of(schema));
-                return new InputSchema(repository, id, options);
+                return new InputSchema(repository, id, options, patterns(input));
             } catch (RuntimeException e) {
                 throw new IllegalStateException("CALM Hub cannot read its input schema: " + e.getMessage(), e);
             }
         }
 
+        // Compiled as vertx does.
+        private static List<Pattern> patterns(Map<String, Object> schema) {
+            Set<String> patterns = new LinkedHashSet<>();
+            firstError(schema, "", (subschema, pointer) -> {
+                if (subschema.get("pattern") instanceof String pattern) {
+                    patterns.add(pattern);
+                }
+                if (subschema.get("patternProperties") instanceof Map<?, ?> named) {
+                    named.keySet().forEach(key -> patterns.add(String.valueOf(key)));
+                }
+                return null;
+            });
+            return patterns.stream().map(Pattern::compile).toList();
+        }
+
         OutputUnit validate(JsonObject instance) {
             return repository.validator(id, options).validate(instance);
+        }
+
+        /**
+         * False if a pattern of the schema does not finish a match on a string or a property name of
+         * the input in time. This tries each pattern on each string, also where the schema does not
+         * apply it, so the time of the match in {@link #validate} is no longer.
+         */
+        boolean matchesInTime(JsonObject instance) {
+            if (patterns.isEmpty()) {
+                return true;
+            }
+            long callDeadline = System.nanoTime() + CALL_MATCH_TIME.toNanos();
+            Deque<Object> values = new ArrayDeque<>(List.of(instance));
+            try {
+                while (!values.isEmpty()) {
+                    Object value = values.pop();
+                    if (value instanceof JsonObject object) {
+                        value = object.getMap();
+                    } else if (value instanceof JsonArray array) {
+                        value = array.getList();
+                    }
+                    if (value instanceof Map<?, ?> map) {
+                        for (Map.Entry<?, ?> entry : map.entrySet()) {
+                            match(String.valueOf(entry.getKey()), callDeadline);
+                            if (entry.getValue() != null) {
+                                values.push(entry.getValue());
+                            }
+                        }
+                    } else if (value instanceof List<?> list) {
+                        list.stream().filter(Objects::nonNull).forEach(values::push);
+                    } else if (value instanceof String text) {
+                        match(text, callDeadline);
+                    }
+                }
+                return true;
+            } catch (MatchTimeout e) {
+                return false;
+            }
+        }
+
+        private void match(String text, long callDeadline) {
+            long deadline = Math.min(System.nanoTime() + MATCH_TIME.toNanos(), callDeadline);
+            for (Pattern pattern : patterns) {
+                pattern.matcher(new DeadlineText(text, deadline)).find();
+            }
+        }
+    }
+
+    private static final class MatchTimeout extends RuntimeException {
+        MatchTimeout() {
+            super(null, null, false, false);
+        }
+    }
+
+    /** Text that throws {@link MatchTimeout} once the deadline passes, so a slow match stops. */
+    static final class DeadlineText implements CharSequence {
+        // System.nanoTime() on each charAt would slow each match.
+        private static final int CHECK_EVERY = 1024;
+        private final String text;
+        private final long deadline;
+        private int reads;
+
+        DeadlineText(String text, long deadline) {
+            this.text = text;
+            this.deadline = deadline;
+        }
+
+        @Override
+        public char charAt(int index) {
+            if (++reads % CHECK_EVERY == 0 && System.nanoTime() - deadline > 0) {
+                throw new MatchTimeout();
+            }
+            return text.charAt(index);
+        }
+
+        @Override
+        public int length() {
+            return text.length();
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return new DeadlineText(text.substring(start, end), deadline);
+        }
+
+        @Override
+        public String toString() {
+            return text;
         }
     }
 }

@@ -3,6 +3,7 @@ package org.finos.calm.mcp.tools;
 import io.quarkiverse.mcp.server.ToolManager;
 import io.quarkiverse.mcp.server.ToolResponse;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.finos.calm.domain.extensions.ExtensionManifest;
 import org.finos.calm.extensions.ExtensionManifestLoader;
@@ -23,9 +24,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -38,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -99,7 +105,7 @@ class TestExtensionToolsShould {
     void name_the_tools_after_the_extension_and_command_sorted_by_name() {
         assertThat(TOOLS.stream().map(ExtensionTools.ExtensionTool::name).toList(),
                 contains("ext_mcp-test_add-service", "ext_mcp-test_annotate", "ext_mcp-test_get-service", "ext_mcp-test_list-services", "ext_mcp-test_remove-service",
-                        "ext_mcp-test_search", "ext_mcp-test_service-names"));
+                        "ext_mcp-test_search", "ext_mcp-test_service-names", "ext_mcp-test_slow-pattern"));
     }
 
     @Test
@@ -123,14 +129,14 @@ class TestExtensionToolsShould {
         extensionTools.register();
 
         ArgumentCaptor<String> names = ArgumentCaptor.forClass(String.class);
-        verify(toolManager, times(7)).newTool(names.capture());
+        verify(toolManager, times(8)).newTool(names.capture());
         assertThat(names.getAllValues().getFirst(), is("ext_mcp-test_add-service"));
         verify(definition).setDescription("List the services that a namespace owns");
         verify(definition).setTitle("MCP test: list-services");
         verify(definition).setInputSchema(tool("list-services").command().input());
         verify(definition).setOutputSchema(tool("list-services").command().output());
         verify(definition).setOutputSchema(tool("service-names").outputSchema());
-        verify(definition, times(7)).register();
+        verify(definition, times(8)).register();
     }
 
     @Test
@@ -278,7 +284,8 @@ class TestExtensionToolsShould {
     void refuse_schema_identifiers() {
         for (String keyword : List.of("$id", "$anchor", "$dynamicAnchor", "$dynamicRef", "$recursiveAnchor", "$recursiveRef")) {
             assertThat(ExtensionTools.schemaError(Map.of(keyword, "#a")), is("/" + keyword + ": CALM Hub does not support "
-                    + keyword + " in command schemas. Use a $ref with a JSON Pointer, such as #/$defs/name"));
+                    + keyword + " in command schemas, at any depth or under any keyword. Use a $ref with a JSON Pointer, "
+                    + "such as #/$defs/name"));
         }
         assertThat(ExtensionTools.schemaError(Map.of("$defs", Map.of("a", Map.of("$id", "urn:example:a")))),
                 startsWith("/$defs/a/$id: "));
@@ -286,14 +293,105 @@ class TestExtensionToolsShould {
                 startsWith("/items/1/$anchor: "));
     }
 
+    // Ajv in the SDK collects ids also under unknown keywords, and reads $defs.$id as an id.
     @Test
-    void accept_identifier_names_where_they_are_data() {
+    @SuppressWarnings("unchecked")
+    void refuse_schema_identifiers_under_any_keyword() {
+        Map<String, Object> id = Map.of("$id", "urn:x:y");
+        Map<String, Object> cases = Map.of(
+                "/x-a/$id", Map.of("type", "object", "x-a", id),
+                "/x-a/b/0/$dynamicAnchor", Map.of("x-a", Map.of("b", List.of(Map.of("$dynamicAnchor", "d")))),
+                "/default/$id", Map.of("default", id),
+                "/examples/0/$anchor", Map.of("examples", List.of(Map.of("$anchor", "a"))),
+                "/const/$recursiveRef", Map.of("const", Map.of("$recursiveRef", "#")),
+                "/enum/0/$id", Map.of("enum", List.of(id)),
+                "/properties/$id", Map.of("properties", Map.of("$id", Map.of("type", "string"))),
+                "/$defs/$id", Map.of("$defs", Map.of("$id", Map.of())));
+        cases.forEach((pointer, schema) -> assertThat(pointer, ExtensionTools.schemaError((Map<String, Object>) schema),
+                startsWith(pointer + ": CALM Hub does not support ")));
+    }
+
+    @Test
+    void accept_refs_and_identifier_values_where_they_are_data() {
         assertThat(ExtensionTools.schemaError(Map.of("type", "object",
-                "properties", Map.of("$id", Map.of("type", "string"), "$anchor", true),
-                "x-example", Map.of("$id", "urn:x", "$ref", "https://example.com/a.json"),
-                "default", Map.of("$id", "urn:x"),
+                "x-example", Map.of("$ref", "https://example.com/a.json", "name", "$id"),
+                "enum", List.of("$id", "$anchor"),
                 "examples", List.of(Map.of("$ref", "https://example.com/c.json")))), nullValue());
         assertThat(tool("annotate"), notNullValue());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void refuse_a_schema_nested_deeper_than_the_limit() {
+        Object deep = Map.of("type", "string");
+        for (int i = 1; i < ExtensionTools.MAX_SCHEMA_DEPTH; i++) {
+            deep = Map.of("items", deep);
+        }
+        assertThat(ExtensionTools.schemaError((Map<String, Object>) deep), nullValue());
+        assertThat(ExtensionTools.schemaError(Map.of("items", deep)), containsString("nested more than 64 objects and arrays deep"));
+
+        // Each property map, list and unknown keyword value counts.
+        Object data = "x";
+        for (int i = 0; i < 32; i++) {
+            data = List.of(Map.of("a", data));
+        }
+        assertThat(ExtensionTools.schemaError(Map.of("x-data", data)), containsString("nested more than 64"));
+        assertThat(ExtensionTools.schemaError(nestedProperties(31)), nullValue());
+        assertThat(ExtensionTools.schemaError(nestedProperties(32)), containsString("nested more than 64"));
+    }
+
+    private static Map<String, Object> nestedProperties(int levels) {
+        Map<String, Object> schema = Map.of("type", "string");
+        for (int i = 0; i < levels; i++) {
+            schema = Map.of("properties", Map.of("p", schema));
+        }
+        return schema;
+    }
+
+    @Test
+    void refuse_a_ref_with_a_percent_sign() {
+        Map<String, Object> defs = Map.of("a", Map.of("not", Map.of()), "a/not", Map.of(), "s p", Map.of(), "�", Map.of());
+        for (String ref : List.of("#/$defs/a%2Fnot", "#%2F$defs/a", "#/$defs/s%20p", "#/$defs/%E0", "#/$defs/%C0%AF")) {
+            assertThat(ref, ExtensionTools.schemaError(Map.of("properties", Map.of("p", Map.of("$ref", ref)), "$defs", defs)),
+                    is("/properties/p/$ref: '" + ref + "' has a %, which CALM Hub does not support in a $ref. "
+                            + "Use $defs names that need no percent-encoding"));
+        }
+    }
+
+    @Test
+    void rethrow_virtual_machine_errors_other_than_a_stack_overflow() {
+        ExtensionTools.rethrowIfFatal(new StackOverflowError());
+        ExtensionTools.rethrowIfFatal(new LinkageError());
+        ExtensionTools.rethrowIfFatal(new IllegalStateException());
+        assertThrows(OutOfMemoryError.class, () -> ExtensionTools.rethrowIfFatal(new OutOfMemoryError()));
+        assertThrows(InternalError.class, () -> ExtensionTools.rethrowIfFatal(new InternalError()));
+    }
+
+    @Test
+    void fail_on_an_out_of_memory_error_in_a_schema_check() {
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        Map<String, Object> failing = new HashMap<>(Map.of("type", "object")) {
+            @Override
+            public Object get(Object key) {
+                throw new OutOfMemoryError();
+            }
+        };
+        ExtensionManifest manifest = new ExtensionManifest("bad", "1.0.0", 0, "B", "B", "B", List.of(route),
+                Map.of("c", new ExtensionManifest.Command("r", "C", failing, null, null, null)), null);
+
+        assertThrows(OutOfMemoryError.class, () -> ExtensionTools.tools(List.of(manifest)));
+    }
+
+    @Test
+    void fail_on_an_out_of_memory_error_in_a_registration() {
+        when(toolManager.newTool(anyString())).thenReturn(definition);
+        when(definition.register()).thenThrow(new ClassCastException("not a JsonObject"));
+        when(toolManager.removeTool(anyString())).thenThrow(new OutOfMemoryError());
+
+        assertThrows(OutOfMemoryError.class, () -> extensionTools.register(List.of(tool("search"), tool("annotate"))));
+
+        doThrow(new OutOfMemoryError()).when(definition).register();
+        assertThrows(OutOfMemoryError.class, () -> extensionTools.register(List.of(tool("search"))));
     }
 
     @Test
@@ -303,7 +401,7 @@ class TestExtensionToolsShould {
         Map<String, Object> node = Map.of("type", "object",
                 "properties", Map.of("kids", Map.of("type", "array", "items", Map.of("$ref", "#/$defs/node"))));
 
-        for (String ref : List.of("#/$defs/a", "#/$defs/b", "#/$defs/l/anyOf/1", "#/$defs/e~0~1x", "#/$defs/s%20p", "#", "#/$defs/l")) {
+        for (String ref : List.of("#/$defs/a", "#/$defs/b", "#/$defs/l/anyOf/1", "#/$defs/e~0~1x", "#", "#/$defs/l")) {
             assertThat(ref, ExtensionTools.schemaError(Map.of("properties", Map.of("p", Map.of("$ref", ref)), "$defs", defs)),
                     nullValue());
         }
@@ -389,7 +487,7 @@ class TestExtensionToolsShould {
         ToolResponse response = extensionTools.call(annotate, Map.of("text", "a", "note", 1, "never", 2));
         assertThat(response.isError(), is(true));
         assertThat(text(response), containsString("/never"));
-        verifyNoInteractions(proxyService);
+        verify(proxyService, never()).call(any(), any());
     }
 
     @Test
@@ -405,7 +503,74 @@ class TestExtensionToolsShould {
 
         assertThat(response.isError(), is(true));
         assertThat(text(response), is("Error: CALM Hub cannot check the input against the schema of this command."));
-        verifyNoInteractions(proxyService);
+        verify(proxyService, never()).call(any(), any());
+    }
+
+    @Test
+    void check_the_scope_before_the_input() {
+        doThrow(new ExtensionProxyException(403, "You do not have the scope that this extension route needs"))
+                .when(proxyService).checkAccess(same(identity), any());
+
+        ToolResponse response = extensionTools.call(tool("slow-pattern"),
+                Map.of("namespace", "finos", "text", "a".repeat(60) + "!", "extra", 1));
+
+        assertThat(text(response), is("Error: You do not have the scope that this extension route needs"));
+        verify(proxyService, never()).call(any(), any());
+    }
+
+    @Test
+    void stop_a_pattern_match_that_takes_too_long() throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            long start = System.nanoTime();
+            ToolResponse slow = executor.submit(() -> extensionTools.call(tool("slow-pattern"),
+                    Map.of("namespace", "finos", "text", "a".repeat(60) + "!"))).get(10, TimeUnit.SECONDS);
+
+            assertThat(slow.isError(), is(true));
+            assertThat(text(slow), is("Error: CALM Hub cannot check the input in time: a pattern of this command takes too "
+                    + "long to match the input."));
+            assertThat(Duration.ofNanos(System.nanoTime() - start).toMillis() < 5_000, is(true));
+            verify(proxyService, never()).call(any(), any());
+
+            // The same thread is free for the next call.
+            when(proxyService.call(any(), any())).thenReturn(reply(200, "{}"));
+            ToolResponse fast = executor.submit(() -> extensionTools.call(tool("slow-pattern"),
+                    Map.of("namespace", "finos", "text", "a".repeat(12)))).get(5, TimeUnit.SECONDS);
+            assertThat(fast.isError(), is(false));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void match_the_patterns_against_property_names_and_nested_strings() {
+        ExtensionTools.InputSchema schema = tool("slow-pattern").inputValidator();
+        String slow = "a".repeat(60) + "!";
+
+        assertThat(schema.matchesInTime(new JsonObject().put("namespace", "finos").put("text", "a".repeat(12))), is(true));
+        assertThat(schema.matchesInTime(new JsonObject().put(slow, 1)), is(false));
+        assertThat(schema.matchesInTime(new JsonObject().put("x", new JsonArray().add(new JsonObject().put("y", slow)))),
+                is(false));
+        assertThat(schema.matchesInTime(new JsonObject().put("x", new JsonArray().addNull()).putNull("y")), is(true));
+        assertThat(tool("get-service").inputValidator().matchesInTime(new JsonObject().put("service", slow)), is(true));
+    }
+
+    @Test
+    void stop_reading_text_after_its_deadline() {
+        CharSequence late = new ExtensionTools.DeadlineText("abc", System.nanoTime() - 1);
+        CharSequence open = new ExtensionTools.DeadlineText("abc", System.nanoTime() + Duration.ofMinutes(1).toNanos());
+
+        assertThat(open.length(), is(3));
+        assertThat(open.subSequence(1, 3).toString(), is("bc"));
+        assertThat(open.toString(), is("abc"));
+        assertThrows(RuntimeException.class, () -> {
+            for (int i = 0; i < 2048; i++) {
+                late.charAt(i % 3);
+            }
+        });
+        for (int i = 0; i < 2048; i++) {
+            open.charAt(i % 3);
+        }
     }
 
     @Test
@@ -434,7 +599,7 @@ class TestExtensionToolsShould {
 
         extensionTools.register();
 
-        verify(definition, times(7)).register();
+        verify(definition, times(8)).register();
         verify(toolManager).removeTool(TOOLS.get(0).name());
         verify(toolManager, times(1)).removeTool(anyString());
     }
@@ -710,7 +875,7 @@ class TestExtensionToolsShould {
         assertThat(response.isError(), is(true));
         assertThat(text(response), startsWith("Error: The input does not match the schema of this command:"));
         assertThat(text(response), containsString("/limit"));
-        verifyNoInteractions(proxyService);
+        verify(proxyService, never()).call(any(), any());
     }
 
     @Test
@@ -719,7 +884,7 @@ class TestExtensionToolsShould {
 
         assertThat(response.isError(), is(true));
         assertThat(text(response), containsString("/service/name"));
-        verifyNoInteractions(proxyService);
+        verify(proxyService, never()).call(any(), any());
     }
 
     @Test

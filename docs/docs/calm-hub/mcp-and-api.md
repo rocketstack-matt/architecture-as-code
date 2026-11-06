@@ -216,15 +216,16 @@ curl -s -X POST http://localhost:8080/mcp \
 
 CALM Hub makes one tool for each command of an enabled [extension](index.md#extensions) when `calm.mcp.enabled` is true. The tool name is `ext_<id>_<command>`, for example `ext_example-services_list-services`. These tools come after the built-in tools in `tools/list`, sorted by name.
 
-- The input and output schemas come from the manifest. CALM Hub checks the arguments against the input schema before it calls the extension.
+- The input and output schemas come from the manifest. CALM Hub checks the scope first, and then the arguments against the input schema, before it calls the extension. A pattern match has a time limit of 100 ms for each string or property name of the arguments, and 1 s for all of them. A call that goes over the limit gets a tool error. Some valid patterns are slow in Java, for example `^(.*a){12}$`.
 - One schema that a client cannot compile makes TypeScript MCP SDK clients lose every tool. Thus each input and output schema must use this subset of JSON Schema 2020-12:
 
   | Rule | Supported | Refused |
   |---|---|---|
   | Dialect | 2020-12, with or without `$schema` | Other `$schema` values, for example draft-07 |
   | Subschemas | Objects and booleans | Other values, for example `"properties": {"limit": "integer"}` |
-  | `$ref` | A local JSON Pointer: `#`, `#/$defs/name`, `#/properties/name`. It must point to a subschema, and not only to a loop of `$ref`s | Remote refs (CALM Hub and MCP clients do not fetch them), `#anchor` refs |
-  | Identifiers | None | `$id`, `$anchor`, `$dynamicAnchor`, `$dynamicRef` anywhere in the schema |
+  | Depth | Objects and arrays nested at most 64 deep, counting every level: subschemas, property maps, lists and the values of other keywords | Deeper schemas. Ajv in the SDK overflows its stack on a deep schema |
+  | `$ref` | A local JSON Pointer: `#`, `#/$defs/name`, `#/properties/name`. It must point to a subschema, and not only to a loop of `$ref`s | Remote refs (CALM Hub and MCP clients do not fetch them), `#anchor` refs, and refs with `%`. Use `$defs` names that need no percent-encoding |
+  | Identifiers | None | `$id`, `$anchor`, `$dynamicAnchor`, `$dynamicRef`, `$recursiveAnchor` and `$recursiveRef` as a key at any depth, under any keyword: also under `x-*` keywords, `default`, `examples`, `const`, `enum`, and as a property or `$defs` name |
   | `pattern`, `patternProperties` keys | Regular expressions that are valid in both ECMA-262 (with the `u` flag) and Java. At most 1000 characters, and groups nested at most 64 deep | Java-only syntax, for example `(?i)abc`, `a++` or `\A`. ECMA-only syntax, for example `(?<first_name>…)` (Java group names have only letters and digits) or `\u{5A}` (use `\u005A`). Also `(?i:…)` modifiers and `&&` in a class, which older clients or Java read differently |
 
   A command with a schema outside this subset gets no tool. CALM Hub logs a warning that names the extension, the command, the schema and the location of the error. For a schema that is not valid 2020-12, this is the deepest error, which names the value to fix.

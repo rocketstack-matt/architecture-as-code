@@ -90,8 +90,52 @@ public class ExtensionProxyService {
         return proxyAuthentication ? "proxy" : "oidc";
     }
 
+    /**
+     * Throws {@link ExtensionProxyException} when Hub refuses the call. A caller that does costly work on
+     * the request before {@link #call} uses this first, so that a caller with no scope cannot cause the work.
+     */
+    public void checkAccess(SecurityIdentity identity, ExtensionProxyRequest request) {
+        authorise(identity, request);
+    }
+
     /** Throws {@link ExtensionProxyException} when Hub refuses the call or the backend fails. */
     public ExtensionProxyResponse call(SecurityIdentity identity, ExtensionProxyRequest request) {
+        Access access = authorise(identity, request);
+        RegisteredExtension extension = access.extension();
+        ExtensionManifest.Route route = access.route();
+        String method = access.method();
+        String namespace = access.namespace();
+        String domain = access.domain();
+        boolean audited = !route.readOnly();
+
+        String query = ExtensionPaths.canonicalQuery(request.rawQuery());
+        String pathAndQuery = query.isEmpty() ? access.path() : access.path() + "?" + query;
+        URI target = ExtensionPaths.resolve(access.backend(), pathAndQuery);
+        ExtensionLimits limits = extension.limits();
+        byte[] body = readBody(request.body(), limits.maxRequestBytes());
+
+        String jti = UUID.randomUUID().toString();
+        String assertion = signer.sign(new ExtensionAssertion(identity.getPrincipal().getName(), extension.id(), jti,
+                authMode, extension.manifest().hubApi(), route.id(), route.scope(), namespace, method, pathAndQuery));
+        HttpRequest outbound = outboundRequest(request, method, target, body, limits, assertion);
+        AuditOutcome outcome = AuditOutcome.UNKNOWN;
+        try {
+            ExtensionProxyResponse reply = send(extension, route, outbound);
+            outcome = reply.status() < 300 ? AuditOutcome.SUCCESS
+                    : reply.status() == 401 || reply.status() == 403 ? AuditOutcome.DENIED : AuditOutcome.FAILURE;
+            return reply;
+        } finally {
+            if (audited) {
+                audit(identity, method, extension, route, namespace, domain, jti, outcome);
+            }
+        }
+    }
+
+    private record Access(RegisteredExtension extension, URI backend, String method, String path,
+                          ExtensionManifest.Route route, String namespace, String domain) {
+    }
+
+    private Access authorise(SecurityIdentity identity, ExtensionProxyRequest request) {
         RegisteredExtension extension = registry.find(request.extensionId())
                 .orElseThrow(() -> new ExtensionProxyException(404, "There is no such extension"));
         URI backend = extension.backendUrl()
@@ -121,28 +165,7 @@ public class ExtensionProxyService {
                     ? new ExtensionProxyException(401, "Sign in to call this extension")
                     : new ExtensionProxyException(403, "You do not have the scope that this extension route needs");
         }
-
-        String query = ExtensionPaths.canonicalQuery(request.rawQuery());
-        String pathAndQuery = query.isEmpty() ? path : path + "?" + query;
-        URI target = ExtensionPaths.resolve(backend, pathAndQuery);
-        ExtensionLimits limits = extension.limits();
-        byte[] body = readBody(request.body(), limits.maxRequestBytes());
-
-        String jti = UUID.randomUUID().toString();
-        String assertion = signer.sign(new ExtensionAssertion(identity.getPrincipal().getName(), extension.id(), jti,
-                authMode, extension.manifest().hubApi(), route.id(), route.scope(), namespace, method, pathAndQuery));
-        HttpRequest outbound = outboundRequest(request, method, target, body, limits, assertion);
-        AuditOutcome outcome = AuditOutcome.UNKNOWN;
-        try {
-            ExtensionProxyResponse reply = send(extension, route, outbound);
-            outcome = reply.status() < 300 ? AuditOutcome.SUCCESS
-                    : reply.status() == 401 || reply.status() == 403 ? AuditOutcome.DENIED : AuditOutcome.FAILURE;
-            return reply;
-        } finally {
-            if (audited) {
-                audit(identity, method, extension, route, namespace, domain, jti, outcome);
-            }
-        }
+        return new Access(extension, backend, method, path, route, namespace, domain);
     }
 
     /**

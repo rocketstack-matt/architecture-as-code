@@ -98,7 +98,7 @@ class TestExtensionToolsMcpShould {
                 .filter(name -> name.startsWith("ext_")).toList();
 
         assertThat(names, is(List.of("ext_mcp-test_add-service", "ext_mcp-test_annotate", "ext_mcp-test_get-service", "ext_mcp-test_list-services",
-                "ext_mcp-test_remove-service", "ext_mcp-test_search", "ext_mcp-test_service-names")));
+                "ext_mcp-test_remove-service", "ext_mcp-test_search", "ext_mcp-test_service-names", "ext_mcp-test_slow-pattern")));
         JsonObject list = find(tools, "ext_mcp-test_list-services");
         assertThat(list.getString("description"), is("List the services that a namespace owns"));
         assertThat(list.getString("title"), is("MCP test: list-services"));
@@ -191,6 +191,35 @@ class TestExtensionToolsMcpShould {
     }
 
     @Test
+    @TestSecurity(user = "bob")
+    void check_the_scope_before_the_slow_pattern_of_the_input() {
+        when(mockUserAccessStore.getGrantsForUser("bob")).thenReturn(List.of());
+
+        JsonObject result = callTool("ext_mcp-test_slow-pattern",
+                new JsonObject().put("namespace", "finos").put("text", "a".repeat(60) + "!"));
+
+        assertThat(text(result), is("Error: You do not have the scope that this extension route needs"));
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void return_a_tool_error_when_a_pattern_match_takes_too_long() {
+        when(mockUserAccessStore.getGrantsForUser("alice"))
+                .thenReturn(List.of(new UserAccess("alice", UserAccess.Permission.read, "finos")));
+
+        JsonObject result = callTool("ext_mcp-test_slow-pattern",
+                new JsonObject().put("namespace", "finos").put("text", "a".repeat(60) + "!"));
+
+        assertThat(result.getBoolean("isError"), is(true));
+        assertThat(text(result), containsString("cannot check the input in time"));
+        assertThat(backend.received(), nullValue());
+        backend.reply(FixtureBackend.Reply.json(200, "{}"));
+        JsonObject next = callTool("ext_mcp-test_slow-pattern", new JsonObject().put("namespace", "finos").put("text", "a".repeat(12)));
+        assertThat(next.encode(), next.getBoolean("isError", false), is(false));
+    }
+
+    @Test
     void refuse_an_anonymous_call() {
         JsonObject result = callTool("ext_mcp-test_search", new JsonObject().put("text", "pay"));
 
@@ -202,6 +231,9 @@ class TestExtensionToolsMcpShould {
     @Test
     @TestSecurity(user = "alice")
     void refuse_input_that_does_not_match_the_schema() {
+        when(mockUserAccessStore.getGrantsForUser("alice"))
+                .thenReturn(List.of(new UserAccess("alice", UserAccess.Permission.read, "finos")));
+
         JsonObject result = callTool("ext_mcp-test_list-services", new JsonObject().put("namespace", "finos").put("extra", 1));
 
         assertThat(result.getBoolean("isError"), is(true));
@@ -306,6 +338,9 @@ class TestExtensionToolsMcpShould {
         assertThat(names.contains("ext_mcp-test_id-output"), is(false));
         assertThat(names.contains("ext_mcp-test_anchor-input"), is(false));
         assertThat(names.contains("ext_mcp-test_deep-pattern-input"), is(false));
+        assertThat(names.contains("ext_mcp-test_deep-output"), is(false));
+        assertThat(names.contains("ext_mcp-test_hidden-id-output"), is(false));
+        assertThat(names.contains("ext_mcp-test_encoded-ref-output"), is(false));
     }
 
     @Test

@@ -168,6 +168,33 @@
       "description": "Search with a pattern whose groups are nested too deep",
       "input": { "type": "object", "properties": { "text": { "type": "string", "pattern": "(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((a)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" } } }
     },
+    "deep-output": {
+      "route": "search",
+      "description": "Search with a result schema nested too deep",
+      "input": { "type": "object" },
+      "output": { "type": "object", "properties": { "x": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "items": { "type": "string" } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }
+    },
+    "hidden-id-output": {
+      "route": "search",
+      "description": "Search with a result that has the same $id under two unknown keywords",
+      "input": { "type": "object" },
+      "output": { "type": "object", "x-a": { "$id": "urn:x:y" }, "x-b": { "$id": "urn:x:y" } }
+    },
+    "encoded-ref-output": {
+      "route": "search",
+      "description": "Search with a result whose $ref has a percent-encoded slash",
+      "input": { "type": "object" },
+      "output": { "type": "object", "properties": { "a": { "$ref": "#/$defs/a%2Fnot" } }, "$defs": { "a": { "not": {} } } }
+    },
+    "slow-pattern": {
+      "route": "services",
+      "description": "List services with a pattern that java.util.regex matches slowly",
+      "input": {
+        "type": "object",
+        "properties": { "namespace": { "type": "string" }, "text": { "type": "string", "pattern": "^(.*a){12}$" } },
+        "required": ["namespace"]
+      }
+    },
     "draft-07": {
       "route": "search",
       "description": "Search with a draft-07 input schema",
