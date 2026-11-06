@@ -10,9 +10,13 @@ import java.util.regex.Pattern;
  * Checks that a JSON Schema {@code pattern} is an ECMA-262 regular expression with the {@code u} flag,
  * as Ajv in the MCP TypeScript SDK compiles it. java.util.regex accepts syntax such as {@code (?i)},
  * possessive quantifiers and {@code \A} that ECMA-262 refuses. The check is strict: it can refuse a
- * rare valid pattern, but it must never accept one that a client cannot compile.
+ * rare valid pattern, but it must never accept one that a client cannot compile. The limits keep
+ * the parsers of Hub, java.util.regex and the clients well inside their stacks.
  */
 final class EcmaRegex {
+
+    static final int MAX_LENGTH = 1000;
+    static final int MAX_DEPTH = 64;
 
     private static final String SYNTAX_CHARACTERS = "^$\\.*+?()[]{}|";
     private static final Set<String> GENERAL_CATEGORIES = Set.of("C", "Other", "Cc", "Control", "cntrl", "Cf", "Format",
@@ -44,6 +48,7 @@ final class EcmaRegex {
     private final int[] chars;
     private int pos;
     private int groups;
+    private int depth;
     private final Set<String> names = new HashSet<>();
     private final List<String> namedRefs = new ArrayList<>();
     private int maxRef;
@@ -54,6 +59,9 @@ final class EcmaRegex {
 
     /** Null if the pattern compiles in ECMA-262 with the {@code u} flag, else the reason. */
     static String error(String pattern) {
+        if (pattern.codePointCount(0, pattern.length()) > MAX_LENGTH) {
+            return "it is longer than " + MAX_LENGTH + " characters";
+        }
         try {
             new EcmaRegex(pattern).parse();
             return null;
@@ -108,10 +116,14 @@ final class EcmaRegex {
     }
 
     private void group() {
+        if (++depth > MAX_DEPTH) {
+            throw fail("groups are nested more than " + MAX_DEPTH + " deep");
+        }
         if (startsWith("(?=") || startsWith("(?!") || startsWith("(?<=") || startsWith("(?<!")) {
             pos += peek(2) == '<' ? 4 : 3;
             disjunction();
             expect(')');
+            depth--;
             noQuantifier();
             return;
         }
@@ -132,6 +144,7 @@ final class EcmaRegex {
         }
         disjunction();
         expect(')');
+        depth--;
         quantifier();
     }
 

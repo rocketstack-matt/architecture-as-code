@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -153,34 +154,32 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void move_a_ref_beside_an_id_into_all_of() {
-        Map<String, Object> schema = Map.of(
-                "type", "object",
-                "$ref", "#/$defs/top",
-                "properties", Map.of("$id", Map.of("$id", "a.json", "$ref", "#/$defs/b", "allOf", List.of(Map.of("type", "object")))),
-                "$defs", Map.of("d", Map.of("$id", "urn:d", "$dynamicRef", "#m")),
-                "default", Map.of("$id", "data", "$ref", "data"));
+    void keep_the_all_of_of_a_wrapped_output_schema_with_a_ref() {
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        Map<String, Object> output = Map.of("$ref", "#/$defs/n", "allOf", List.of(Map.of("minItems", 1)),
+                "$defs", Map.of("n", Map.of("type", "array")));
+        ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
+                Map.of("c", new ExtensionManifest.Command("r", "C", Map.of("type", "object"), output, null, null)), null);
 
-        Map<String, Object> moved = ExtensionTools.published(schema);
+        Map<?, ?> result = (Map<?, ?>) ((Map<?, ?>) ExtensionTools.tools(List.of(manifest)).getFirst().outputSchema()
+                .get("properties")).get("result");
 
-        assertThat(moved.get("$ref"), is("#/$defs/top"));
-        assertThat(((Map<?, ?>) moved.get("properties")).get("$id"),
-                is(Map.of("$id", "a.json", "allOf", List.of(Map.of("type", "object"), Map.of("$ref", "#/$defs/b")))));
-        assertThat(((Map<?, ?>) moved.get("$defs")).get("d"), is(Map.of("$id", "urn:d", "allOf", List.of(Map.of("$dynamicRef", "#m")))));
-        assertThat(moved.get("default"), is(Map.of("$id", "data", "$ref", "data")));
+        assertThat(result.get("allOf"), is(List.of(Map.of("minItems", 1), Map.of("$ref", "#/$defs/n"))));
+        assertThat(result.containsKey("$ref"), is(false));
     }
 
     @Test
     void move_the_schema_dialect_to_the_wrapper() {
         ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
-        Map<String, Object> output = Map.of("$schema", "https://json-schema.org/draft/2020-12/schema", "$id", "urn:out", "type", "string");
+        Map<String, Object> output = Map.of("$schema", "https://json-schema.org/draft/2020-12/schema", "type", "string");
         ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
                 Map.of("c", new ExtensionManifest.Command("r", "C", Map.of("type", "object"), output, null, null)), null);
 
         Map<String, Object> schema = ExtensionTools.tools(List.of(manifest)).getFirst().outputSchema();
 
         assertThat(schema.get("$schema"), is("https://json-schema.org/draft/2020-12/schema"));
-        assertThat(((Map<?, ?>) schema.get("properties")).get("result"), is(Map.of("$id", "urn:out", "type", "string")));
+        assertThat(((Map<?, ?>) schema.get("properties")).get("result"), is(Map.of("type", "string",
+                "$id", "https://calm.finos.org/calm-hub/extensions/x/commands/c/output.json")));
     }
 
     @Test
@@ -225,7 +224,8 @@ class TestExtensionToolsShould {
         List<String> names = TOOLS.stream().map(ExtensionTools.ExtensionTool::commandName).toList();
 
         assertThat(names.stream().noneMatch(n -> n.startsWith("dangling-") || n.equals("ref-loop-output") || n.startsWith("java-pattern-")
-                || n.equals("draft-07")), is(true));
+                || n.equals("draft-07") || n.startsWith("id-") || n.equals("anchor-input") || n.equals("deep-pattern-input")),
+                is(true));
         assertThat(names.contains("search"), is(true));
     }
 
@@ -235,6 +235,13 @@ class TestExtensionToolsShould {
                 startsWith("/properties/a/pattern: '(?i)abc' is not an ECMA-262 regular expression: "));
         assertThat(ExtensionTools.schemaError(Map.of("items", Map.of("patternProperties", Map.of("\\Aa", Map.of())))),
                 startsWith("/items/patternProperties: the key '\\Aa' is not an ECMA-262 regular expression: "));
+        // Valid in ECMA-262, but not in Java, which checks the schemas and the arguments.
+        assertThat(ExtensionTools.schemaError(Map.of("pattern", "(?<first_name>a)")), startsWith("/pattern: "));
+        assertThat(ExtensionTools.schemaError(Map.of("pattern", "\\u{5A}")), startsWith("/pattern: "));
+        assertThat(ExtensionTools.schemaError(Map.of("pattern", "(".repeat(65) + ")".repeat(65))),
+                startsWith("/pattern: '((((("));
+        assertThat(ExtensionTools.schemaError(Map.of("pattern", "a".repeat(1001))),
+                is("/pattern: '" + "a".repeat(60) + "...' is not an ECMA-262 regular expression: it is longer than 1000 characters"));
         assertThat(ExtensionTools.schemaError(Map.of("pattern", "^(?<a>[a-z]+)\\d{2,}$",
                 "patternProperties", Map.of("^x-", Map.of()))), nullValue());
     }
@@ -244,7 +251,7 @@ class TestExtensionToolsShould {
         assertThat(ExtensionTools.schemaError(Map.of("$schema", "http://json-schema.org/draft-07/schema#", "type", "object")),
                 is("/: it declares the $schema 'http://json-schema.org/draft-07/schema#', but CALM Hub supports only "
                         + "JSON Schema 2020-12 (https://json-schema.org/draft/2020-12/schema)"));
-        assertThat(ExtensionTools.schemaError(Map.of("$defs", Map.of("d", Map.of("$id", "urn:d",
+        assertThat(ExtensionTools.schemaError(Map.of("$defs", Map.of("d", Map.of(
                 "$schema", "https://json-schema.org/draft/2019-09/schema")))), startsWith("/$defs/d: it declares the $schema "));
         assertThat(ExtensionTools.schemaError(Map.of("$schema", "https://json-schema.org/draft/2020-12/schema")), nullValue());
         assertThat(ExtensionTools.schemaError(Map.of("$schema", "https://json-schema.org/draft/2020-12/schema#")), nullValue());
@@ -268,118 +275,79 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void find_the_local_refs_that_point_to_nothing() {
-        String id = ExtensionTools.inputSchemaId("x", "c");
-        Map<String, Object> defs = Map.of("a", Map.of("type", "string", "$anchor", "a"), "b", true,
-                "l", Map.of("anyOf", List.of(Map.of(), true)), "e~/x", Map.of());
-
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/a", "$defs", defs), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/b", "$defs", defs), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/l/anyOf/1", "$defs", defs), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/e~0~1x", "$defs", defs), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#a", "$defs", defs), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("type", "object", "properties", Map.of("p", Map.of("$ref", "#"))), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("type", "object", "properties", Map.of("p", Map.of("$ref", ""))), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$dynamicRef", "#meta", "$dynamicAnchor", "meta"), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$id", "urn:in", "$ref", "urn:in#/$defs/a", "$defs", defs), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "urn:e#/$defs/a",
-                "$defs", Map.of("e", Map.of("$id", "urn:e", "$defs", defs))), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "urn:e#a",
-                "$defs", Map.of("e", Map.of("$id", "urn:e", "$defs", defs))), id), nullValue());
-
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/missing", "$defs", defs), id), is("#/$defs/missing"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#nope", "$defs", defs), id), is("#nope"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/a/type", "$defs", defs), id), is("#/$defs/a/type"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/l/anyOf/2", "$defs", defs), id), is("#/$defs/l/anyOf/2"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/l/anyOf/x", "$defs", defs), id), is("#/$defs/l/anyOf/x"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#$defs/a", "$defs", defs), id), is("#$defs/a"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$id", "urn:in", "$ref", "urn:in#/x"), id), is("urn:in#/x"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("p", Map.of("$ref", "#/$defs/a"))), id),
-                is("#/$defs/a"));
-        // An anchor belongs to its schema resource: the root cannot use one of an embedded resource with #a.
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#a",
-                "$defs", Map.of("e", Map.of("$id", "urn:e", "$defs", defs))), id), is("#a"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$dynamicRef", "#meta"), id), is("#meta"));
+    void refuse_schema_identifiers() {
+        for (String keyword : List.of("$id", "$anchor", "$dynamicAnchor", "$dynamicRef", "$recursiveAnchor", "$recursiveRef")) {
+            assertThat(ExtensionTools.schemaError(Map.of(keyword, "#a")), is("/" + keyword + ": CALM Hub does not support "
+                    + keyword + " in command schemas. Use a $ref with a JSON Pointer, such as #/$defs/name"));
+        }
+        assertThat(ExtensionTools.schemaError(Map.of("$defs", Map.of("a", Map.of("$id", "urn:example:a")))),
+                startsWith("/$defs/a/$id: "));
+        assertThat(ExtensionTools.schemaError(Map.of("items", List.of(Map.of(), Map.of("$anchor", "a")))),
+                startsWith("/items/1/$anchor: "));
     }
 
     @Test
-    void find_the_refs_that_point_only_to_a_loop_of_refs() {
-        String id = ExtensionTools.inputSchemaId("x", "c");
+    void accept_identifier_names_where_they_are_data() {
+        assertThat(ExtensionTools.schemaError(Map.of("type", "object",
+                "properties", Map.of("$id", Map.of("type", "string"), "$anchor", true),
+                "x-example", Map.of("$id", "urn:x", "$ref", "https://example.com/a.json"),
+                "default", Map.of("$id", "urn:x"),
+                "examples", List.of(Map.of("$ref", "https://example.com/c.json")))), nullValue());
+        assertThat(tool("annotate"), notNullValue());
+    }
+
+    @Test
+    void accept_local_json_pointer_refs() {
+        Map<String, Object> defs = Map.of("a", Map.of("type", "string"), "b", true,
+                "l", Map.of("anyOf", List.of(Map.of(), true)), "e~/x", Map.of(), "s p", Map.of());
         Map<String, Object> node = Map.of("type", "object",
                 "properties", Map.of("kids", Map.of("type", "array", "items", Map.of("$ref", "#/$defs/node"))));
 
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "#/$defs/node", "$defs", Map.of("node", node)), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
-                "$defs", Map.of("b", Map.of("$ref", "#/$defs/c"), "c", Map.of("type", "string"))), id), nullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("$ref", "urn:e#/$defs/b", "$defs", Map.of("e", Map.of("$id", "urn:e",
-                "$defs", Map.of("b", Map.of("$ref", "#/$defs/c"), "c", Map.of())))), id), nullValue());
-
-        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("x", Map.of("$ref", "#/properties/x"))), id),
-                is("#/properties/x"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
-                "$defs", Map.of("b", Map.of("$ref", "#/$defs/c"), "c", Map.of("$ref", "#/$defs/b"))), id), notNullValue());
-        assertThat(ExtensionTools.unresolvedRef(Map.of("type", "object", "$ref", "#"), id), is("#"));
-        assertThat(ExtensionTools.unresolvedRef(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
-                "$defs", Map.of("b", Map.of("$ref", "#/$defs/missing"))), id), notNullValue());
-    }
-
-    @Test
-    void find_the_remote_refs_of_a_schema() {
-        String id = ExtensionTools.inputSchemaId("x", "c");
-
-        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "#/$defs/a", "$defs", Map.of("a", Map.of())), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$ref", id + "#/$defs/a"), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$ref", ""), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$defs", Map.of("a", Map.of("$id", "a.json"))), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "a.json", "$defs", Map.of("a", Map.of("$id", "a.json"))), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:in", "$ref", "urn:in#/x"), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("const", Map.of("$ref", "https://example.com/a.json")), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("allOf", List.of(Map.of("$ref", "https://example.com/a.json"))), id),
-                is("https://example.com/a.json"));
-        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "other.json"), id), is("other.json"));
-        assertThat(ExtensionTools.remoteRef(Map.of("$dynamicRef", "urn:other#x"), id), is("urn:other#x"));
-        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "a b:c"), id), is("a b:c"));
-    }
-
-    @Test
-    void resolve_local_refs_against_an_id_that_is_not_hierarchical() {
-        String id = ExtensionTools.inputSchemaId("x", "c");
-        Map<String, Object> defs = Map.of("a", Map.of("type", "string"));
-
-        assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:example:in", "properties", Map.of("p", Map.of("$ref", "#/$defs/a")),
-                "$defs", defs), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$id", "tag:example.com,2026:in", "$ref", "#/$defs/a", "$defs", defs), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$id", "https://example.com/in.json", "$ref", "#/$defs/a", "$defs", defs), id),
+        for (String ref : List.of("#/$defs/a", "#/$defs/b", "#/$defs/l/anyOf/1", "#/$defs/e~0~1x", "#/$defs/s%20p", "#", "#/$defs/l")) {
+            assertThat(ref, ExtensionTools.schemaError(Map.of("properties", Map.of("p", Map.of("$ref", ref)), "$defs", defs)),
+                    nullValue());
+        }
+        assertThat(ExtensionTools.schemaError(Map.of("$ref", "#/$defs/node", "$defs", Map.of("node", node))), nullValue());
+        assertThat(ExtensionTools.schemaError(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
+                "$defs", Map.of("b", Map.of("$ref", "#/$defs/c"), "c", Map.of("type", "string")))), nullValue());
+        assertThat(ExtensionTools.schemaError(Map.of("prefixItems", List.of(Map.of("type", "string")), "contains", Map.of("$ref", "#/prefixItems/0"))),
                 nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$defs", Map.of("e", Map.of("$id", "urn:example:e", "$ref", "#/$defs/a",
-                "$defs", defs))), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$ref", "urn:example:e#/$defs/a", "$defs", Map.of("e", Map.of("$id", "urn:example:e",
-                "$defs", defs))), id), nullValue());
-        assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:example:in", "$ref", "other.json"), id), is("other.json"));
-        assertThat(ExtensionTools.remoteRef(Map.of("$id", "urn:example:in", "$ref", "urn:example:other#/a"), id), is("urn:example:other#/a"));
-        assertThat(ExtensionTools.remoteRef(Map.of("$id", "https://example.com/in.json", "$ref", "https://example.com/other.json"), id),
-                is("https://example.com/other.json"));
     }
 
     @Test
-    void check_the_refs_of_properties_named_like_data_keywords() {
-        String id = ExtensionTools.inputSchemaId("x", "c");
-
-        assertThat(ExtensionTools.remoteRef(Map.of("properties", Map.of("default", Map.of("$ref", "https://example.com/a.json"))), id),
-                is("https://example.com/a.json"));
-        assertThat(ExtensionTools.remoteRef(Map.of("$defs", Map.of("enum", Map.of("$ref", "https://example.com/b.json"))), id),
-                is("https://example.com/b.json"));
-        assertThat(ExtensionTools.remoteRef(Map.of("properties", Map.of("examples", Map.of("type", "array")),
-                "examples", List.of(Map.of("$ref", "https://example.com/c.json"))), id), nullValue());
+    void refuse_a_ref_that_is_not_a_local_json_pointer() {
+        for (String ref : List.of("https://example.com/a.json", "other.json", "urn:example:a#/x", "", "#a", "#$defs/a")) {
+            assertThat(ref, ExtensionTools.schemaError(Map.of("properties", Map.of("p", Map.of("$ref", ref)))),
+                    is("/properties/p/$ref: '" + ref + "' is not a local JSON Pointer such as #/$defs/name. CALM Hub and MCP "
+                            + "clients do not fetch remote schemas"));
+        }
+        assertThat(ExtensionTools.schemaError(Map.of("allOf", List.of(Map.of("$ref", "https://example.com/a.json")))),
+                startsWith("/allOf/0/$ref: "));
+        assertThat(ExtensionTools.schemaError(Map.of("$defs", Map.of("enum", Map.of("$ref", "https://example.com/b.json")))),
+                startsWith("/$defs/enum/$ref: "));
     }
 
     @Test
-    void not_check_the_refs_in_unknown_keywords() {
-        String id = ExtensionTools.inputSchemaId("x", "c");
+    void refuse_a_ref_that_points_to_no_subschema() {
+        Map<String, Object> defs = Map.of("a", Map.of("type", "string"), "l", Map.of("anyOf", List.of(Map.of(), true)),
+                "d", Map.of("dependencies", Map.of("x", List.of("y"))));
 
-        assertThat(ExtensionTools.remoteRef(Map.of("type", "string", "x-example", Map.of("$ref", "https://example.com/a.json"),
-                "example", Map.of("$ref", "https://example.com/b.json")), id), nullValue());
-        assertThat(tool("annotate"), notNullValue());
+        for (String ref : List.of("#/$defs/missing", "#/$defs/a/type", "#/$defs/l/anyOf/2", "#/$defs/l/anyOf/x", "#/$defs/l/anyOf",
+                "#/$defs", "#/properties", "#/$defs/", "#/$defs/a/", "#/$defs/d/dependencies/x", "#/$defs/a/x-ext")) {
+            assertThat(ref, ExtensionTools.schemaError(Map.of("properties", Map.of("p", Map.of("$ref", ref)), "$defs", defs)),
+                    is("/properties/p/$ref: '" + ref + "' points to no subschema"));
+        }
+        assertThat(ExtensionTools.schemaError(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
+                "$defs", Map.of("b", Map.of("$ref", "#/$defs/missing")))), containsString("points to no subschema"));
+    }
+
+    @Test
+    void refuse_a_ref_that_leads_only_to_a_loop_of_refs() {
+        assertThat(ExtensionTools.schemaError(Map.of("properties", Map.of("x", Map.of("$ref", "#/properties/x")))),
+                is("/properties/x/$ref: '#/properties/x' leads only to a loop of $refs"));
+        assertThat(ExtensionTools.schemaError(Map.of("properties", Map.of("a", Map.of("$ref", "#/$defs/b")),
+                "$defs", Map.of("b", Map.of("$ref", "#/$defs/c"), "c", Map.of("$ref", "#/$defs/b")))), containsString("loop of $refs"));
+        assertThat(ExtensionTools.schemaError(Map.of("type", "object", "$ref", "#")), is("/$ref: '#' leads only to a loop of $refs"));
     }
 
     @Test
@@ -421,6 +389,22 @@ class TestExtensionToolsShould {
         ToolResponse response = extensionTools.call(annotate, Map.of("text", "a", "note", 1, "never", 2));
         assertThat(response.isError(), is(true));
         assertThat(text(response), containsString("/never"));
+        verifyNoInteractions(proxyService);
+    }
+
+    @Test
+    void refuse_an_argument_that_overflows_the_stack_of_the_pattern_check() {
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        Map<String, Object> input = Map.of("type", "object",
+                "properties", Map.of("text", Map.of("type", "string", "pattern", "^(a|b)*$")));
+        ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
+                Map.of("c", new ExtensionManifest.Command("r", "C", input, null, null, null)), null);
+        ExtensionTools.ExtensionTool command = ExtensionTools.tools(List.of(manifest)).getFirst();
+
+        ToolResponse response = extensionTools.call(command, Map.of("text", "ab".repeat(1_000_000)));
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), is("Error: CALM Hub cannot check the input against the schema of this command."));
         verifyNoInteractions(proxyService);
     }
 
@@ -480,11 +464,30 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void skip_a_command_whose_input_schema_cannot_be_read_or_whose_route_is_not_declared() {
+    void register_the_other_tools_when_one_overflows_the_stack() {
+        when(toolManager.newTool(anyString())).thenReturn(definition);
+        when(definition.register()).thenThrow(new StackOverflowError()).thenReturn(null);
+        when(toolManager.removeTool(anyString())).thenThrow(new StackOverflowError());
+
+        extensionTools.register(List.of(tool("search"), tool("annotate")));
+
+        verify(definition, times(2)).register();
+        verify(toolManager).removeTool("ext_mcp-test_search");
+    }
+
+    @Test
+    void skip_a_command_whose_schema_check_overflows_or_whose_route_is_not_declared() {
         ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
         Map<String, Object> input = Map.of("type", "object");
+        // A schema check that overflows the stack must skip only its own command.
+        Map<String, Object> overflowing = new HashMap<>(Map.of("type", "object")) {
+            @Override
+            public Object get(Object key) {
+                throw new StackOverflowError();
+            }
+        };
         ExtensionManifest manifest = new ExtensionManifest("bad", "1.0.0", 0, "B", "B", "B", List.of(route), Map.of(
-                "unreadable", new ExtensionManifest.Command("r", "C", Map.of("type", "object", "$id", 5), null, null, null),
+                "overflowing", new ExtensionManifest.Command("r", "C", overflowing, null, null, null),
                 "no-route", new ExtensionManifest.Command("missing", "C", input, null, null, null),
                 "good", new ExtensionManifest.Command("r", "C", input, null, null, null)), null);
 
@@ -717,22 +720,6 @@ class TestExtensionToolsShould {
         assertThat(response.isError(), is(true));
         assertThat(text(response), containsString("/service/name"));
         verifyNoInteractions(proxyService);
-    }
-
-    @Test
-    void keep_and_check_an_input_schema_with_a_urn_id_and_local_refs() {
-        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
-        Map<String, Object> input = Map.of("$id", "urn:example:in", "type", "object",
-                "properties", Map.of("p", Map.of("$ref", "#/$defs/a")), "$defs", Map.of("a", Map.of("type", "string")));
-        ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
-                Map.of("c", new ExtensionManifest.Command("r", "C", input, null, null, null)), null);
-
-        ExtensionTools.ExtensionTool urnTool = ExtensionTools.tools(List.of(manifest)).getFirst();
-        ToolResponse response = extensionTools.call(urnTool, Map.of("p", 3));
-
-        assertThat(response.isError(), is(true));
-        assertThat(text(response), containsString("/p"));
-        assertThat(Boolean.TRUE.equals(urnTool.inputValidator().validate(new JsonObject().put("p", "s")).getValid()), is(true));
     }
 
     @Test

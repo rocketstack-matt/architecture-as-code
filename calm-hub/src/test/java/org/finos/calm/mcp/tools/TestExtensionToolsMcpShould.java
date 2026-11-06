@@ -211,7 +211,7 @@ class TestExtensionToolsMcpShould {
 
     @Test
     @TestSecurity(user = "alice")
-    void check_input_against_an_anchor_ref_with_an_ecma_262_pattern() {
+    void check_input_against_a_json_pointer_ref_with_an_ecma_262_pattern() {
         JsonObject refused = callTool("ext_mcp-test_search", new JsonObject().put("text", "pay").put("code", "ab-1"));
 
         assertThat(refused.getBoolean("isError"), is(true));
@@ -302,6 +302,10 @@ class TestExtensionToolsMcpShould {
         assertThat(names.contains("ext_mcp-test_java-pattern-input"), is(false));
         assertThat(names.contains("ext_mcp-test_java-pattern-output"), is(false));
         assertThat(names.contains("ext_mcp-test_draft-07"), is(false));
+        assertThat(names.contains("ext_mcp-test_id-input"), is(false));
+        assertThat(names.contains("ext_mcp-test_id-output"), is(false));
+        assertThat(names.contains("ext_mcp-test_anchor-input"), is(false));
+        assertThat(names.contains("ext_mcp-test_deep-pattern-input"), is(false));
     }
 
     @Test

@@ -217,15 +217,19 @@ curl -s -X POST http://localhost:8080/mcp \
 CALM Hub makes one tool for each command of an enabled [extension](index.md#extensions) when `calm.mcp.enabled` is true. The tool name is `ext_<id>_<command>`, for example `ext_example-services_list-services`. These tools come after the built-in tools in `tools/list`, sorted by name.
 
 - The input and output schemas come from the manifest. CALM Hub checks the arguments against the input schema before it calls the extension.
-- Each input and output schema must be valid JSON Schema 2020-12. A command with an invalid schema gets no tool, and CALM Hub logs a warning with the deepest error, which names the value to fix. One invalid schema in the tool list makes TypeScript MCP SDK clients lose every tool, so CALM Hub also refuses:
-  - a `$schema` other than `https://json-schema.org/draft/2020-12/schema`, for example draft-07;
-  - a property schema that is not an object or a boolean;
-  - a `pattern` or `patternProperties` key that is not an ECMA-262 regular expression (with the `u` flag), for example `(?i)abc`, `a++` or `\A`. Java accepts these, but JavaScript clients do not. CALM Hub also refuses `(?i:...)` modifiers and `&&` in a class, which older clients or Java read differently. A pattern must also compile in Java, because CALM Hub checks schemas and arguments with Java, so use `\u005A`, not `\u{5A}`;
-  - a local `$ref` that points to nothing, for example `#/$defs/missing` or an `#anchor` that is not declared, or only to a loop of `$ref`s.
+- One schema that a client cannot compile makes TypeScript MCP SDK clients lose every tool. Thus each input and output schema must use this subset of JSON Schema 2020-12:
+
+  | Rule | Supported | Refused |
+  |---|---|---|
+  | Dialect | 2020-12, with or without `$schema` | Other `$schema` values, for example draft-07 |
+  | Subschemas | Objects and booleans | Other values, for example `"properties": {"limit": "integer"}` |
+  | `$ref` | A local JSON Pointer: `#`, `#/$defs/name`, `#/properties/name`. It must point to a subschema, and not only to a loop of `$ref`s | Remote refs (CALM Hub and MCP clients do not fetch them), `#anchor` refs |
+  | Identifiers | None | `$id`, `$anchor`, `$dynamicAnchor`, `$dynamicRef` anywhere in the schema |
+  | `pattern`, `patternProperties` keys | Regular expressions that are valid in both ECMA-262 (with the `u` flag) and Java. At most 1000 characters, and groups nested at most 64 deep | Java-only syntax, for example `(?i)abc`, `a++` or `\A`. ECMA-only syntax, for example `(?<first_name>…)` (Java group names have only letters and digits) or `\u{5A}` (use `\u005A`). Also `(?i:…)` modifiers and `&&` in a class, which older clients or Java read differently |
+
+  A command with a schema outside this subset gets no tool. CALM Hub logs a warning that names the extension, the command, the schema and the location of the error. For a schema that is not valid 2020-12, this is the deepest error, which names the value to fix.
 - If CALM Hub cannot load the JSON Schema 2020-12 meta-schema, it makes no extension tools and logs an error.
-- MCP requires an output schema of type `object`. CALM Hub wraps any other output schema as `{"type": "object", "properties": {"result": <schema>}, "required": ["result"]}`, and returns the reply as `{"result": <reply>}`.
-- CALM Hub and MCP clients do not fetch a remote `$ref`. A command whose input or output schema has one gets no tool, and CALM Hub logs a warning. A `$ref` that starts with `#` is local, also in a schema with a `urn:` or `tag:` `$id`.
-- The TypeScript MCP SDK cannot compile a subschema that has both `$id` and `$ref`. CALM Hub moves such a `$ref` into `allOf`, which has the same meaning.
+- MCP requires an output schema of type `object`. CALM Hub wraps any other output schema as `{"type": "object", "properties": {"result": <schema>}, "required": ["result"]}`, and returns the reply as `{"result": <reply>}`. The wrapped schema gets a CALM Hub `$id`, so that its `$ref`s still point into it.
 - MCP servers and clients need an object for each property schema. CALM Hub publishes a boolean subschema as `{}` (`true`) or `{"not": {}}` (`false`). `additionalProperties` and `unevaluatedProperties` stay booleans.
 - A command that CALM Hub cannot make a tool for gets no tool, and CALM Hub logs a warning. An extension never stops CALM Hub from starting.
 - `readOnlyHint` is true for a `GET` or `readOnly` route. `destructiveHint` and `idempotentHint` come from the command. With no hint, a write is destructive and not idempotent.

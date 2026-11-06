@@ -341,11 +341,11 @@ Tool providers are in `src/main/java/org/finos/calm/mcp/tools/`:
 `ArchitectureTools`, `PatternTools`, `ControlTools`, `DomainTools`, `InterfaceTools`,  
 `NamespaceTools`, `SearchTools`, `StandardTools`, `TimelineTools`, `AdrTools`.  
 `ExtensionTools` registers one `ext_<id>_<command>` tool for each extension command at start up, with `ToolManager`, only when MCP is on.
-It wraps an output schema that is not an object in `result`, and skips a command whose input or output schema has a remote `$ref`.
-It moves a `$ref` beside an `$id` into `allOf`, because Ajv (in the MCP TypeScript SDK) overflows its stack on that.
+It wraps an output schema that is not an object in `result`, with a Hub `$id`, and moves its root `$ref` into `allOf`: Ajv (in the MCP TypeScript SDK) overflows its stack on a subschema with `$id` and `$ref`.
 It publishes boolean subschemas as objects (not `additionalProperties`/`unevaluatedProperties`): the Quarkus MCP header observer and the SDK `ToolSchema` require an object for each property.
-It skips a command whose schema is not valid JSON Schema 2020-12 (meta-schemas bundled in vertx-json-schema), declares another `$schema`, has a property schema that is not an object or a boolean, a `pattern` that is not ECMA-262 (`EcmaRegex`; vertx checks `format: regex` with java.util.regex), or a local `$ref` that does not resolve or only reaches a loop of `$ref`s (Ajv overflows its stack on one). If the meta-schemas do not load, it registers no extension tools.
-A command that it cannot register is skipped with a warning, so a manifest never stops Hub. `ToolManager` adds a tool before its `ToolAdded` observers run, so a failed tool is removed again. It never registers over, or removes, a tool that has the same name.
+Command schemas must use a subset of 2020-12, because one schema that the SDK cannot compile makes `listTools()` throw. Do not add support for schema identifiers: each round of review found another `$id` or anchor case that the SDK refuses.
+It skips a command whose schema is not valid JSON Schema 2020-12 (meta-schemas bundled in vertx-json-schema), declares another `$schema`, has a subschema that is not an object or a boolean, has `$id`, `$anchor`, `$dynamicAnchor` or `$dynamicRef`, has a `$ref` that is not a local JSON Pointer to a subschema or only reaches a loop of `$ref`s (Ajv overflows its stack on one), or has a `pattern` that is not ECMA-262 (`EcmaRegex`, with length and nesting limits; vertx checks `format: regex` with java.util.regex). If the meta-schemas do not load, it registers no extension tools.
+A command that it cannot check or register is skipped with a warning, also on an `Error` such as `StackOverflowError`, so a manifest never stops Hub. `ToolManager` adds a tool before its `ToolAdded` observers run, so a failed tool is removed again. It never registers over, or removes, a tool that has the same name.
 
 Enable for development:
 ```bash

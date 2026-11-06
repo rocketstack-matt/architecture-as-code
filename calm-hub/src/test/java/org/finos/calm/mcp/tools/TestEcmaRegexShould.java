@@ -1,9 +1,11 @@
 package org.finos.calm.mcp.tools;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
@@ -43,5 +45,24 @@ class TestEcmaRegexShould {
     @ValueSource(strings = {"(?i:abc)", "(?-i:a)", "[a&&b]", "(?<x>a)|(?<x>b)"})
     void refuse_a_pattern_that_clients_or_java_read_differently(String pattern) {
         assertThat(pattern, EcmaRegex.error(pattern), notNullValue());
+    }
+
+    @Test
+    void refuse_a_pattern_whose_groups_are_nested_too_deep() {
+        String deepest = "(".repeat(EcmaRegex.MAX_DEPTH) + "a" + ")".repeat(EcmaRegex.MAX_DEPTH);
+        String deeper = "(?:".repeat(EcmaRegex.MAX_DEPTH + 1) + "a" + ")".repeat(EcmaRegex.MAX_DEPTH + 1);
+
+        assertThat(EcmaRegex.error(deepest), nullValue());
+        assertThat(EcmaRegex.error("(?=" + deepest + ")"), is("groups are nested more than 64 deep (at character 67)"));
+        assertThat(EcmaRegex.error(deeper), is("groups are nested more than 64 deep (at character 193)"));
+        assertThat(EcmaRegex.error("(a)".repeat(300)), nullValue());
+    }
+
+    @Test
+    void refuse_a_pattern_that_is_too_long() {
+        assertThat(EcmaRegex.error("a".repeat(EcmaRegex.MAX_LENGTH)), nullValue());
+        assertThat(EcmaRegex.error("😀".repeat(EcmaRegex.MAX_LENGTH)), nullValue());
+        assertThat(EcmaRegex.error("a".repeat(EcmaRegex.MAX_LENGTH + 1)), is("it is longer than 1000 characters"));
+        assertThat(EcmaRegex.error("(".repeat(1_000_000)), is("it is longer than 1000 characters"));
     }
 }

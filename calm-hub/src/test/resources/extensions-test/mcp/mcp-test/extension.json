@@ -41,9 +41,9 @@
       "description": "Search the services",
       "input": {
         "type": "object",
-        "properties": { "text": { "type": "string" }, "code": { "$ref": "#code" } },
+        "properties": { "text": { "type": "string" }, "code": { "$ref": "#/$defs/code" } },
         "required": ["text"],
-        "$defs": { "code": { "$anchor": "code", "type": "string", "pattern": "^(?<area>[A-Z]{2})-\\d+$" } }
+        "$defs": { "code": { "type": "string", "pattern": "^(?<area>[A-Z]{2})-\\d+$" } }
       }
     },
     "list-services": {
@@ -122,9 +122,9 @@
     },
     "dangling-output": {
       "route": "search",
-      "description": "Search with a result from an anchor that does not exist",
+      "description": "Search with a result from a definition that does not exist",
       "input": { "type": "object" },
-      "output": { "type": "object", "properties": { "hits": { "$ref": "#hits" } } }
+      "output": { "type": "object", "properties": { "hits": { "$ref": "#/$defs/hits" } } }
     },
     "ref-loop-output": {
       "route": "search",
@@ -142,6 +142,31 @@
       "description": "Search with a result pattern that only Java accepts",
       "input": { "type": "object" },
       "output": { "type": "object", "patternProperties": { "\\Ahit": { "type": "string", "pattern": "a++" } } }
+    },
+    "id-input": {
+      "route": "search",
+      "description": "Search with an input schema that has a urn $id with no NID",
+      "input": { "$id": "urn:root", "type": "object" }
+    },
+    "id-output": {
+      "route": "search",
+      "description": "Search with a result whose definitions have the same $id",
+      "input": { "type": "object" },
+      "output": {
+        "type": "object",
+        "properties": { "a": { "$ref": "#/$defs/a" } },
+        "$defs": { "a": { "$id": "urn:example:dup" }, "b": { "$id": "urn:example:dup" } }
+      }
+    },
+    "anchor-input": {
+      "route": "search",
+      "description": "Search with an input schema that declares the same anchor twice",
+      "input": { "type": "object", "$defs": { "a": { "$anchor": "d" }, "b": { "$dynamicAnchor": "d" } } }
+    },
+    "deep-pattern-input": {
+      "route": "search",
+      "description": "Search with a pattern whose groups are nested too deep",
+      "input": { "type": "object", "properties": { "text": { "type": "string", "pattern": "(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((a)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))" } } }
     },
     "draft-07": {
       "route": "search",
