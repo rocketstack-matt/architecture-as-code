@@ -1153,8 +1153,8 @@ export async function runDescribeExtension(options: DescribeExtensionOptions): P
 }
 
 /**
- * Runs an extension command through the CALM Hub proxy and prints the reply. Hub validates the
- * input, so a validation error is printed as Hub sent it.
+ * Runs an extension command through the CALM Hub proxy and prints the reply. The proxy does not
+ * validate the input (only MCP does), so the extension does, and its error is printed as Hub sent it.
  * @param options Command options.
  */
 export async function runExtensionCommand(options: RunExtensionCommandOptions): Promise<void> {
