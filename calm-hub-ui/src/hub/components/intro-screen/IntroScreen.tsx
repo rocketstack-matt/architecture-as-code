@@ -1,4 +1,3 @@
-import { ExtensionPoints, ExtensionScreenLinks } from '../../../extensions/ExtensionPoints.js';
 import { NamespaceCounts, DomainControlCount } from '../../../model/counts.js';
 import { useTheme } from '../../../theme/useTheme.js';
 import { ThemeToggle } from '../../../components/navbar/ThemeToggle.js';
@@ -57,9 +56,6 @@ export function IntroScreen({ namespaceCounts, domainCounts, storage }: IntroScr
                     <IntroBrowse namespaceCounts={namespaceCounts} domainCounts={domainCounts} />
                 </div>
             </div>
-            <ExtensionScreenLinks />
-            <ExtensionPoints point="landing-card" />
-            <ExtensionPoints point="action" />
         </div>
     );
 }

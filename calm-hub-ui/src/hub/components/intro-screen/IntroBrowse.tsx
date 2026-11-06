@@ -5,6 +5,8 @@ import { CountBadge } from '../explore-rail/CountBadge.js';
 import { useIsMobile } from '../../../hooks/useMediaQuery.js';
 import { useClampToggle } from '../show-more/useClampToggle.js';
 import { ShowMoreToggle } from '../show-more/ShowMoreToggle.js';
+import { useExtensions } from '../../../components/extensions/ExtensionsContext.js';
+import { ExtensionCard } from './ExtensionCard.js';
 
 interface BrowseCardProps {
     label: string;
@@ -92,10 +94,13 @@ interface IntroBrowseProps {
 /**
  * The intro's browse affordance: every namespace and control domain as a clickable
  * tile (the same routes the explore rail uses), so the sidebar's targets are
- * reachable from the hero. Renders nothing when the catalogue is empty.
+ * reachable from the hero, and each extension with a landing card or a screen. Renders nothing when all are empty.
  */
 export function IntroBrowse({ namespaceCounts, domainCounts }: IntroBrowseProps) {
-    if (namespaceCounts.length === 0 && domainCounts.length === 0) return null;
+    const extensions = useExtensions().filter(
+        (extension) => (extension.contributes['landing-card'] ?? []).length > 0 || (extension.contributes.screen ?? []).length > 0
+    );
+    if (namespaceCounts.length === 0 && domainCounts.length === 0 && extensions.length === 0) return null;
 
     return (
         <div className="w-full max-w-[640px] flex flex-col gap-10">
@@ -110,6 +115,14 @@ export function IntroBrowse({ namespaceCounts, domainCounts }: IntroBrowseProps)
                             testId="browse-namespace"
                             description={nc.description}
                         />
+                    ))}
+                </BrowseSection>
+            )}
+
+            {extensions.length > 0 && (
+                <BrowseSection title="Extensions">
+                    {extensions.map((extension) => (
+                        <ExtensionCard key={extension.id} extension={extension} />
                     ))}
                 </BrowseSection>
             )}
