@@ -16,25 +16,12 @@ URL does not start, and the UI then shows "CalmHub failed to load".
 | `detail-panel` | The Extensions section of the node details |
 | `decorator-views` | Badges on the diagram for `release-risk` decorators |
 
-Run it from `calm-hub/`, with the keys from the
-[example-services README](../../extensions/example-services/README.md):
-
-```bash
-../mvnw quarkus:dev -Pstandalone,server-only \
-  -Dcalm.extensions.dir=local-dev/demo-extensions \
-  -Dcalm.extensions.release-tracker.backend-url=http://localhost:8092 \
-  -Dcalm.extensions.identity.private-key-location=../sandbox/keys/hub-private.pem \
-  -Dcalm.extensions.identity.public-key-locations=../sandbox/keys/hub-public.pem \
-  -Dcalm.extensions.allow-without-auth=true
-
-# In another shell
-node local-dev/demo-extensions/release-tracker/server.mjs
-```
+Run it with [stride-threats](../stride-threats/README.md), as the [demo-extensions README](../README.md)
+says: Hub loads both manifests from this folder.
 
 The detail panel has data for the nodes `web-app`, `api-gateway`, `user-service`, `order-service`,
 `database` and `message-queue`. To see the overlay, add a decorator of type `release-risk` with
 `data.risk` set to `low`, `medium` or `high`, and `data.summary` set to a short text.
 
 Set `PORT` or `CALM_HUB_URL` (where the backend gets the JWKS) to change the defaults. The backend
-accepts only the issuer `http://localhost:8080`, which is the default of `calm.hub.base-url`. If you
-set `calm.hub.base-url`, set `CALM_HUB_ISSUER` to the same value.
+accepts only the issuer `http://localhost:8080`; see the [demo-extensions README](../README.md).
