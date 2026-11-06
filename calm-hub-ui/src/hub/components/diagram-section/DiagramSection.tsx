@@ -37,6 +37,7 @@ import { usePatternImplementations } from './used-by/usePatternImplementations.j
 import { useArchitectureDecorators } from './decorators/useArchitectureDecorators.js';
 import { DECORATOR_TYPE_PARAM, DIAGRAM_TAB_REDIRECTS, DIAGRAM_TABS, extensionContext } from './tabs/diagramTabs.js';
 import {
+    carriedDiagramTab,
     DEFAULT_DIAGRAM_TAB_ID,
     diagramTabLabel,
     diagramTabQuery,
@@ -219,7 +220,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     const tabScope = { isArchitecture, patternName, hasExtensions };
     const visibleTabs = visibleDiagramTabs(DIAGRAM_TABS, tabScope);
     const activeTab = resolveDiagramTab(DIAGRAM_TABS, searchParams.get('tab'), tabScope);
-    const tabQuery = diagramTabQuery(activeTab, searchParams);
+    const tabQuery = diagramTabQuery(carriedDiagramTab(DIAGRAM_TABS, searchParams.get('tab'), activeTab), searchParams);
     const usedByOpen = activeTab.id === 'used-by' && !comparing;
     const usedBy = usePatternImplementations(implementationService, data.name, patternName, data.version, usedByOpen);
 

@@ -940,6 +940,26 @@ describe('DiagramSection', () => {
             expect(navigate).toHaveBeenCalledTimes(1);
         });
 
+        it('keeps a link to the Extensions tab when it redirects before the extension registry loads', async () => {
+            const navigate = vi.fn();
+            vi.mocked(useNavigate).mockReturnValue(navigate);
+
+            render(
+                <MemoryRouter initialEntries={['/?tab=extensions']}>
+                    <ExtensionsContext.Provider value={[]}>
+                        <DiagramSection data={latestArchitectureData} />
+                    </ExtensionsContext.Provider>
+                </MemoryRouter>
+            );
+
+            await waitFor(() => {
+                expect(navigate).toHaveBeenCalledWith('/arch-namespace/architectures/test-arch/1.0.0?tab=extensions', {
+                    replace: true,
+                    state: null,
+                });
+            });
+        });
+
         it('marks a timeline selection in navigation state and keeps the existing state', async () => {
             const navigate = vi.fn();
             vi.mocked(useNavigate).mockReturnValue(navigate);
