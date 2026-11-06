@@ -38,6 +38,20 @@ describe('ExtensionService', () => {
         expect(await new ExtensionService(ax).fetchDecoratorViews()).toEqual([first, second, second]);
         expect(mock.history.get[0].headers?.Authorization).toBe('test');
     });
+    it('tags each decorator view with its extension, and marks built-in ones', async () => {
+        const view = { id: 'risk', match: { type: 'risk' }, label: 'Risk' };
+        mock.onGet('/api/calm/extensions').reply(200, { values: [
+            { id: 'release-tracker', name: 'Release tracker', contributes: { 'decorator-views': [view] } },
+            { id: 'deployment', name: 'Deployments', contributes: { 'decorator-views': [view] } },
+            { id: 'nameless', contributes: { 'decorator-views': [view] } },
+        ] });
+        expect((await new ExtensionService(ax).fetchDecoratorViews()).map((v) => v.source)).toEqual([
+            { id: 'release-tracker', name: 'Release tracker', builtIn: false },
+            { id: 'deployment', name: 'Deployments', builtIn: true },
+            { id: 'nameless', name: 'nameless', builtIn: false },
+        ]);
+        expect(mock.history.get[0].headers?.Authorization).toBe('test');
+    });
     it('rejects a failed decorator view request', async () => {
         mock.onGet('/api/calm/extensions').reply(503);
         await expect(new ExtensionService(ax).fetchDecoratorViews()).rejects.toThrow('Error fetching decorator views:');

@@ -1,6 +1,5 @@
-import { ExtensionPoints } from '../../../extensions/ExtensionPoints.js';
 import { useExtensions } from '../../../components/extensions/ExtensionsContext.js';
-import { extensionTabs } from '../../../extensions/extension-tabs.js';
+import { resourceExtensions } from '../../../extensions/contributions.js';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -36,8 +35,9 @@ import { IoSaveOutline, IoRefreshOutline } from 'react-icons/io5';
 import { PatternImplementationService } from '../../../service/pattern-implementation-service.js';
 import { usePatternImplementations } from './used-by/usePatternImplementations.js';
 import { useArchitectureDecorators } from './decorators/useArchitectureDecorators.js';
-import { DECORATOR_TYPE_PARAM, DIAGRAM_TAB_REDIRECTS, DIAGRAM_TABS } from './tabs/diagramTabs.js';
+import { DECORATOR_TYPE_PARAM, DIAGRAM_TAB_REDIRECTS, DIAGRAM_TABS, extensionContext } from './tabs/diagramTabs.js';
 import {
+    carriedDiagramTab,
     DEFAULT_DIAGRAM_TAB_ID,
     diagramTabLabel,
     diagramTabQuery,
@@ -216,11 +216,11 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
 
     const implementationService = useMemo(() => new PatternImplementationService(), []);
     const extensions = useExtensions();
-    const registeredTabs = [...DIAGRAM_TABS, ...extensionTabs(extensions)];
-    const tabScope = { isArchitecture, patternName };
-    const visibleTabs = visibleDiagramTabs(registeredTabs, tabScope);
-    const activeTab = resolveDiagramTab(registeredTabs, searchParams.get('tab'), tabScope);
-    const tabQuery = diagramTabQuery(activeTab, searchParams);
+    const hasExtensions = !showsDroppedFile && resourceExtensions(extensions, extensionContext(data, selectedElement)).length > 0;
+    const tabScope = { isArchitecture, patternName, hasExtensions };
+    const visibleTabs = visibleDiagramTabs(DIAGRAM_TABS, tabScope);
+    const activeTab = resolveDiagramTab(DIAGRAM_TABS, searchParams.get('tab'), tabScope);
+    const tabQuery = diagramTabQuery(carriedDiagramTab(DIAGRAM_TABS, searchParams.get('tab'), activeTab), searchParams);
     const usedByOpen = activeTab.id === 'used-by' && !comparing;
     const usedBy = usePatternImplementations(implementationService, data.name, patternName, data.version, usedByOpen);
 
@@ -476,9 +476,6 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     ]);
 
     const Icon = iconMap[data.calmType];
-    const extensionActions = !showsDroppedFile && <ExtensionPoints point="action" context={{
-        namespace: data.name, resource: `${data.calmType.toLowerCase()}/${data.id}`, version: data.version, selectedElement,
-    }} />;
 
     const tabContext: DiagramTabContext = {
         ...tabScope,
@@ -802,7 +799,6 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
                         rightContent={
                             <div className="flex items-center gap-2">
                                 {tabs}
-                                {extensionActions}
                                 {layoutActions}
                             </div>
                         }
@@ -824,7 +820,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     return (
         <NodeSearchProvider value={nodeSearch}>
         <div className="w-full h-full">
-            {navbarSlot ? createPortal(<>{viewMenu}{extensionActions}</>, navbarSlot) : <>{viewMenu}{extensionActions}</>}
+            {navbarSlot ? createPortal(viewMenu, navbarSlot) : viewMenu}
             <div className="h-full bg-base-100 overflow-hidden flex flex-col">
                 {/* Mobile has no SectionHeader (full-bleed canvas), so after a
                     detailed-architecture hop the trail would be unreachable.

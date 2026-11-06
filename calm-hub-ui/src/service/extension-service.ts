@@ -2,6 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 import { getAuthHeaders } from '../authService.js';
 import { ExtensionContext, ExtensionRoute, ExtensionSummary } from '../model/extensions.js';
 import type { DecoratorView } from '../visualizer/contracts/contracts.js';
+import { isBuiltInExtension } from '../extensions/extensionIdentity.js';
 
 type RegistryEntry = ExtensionSummary & { contributes?: { 'decorator-views'?: DecoratorView[] } };
 
@@ -47,7 +48,22 @@ export class ExtensionService {
 
     public async fetchDecoratorViews(): Promise<DecoratorView[]> {
         return this.loadRegistry()
-            .then((values) => values.flatMap((extension) => extension.contributes?.['decorator-views'] ?? []))
+            .then((values) =>
+                values.flatMap((extension) =>
+                    (extension.contributes?.['decorator-views'] ?? []).map((view) =>
+                        typeof extension.id === 'string'
+                            ? {
+                                  ...view,
+                                  source: {
+                                      id: extension.id,
+                                      name: extension.name || extension.id,
+                                      builtIn: isBuiltInExtension(extension.id),
+                                  },
+                              }
+                            : view
+                    )
+                )
+            )
             .catch((error) => {
                 const errorMessage = 'Error fetching decorator views:';
                 console.error('%s', errorMessage, error);

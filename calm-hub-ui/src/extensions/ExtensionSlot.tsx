@@ -3,6 +3,7 @@ import { ExtensionContext, ExtensionContribution, ExtensionScreen, ExtensionSumm
 import { ExtensionService } from '../service/extension-service.js';
 import { ScreenErrorBoundary } from './ScreenErrorBoundary.js';
 import { BlockRenderer } from './blocks/BlockRenderer.js';
+import { isBlocksReply } from './landingCard.js';
 
 export interface ExtensionSlotProps {
     extension: ExtensionSummary;
@@ -26,11 +27,8 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
         const controller = new AbortController();
         service
             .call(extension.id, route, { namespace, resource, version, selectedElement }, controller.signal)
-            .then((data) => {
-                const reply = data as ExtensionScreen | null;
-                if (!reply || reply.hubApi !== extension.hubApi || !Array.isArray(reply.blocks)) {
-                    throw new Error('Invalid blocks reply');
-                }
+            .then((reply) => {
+                if (!isBlocksReply(reply, extension.hubApi)) throw new Error('Invalid blocks reply');
                 if (!controller.signal.aborted) setResult(reply);
             })
             .catch(() => {

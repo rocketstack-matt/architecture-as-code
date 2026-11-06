@@ -13,6 +13,7 @@ import { CONTROL_EVALUATION_VIEW_ID, DecoratorOverlayContext, type DecoratorOver
 import { containersOfContainment, hasOverlay, matchesView, overlayByElement } from '../../overlay/overlayEngine.js';
 import { useDecoratorViews } from '../../overlay/decoratorViews.js';
 import { useOverlayDecorators } from '../../overlay/useOverlayDecorators.js';
+import { useOverlayVisibility } from '../../overlay/useOverlayVisibility.js';
 import type { DrawerProps, Control, ControlEvaluationDecorator, ViewOverlay } from '../../contracts/contracts.js';
 
 /**
@@ -40,11 +41,11 @@ export function Drawer({
     onPositionsChange,
     onDroppedFileChange,
     onOpenView,
+    storage,
 }: DrawerProps) {
     const calmService = useMemo(() => new CalmService(), []);
     const [fileInstance, setFileInstance] = useState<Record<string, unknown> | undefined>(undefined);
     const [dropError, setDropError] = useState<string | undefined>(undefined);
-    const [hiddenViews, setHiddenViews] = useState<ReadonlySet<string>>(() => new Set());
     const [isMetadataCollapsed, setIsMetadataCollapsed] = useState(true);
     const [metadataPanelHeight, setMetadataPanelHeight] = useState(250);
 
@@ -113,16 +114,10 @@ export function Drawer({
             .map((view) => ({ view, elements: overlayByElement(view, overlayDecorators, drawnAs) }))
             .filter(({ elements }) => elements.size > 0);
     }, [views, overlayDecorators, calmInstance]);
-    const toggleView = useCallback((viewId: string) => {
-        setHiddenViews((prev) => {
-            const next = new Set(prev);
-            if (!next.delete(viewId)) next.add(viewId);
-            return next;
-        });
-    }, []);
+    const { hiddenViews, toggleView, setViewsShown } = useOverlayVisibility(overlays, storage);
     const overlayState = useMemo(
-        (): DecoratorOverlayState => ({ overlays, hiddenViews, toggleView, onOpenView }),
-        [overlays, hiddenViews, toggleView, onOpenView],
+        (): DecoratorOverlayState => ({ overlays, hiddenViews, toggleView, setViewsShown, onOpenView }),
+        [overlays, hiddenViews, toggleView, setViewsShown, onOpenView],
     );
     // The evaluation history for the panel under the diagram, which lists every evaluation, not only the newest.
     const evaluations = useMemo(() => {

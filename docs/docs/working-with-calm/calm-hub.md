@@ -221,6 +221,19 @@ Selecting a control from a **Control Domain** (e.g. `security` or `ai-governance
 
 ---
 
+## Extensions
+
+An operator can install extensions (see [Extensions](../calm-hub/index.md#extensions)). The UI groups
+what they add:
+
+* **Home page:** an **Extensions** section under **Namespaces**, with one card per extension. A card shows the extension name, its provider and up to three figures. Click a card to open the extension screen.
+* **Side menu:** an **Extensions** group with one entry per extension screen.
+* **Architecture and pattern pages:** one **Extensions** tab. Each extension has a collapsible section with its actions and its tab content. With more than five extensions, a filter shows above the sections.
+* **Node details:** one **Extensions** section, with a collapsible part for each extension.
+* **Diagram overlays:** each extension has a colour marker on its badges and legend rows. Click a badge to see what it means.
+
+---
+
 ## Access Control
 
 CALM Hub uses a hierarchical entitlement model to control who can read, write, and administer namespaces. See [CALM Hub Entitlements](./calm-hub-entitlements) for the full model, worked examples, and API usage.

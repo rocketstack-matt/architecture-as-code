@@ -26,4 +26,6 @@ curl http://localhost:8080/api/calm/extensions/example-services/api/namespaces/f
 The standalone profile has auth off, so `allow-without-auth` is needed and every caller is the
 `no-auth` principal. Set `PORT`, `CALM_HUB_URL` or `CALM_HUB_ISSUER` to change the defaults.
 
+The [release-tracker](../../demo-extensions/release-tracker/README.md) demo is in its own folder, `local-dev/demo-extensions`.
+
 Test the verifier with `node --test local-dev/extensions/example-services/identity.test.mjs`.

@@ -20,6 +20,13 @@ const isOverlayStatus = (value: unknown): value is OverlayStatus =>
 
 export const hasOverlay = (view: DecoratorView): view is OverlayDecoratorView => !!view.overlay;
 
+/** Two extensions can use the same view id, so a view is keyed by its extension too. */
+export const viewKey = (view: DecoratorView): string => (view.source ? `${view.source.id}/${view.id}` : view.id);
+
+/** "Release risk · Release tracker"; a built-in view says "Built-in". */
+export const viewTitle = (view: DecoratorView): string =>
+    view.source ? `${view.label} · ${view.source.builtIn ? 'Built-in' : view.source.name}` : view.label;
+
 export function matchesView(view: DecoratorView, decorator: Decorator): boolean {
     const { type, schema } = view.match;
     if (type === undefined && schema === undefined) return false;
@@ -116,7 +123,13 @@ export function overlayByElement(
             time,
             entry: status.status === null
                 ? null
-                : { decorator, value: status.value, status: status.status, label: stringAt(decorator.data, overlay.label) },
+                : {
+                    decorator,
+                    value: status.value,
+                    status: status.status,
+                    label: stringAt(decorator.data, overlay.label),
+                    time: stringAt(decorator.data, overlay.time),
+                },
         };
         const group = overlay.time === undefined ? `#${decorator.uniqueId}` : `=${key ?? ''}`;
         for (const element of new Set(decorator.appliesTo ?? [])) {
