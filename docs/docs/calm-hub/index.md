@@ -144,7 +144,7 @@ CALM_UI_ITEMS_1__VALUE=2026.10.1
 
 An extension adds features to CALM Hub without a fork. It is an HTTP service that CALM Hub calls. The operator installs it with a manifest. CALM Hub reads the manifests at start up. No API adds an extension.
 
-> Work in progress: CALM Hub proxies extension routes. The UI, the CLI and MCP do not use them yet.
+> Work in progress: CALM Hub proxies extension routes, and makes an MCP tool for each command (see [MCP & API](mcp-and-api.md#extension-tools)). The UI and the CLI do not use them yet.
 
 Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`. Hub skips hidden folders and warns about folders without a manifest. Settings for unknown extension ids also produce a warning.
 

@@ -212,6 +212,38 @@ curl -s -X POST http://localhost:8080/mcp \
   | jq '.result.tools[].name'
 ```
 
+### Extension Tools
+
+CALM Hub makes one tool for each command of an enabled [extension](index.md#extensions) when `calm.mcp.enabled` is true. The tool name is `ext_<id>_<command>`, for example `ext_example-services_list-services`. These tools come after the built-in tools in `tools/list`, sorted by name.
+
+**Trust model.** Extension manifests, with their input and output schemas, are trusted operator configuration, as `application.properties` is. CALM Hub reads them one time at start-up, from its built-in extensions and `calm.extensions.dir`, and nothing changes them at runtime. At start-up CALM Hub checks them for usual mistakes (the rules below). It does not try to stop a schema that is made to be slow or to break clients. Such a schema can make its own tool slow, and an output schema can make some MCP clients refuse to list the tools. To fix this, correct the manifest. CALM Hub bounds what a caller controls: arguments are at most 1 MiB of JSON, deeply nested arguments are a tool error, input patterns match in linear time, and the scope is checked before the input.
+
+- The input and output schemas come from the manifest. CALM Hub checks the scope first, and then the arguments against the input schema, before it calls the extension. It matches the patterns of the input schema with [RE2J](https://github.com/google/re2j), in a time that is linear in the length of the argument. Thus a pattern such as `^(.*a){12}$`, which is very slow in Java, cannot hold a request. Arguments larger than 1 MiB of JSON, or nested too deeply for CALM Hub to read, are a tool error before the scope and input checks. With the 100-term pattern limit below, this bounds the time to match one pattern. It does not bound the time of a whole check: that depends on the schema, which the operator controls (see the trust model below).
+- One schema that a client cannot compile makes TypeScript MCP SDK clients lose every tool. Thus each input and output schema must use this subset of JSON Schema 2020-12:
+
+  | Rule | Supported | Refused |
+  |---|---|---|
+  | Dialect | 2020-12, with or without `$schema` | Other `$schema` values, for example draft-07 |
+  | Subschemas | Objects and booleans | Other values, for example `"properties": {"limit": "integer"}` |
+  | Depth | Objects and arrays nested at most 64 deep, counting every level: subschemas, property maps, lists and the values of other keywords. Each `$ref` counts as one more level, followed by the levels of its target, as Ajv compiles it. A `$ref` back to a schema that contains it adds no levels, so recursive schemas are supported | Deeper schemas, also a long chain of `$ref`s through `$defs`. Ajv in the SDK overflows its stack on a deep schema |
+  | `$ref` | A local JSON Pointer: `#`, `#/$defs/name`, `#/properties/name`. It must point to a subschema, and not only to a loop of `$ref`s | Remote refs (CALM Hub and MCP clients do not fetch them), `#anchor` refs, and refs with `%`. Use `$defs` names that need no percent-encoding |
+  | Identifiers | None | `$id`, `$anchor`, `$dynamicAnchor`, `$dynamicRef`, `$recursiveAnchor` and `$recursiveRef` as a key at any depth, under any keyword: also under `x-*` keywords, `default`, `examples`, `const`, `enum`, and as a property or `$defs` name. Thus a schema cannot declare a property named `$id`. The arguments can still have one, unless the schema refuses additional properties |
+  | `pattern`, `patternProperties` keys | Regular expressions that are valid in both ECMA-262 (with the `u` flag) and Java. At most 1000 characters, and groups nested at most 64 deep | Java-only syntax, for example `(?i)abc`, `a++` or `\A`. ECMA-only syntax, for example `(?<first_name>…)` (Java group names have only letters and digits) or `\u{5A}` (use `\u005A`). Also `(?i:…)` modifiers and `&&` in a class, which older clients or Java read differently |
+  | Input `pattern`, `patternProperties` keys | Also patterns that RE2J can match with the same meaning | Lookaheads, lookbehinds, back references, `\S` in a class, and Unicode properties (`\p{…}`, `\P{…}`: RE2J has older Unicode tables than the clients). Also a pattern larger than 100 terms when each repeat is expanded, where an empty group or alternative counts as 1 term: `a{100}` is accepted, `a{101}`, `(?:a{10}){11}` and `(?:(?:){1000}){1000}` are refused. Output schemas keep the rule above |
+  | Input `format` | `date`, `time`, `date-time`, `duration`, `email`, `hostname`, `ipv4`, `ipv6` and `uuid`, which CALM Hub checks in linear time | All other formats, also `uri`, `url` and `regex`. Output schemas can use any format |
+  | Input `patternProperties` | With `properties` and `additionalProperties` next to them | `unevaluatedProperties` anywhere in the same input schema, and a `$ref` into `patternProperties` or into the `additionalProperties` next to them. CALM Hub checks these keywords itself, so vertx cannot see which properties they evaluate |
+
+  A command with a schema outside this subset gets no tool. CALM Hub logs a warning that names the extension, the command, the schema and the location of the error. For a schema that is not valid 2020-12, this is the deepest error, which names the value to fix.
+- If CALM Hub cannot load the JSON Schema 2020-12 meta-schema, it makes no extension tools and logs an error.
+- MCP requires an output schema of type `object`. CALM Hub wraps any other output schema as `{"type": "object", "properties": {"result": <schema>}, "required": ["result"]}`, and returns the reply as `{"result": <reply>}`. The wrapped schema gets a CALM Hub `$id`, so that its `$ref`s still point into it.
+- MCP servers and clients need an object for each property schema. CALM Hub publishes a boolean subschema as `{}` (`true`) or `{"not": {}}` (`false`). `additionalProperties` and `unevaluatedProperties` stay booleans.
+- A command that CALM Hub cannot make a tool for gets no tool, and CALM Hub logs a warning. An extension never stops CALM Hub from starting.
+- `readOnlyHint` is true for a `GET` or `readOnly` route. `destructiveHint` and `idempotentHint` come from the command. With no hint, a write is destructive and not idempotent.
+- Each call goes through the extension proxy, with the same scope, read-only, audit and size rules as a REST call. CALM Hub checks the scope when the tool is called. A user sees every tool, also one that they cannot call.
+- A read-only CALM Hub makes no tool for a command whose route it cannot run.
+- Arguments that fill a `{param}` go in the path, percent-encoded, with the same path checks as a REST call. A value such as `%61dmin` or `a/../b` is refused. The rest go to the query for `GET` and `DELETE`, and to the JSON body for other methods.
+- A `2xx` reply is the result: structured content and the same JSON as text if the command has an output schema, otherwise text. Any other reply is a tool error.
+
 ### Example Tool Call
 
 ```bash
