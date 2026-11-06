@@ -188,10 +188,15 @@
     },
     "slow-pattern": {
       "route": "services",
-      "description": "List services with a pattern that java.util.regex matches slowly",
+      "description": "List services with patterns that java.util.regex matches slowly",
       "input": {
         "type": "object",
-        "properties": { "namespace": { "type": "string" }, "text": { "type": "string", "pattern": "^(.*a){12}$" } },
+        "properties": {
+          "namespace": { "type": "string" },
+          "text": { "type": "string", "pattern": "^(.*a){12}$" },
+          "empty": { "type": "string", "pattern": "(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)(?:|)\\b\\B" },
+          "choice": { "type": "string", "pattern": "(a|a)*b" }
+        },
         "required": ["namespace"]
       }
     },

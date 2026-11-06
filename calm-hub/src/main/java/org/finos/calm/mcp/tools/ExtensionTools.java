@@ -15,6 +15,7 @@ import io.vertx.json.schema.JsonSchemaOptions;
 import io.vertx.json.schema.OutputFormat;
 import io.vertx.json.schema.OutputUnit;
 import io.vertx.json.schema.SchemaRepository;
+import io.vertx.json.schema.Validator;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -37,24 +38,22 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Registers one MCP tool for each extension command at start up (ADR 0014). Each call goes through
@@ -83,10 +82,6 @@ public class ExtensionTools {
             "$recursiveAnchor", "$recursiveRef");
     // Ajv in the SDK overflows its stack on a schema nested about 350 deep.
     static final int MAX_SCHEMA_DEPTH = 64;
-    // Limits for matching the input against the patterns of the input schema. java.util.regex can take hours on
-    // some valid patterns, such as ^(.*a){12}$.
-    static final Duration MATCH_TIME = Duration.ofMillis(100);
-    static final Duration CALL_MATCH_TIME = Duration.ofSeconds(1);
     private static final String META_SCHEMA_BASE = "https://json-schema.org/draft/2020-12/";
     private static final String META_SCHEMA = META_SCHEMA_BASE + "schema";
     // Bundled in vertx-json-schema under this classpath folder.
@@ -240,8 +235,8 @@ public class ExtensionTools {
                     ExtensionManifest.Route route = manifest.route(command.route())
                             .orElseThrow(() -> new IllegalStateException("it names route '" + command.route()
                                     + "', which is not declared"));
-                    if (isInvalid(manifest.id(), name, "input", command.input())
-                            || isInvalid(manifest.id(), name, "output", command.output())) {
+                    if (isInvalid(manifest.id(), name, "input", command.input(), ExtensionTools::inputSchemaError)
+                            || isInvalid(manifest.id(), name, "output", command.output(), ExtensionTools::schemaError)) {
                         return;
                     }
                     tools.add(new ExtensionTool(ExtensionManifestLoader.toolName(manifest.id(), name), manifest.id(),
@@ -261,8 +256,9 @@ public class ExtensionTools {
         return tools;
     }
 
-    private static boolean isInvalid(String extensionId, String commandName, String kind, Map<String, Object> schema) {
-        String error = schema == null ? null : schemaError(schema);
+    private static boolean isInvalid(String extensionId, String commandName, String kind, Map<String, Object> schema,
+                                     Function<Map<String, Object>, String> check) {
+        String error = schema == null ? null : check.apply(schema);
         if (error != null) {
             logger.warn("Extension {} command '{}' has no MCP tool: its {} schema is not in the JSON Schema 2020-12 subset "
                             + "that CALM Hub supports: {}",
@@ -308,7 +304,132 @@ public class ExtensionTools {
                     .orElse(result);
             return at(location(deepest)) + ": " + deepest.getError();
         }
-        return firstError(schema, "", (subschema, pointer) -> refError(schema, subschema, pointer));
+        error = firstError(schema, "", (subschema, pointer) -> refError(schema, subschema, pointer));
+        return error != null ? error : refDepthError(schema);
+    }
+
+    /**
+     * {@link #schemaError}, and also the error of a pattern that Hub cannot match in linear time, or
+     * of a schema for which {@link InputSchema} would change the meaning.
+     */
+    static String inputSchemaError(Map<String, Object> schema) {
+        String error = schemaError(schema);
+        return error != null ? error : linearPatternError(schema);
+    }
+
+    private static String linearPatternError(Map<String, Object> root) {
+        boolean[] patternProperties = {false};
+        String error = firstError(root, "", (subschema, pointer) -> {
+            if (subschema.get("pattern") instanceof String pattern) {
+                String reason = EcmaRegex.linearError(pattern);
+                if (reason != null) {
+                    return pointer + "/pattern: '" + shortened(pattern) + "' cannot be in an input schema: " + reason;
+                }
+            }
+            if (subschema.get("patternProperties") instanceof Map<?, ?> named) {
+                patternProperties[0] = true;
+                for (Object key : named.keySet()) {
+                    String reason = EcmaRegex.linearError(String.valueOf(key));
+                    if (reason != null) {
+                        return pointer + "/patternProperties: the key '" + shortened(String.valueOf(key))
+                                + "' cannot be in an input schema: " + reason;
+                    }
+                }
+            }
+            return null;
+        });
+        if (error != null || !patternProperties[0]) {
+            return error;
+        }
+        // Hub checks patternProperties outside vertx, so vertx cannot tell which properties they evaluate.
+        return firstError(root, "", (subschema, pointer) -> {
+            if (subschema.containsKey("unevaluatedProperties")) {
+                return pointer + "/unevaluatedProperties: CALM Hub does not support unevaluatedProperties in an input "
+                        + "schema that has patternProperties";
+            }
+            if (subschema.get("$ref") instanceof String ref && throughPatternProperties(root, localPointer(ref))) {
+                return pointer + "/$ref: '" + shortened(ref) + "' points into patternProperties, or into the "
+                        + "additionalProperties next to them, which CALM Hub does not support in an input schema";
+            }
+            return null;
+        });
+    }
+
+    // Hub moves these subschemas when it checks the input.
+    private static boolean throughPatternProperties(Map<String, Object> root, String pointer) {
+        if (pointer == null) {
+            return false;
+        }
+        Object value = root;
+        for (String token : pointer.isEmpty() ? new String[0] : pointer.substring(1).split("/", -1)) {
+            String keyword = unescape(token);
+            if (!(value instanceof Map<?, ?> schema)) {
+                return false;
+            }
+            if (keyword.equals("patternProperties")
+                    || (keyword.equals("additionalProperties") && schema.containsKey("patternProperties"))) {
+                return true;
+            }
+            value = schema.get(keyword);
+        }
+        return false;
+    }
+
+    /**
+     * The error of a schema that is nested more than {@link #MAX_SCHEMA_DEPTH} deep when each
+     * {@code $ref} is replaced by its target, as Ajv compiles it. A ref that leads back to a schema
+     * that the walk is in adds no depth: Ajv compiles that schema only once.
+     */
+    private static String refDepthError(Map<String, Object> root) {
+        try {
+            height(root, root, "", 1, new IdentityHashMap<>(), Collections.newSetFromMap(new IdentityHashMap<>()));
+            return null;
+        } catch (TooDeep e) {
+            return at(e.pointer) + ": the schema is nested more than " + MAX_SCHEMA_DEPTH + " objects and arrays deep "
+                    + "when its $refs are followed, which CALM Hub does not support";
+        }
+    }
+
+    // The number of levels from value down to its deepest value, with each $ref target one level below the ref.
+    private static int height(Map<String, Object> root, Object value, String pointer, int depth,
+                              Map<Object, Integer> heights, Set<Object> open) {
+        if (!(value instanceof Map || value instanceof List)) {
+            return 0;
+        }
+        Integer known = heights.get(value);
+        if (depth > MAX_SCHEMA_DEPTH || (known != null && depth + known - 1 > MAX_SCHEMA_DEPTH)) {
+            throw new TooDeep(pointer);
+        }
+        if (known != null || !open.add(value)) {
+            return known == null ? 0 : known;
+        }
+        int below = 0;
+        if (value instanceof List<?> list) {
+            for (int i = 0; i < list.size(); i++) {
+                below = Math.max(below, height(root, list.get(i), pointer + "/" + i, depth + 1, heights, open));
+            }
+        } else {
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                String here = pointer + "/" + escape(String.valueOf(entry.getKey()));
+                below = Math.max(below, height(root, entry.getValue(), here, depth + 1, heights, open));
+            }
+            // refError has checked that each ref is a local pointer to a subschema.
+            if (((Map<?, ?>) value).get("$ref") instanceof String ref && localPointer(ref) instanceof String target) {
+                below = Math.max(below, height(root, subschema(root, target), target, depth + 1, heights, open));
+            }
+        }
+        open.remove(value);
+        heights.put(value, below + 1);
+        return below + 1;
+    }
+
+    private static final class TooDeep extends RuntimeException {
+        private final String pointer;
+
+        TooDeep(String pointer) {
+            super(null, null, false, false);
+            this.pointer = pointer;
+        }
     }
 
     private static String location(OutputUnit error) {
@@ -571,17 +692,10 @@ public class ExtensionTools {
     private static String validate(ExtensionTool tool, JsonObject input) {
         OutputUnit result;
         try {
-            // vertx has no time limit on a pattern. A match that is in time here is in time there too.
-            if (!tool.inputValidator().matchesInTime(input)) {
-                logger.warn("Cannot check the input of MCP tool {}: a pattern match took more than {} ms", tool.name(),
-                        MATCH_TIME.toMillis());
-                return "Error: CALM Hub cannot check the input in time: a pattern of this command takes too long to "
-                        + "match the input.";
-            }
             result = tool.inputValidator().validate(input);
         } catch (RuntimeException | StackOverflowError e) {
-            // vertx-json-schema throws on some valid schemas, such as a pattern with \p{..}. java.util.regex
-            // recurses for each repeat, so a long argument can overflow the stack.
+            // vertx-json-schema throws on some valid schemas. Its format checks use java.util.regex, which recurses
+            // for each repeat, and it recurses for each level of the input, so a long or deep argument can overflow the stack.
             logger.warn("Cannot check the input of MCP tool {}: {}", tool.name(), e.toString());
             return "Error: CALM Hub cannot check the input against the schema of this command.";
         }
@@ -755,130 +869,174 @@ public class ExtensionTools {
     /**
      * MCP servers do not check arguments against the input schema, so Hub does. Local {@code $ref}s
      * resolve only once the schema is in a repository.
+     *
+     * <p>java.util.regex can take hours on some valid patterns, so vertx gets a copy of the schema with
+     * no patterns. Each {@code pattern} becomes a {@code format} in an added {@code allOf} entry, which
+     * Hub checks with RE2J in linear time. Each {@code patternProperties}, with the
+     * {@code additionalProperties} next to it, becomes such a format on the object.
+     * {@link #linearPatternError} refuses the schemas for which this changes the meaning.
      */
-    record InputSchema(SchemaRepository repository, String id, JsonSchemaOptions options, List<Pattern> patterns) {
+    record InputSchema(SchemaRepository repository, String id, JsonSchemaOptions options) {
 
         static InputSchema of(String extensionId, String commandName, Map<String, Object> input) {
             try {
-                JsonObject schema = new JsonObject(new LinkedHashMap<>(input)).copy();
                 String id = inputSchemaId(extensionId, commandName);
                 JsonSchemaOptions options = new JsonSchemaOptions()
                         .setDraft(Draft.DRAFT202012)
                         .setBaseUri(id)
                         .setOutputFormat(OutputFormat.Basic);
-                SchemaRepository repository = SchemaRepository.create(options);
-                repository.dereference(id, JsonSchema.of(schema));
-                return new InputSchema(repository, id, options, patterns(input));
+                LinearPatterns patterns = new LinearPatterns(options);
+                Map<String, Object> copy = patterns.copy(input);
+                patterns.addDefinitions(copy);
+                SchemaRepository repository = SchemaRepository.create(options, patterns::error);
+                repository.dereference(id, JsonSchema.of(new JsonObject(copy).copy()));
+                patterns.compile(repository);
+                return new InputSchema(repository, id, options);
             } catch (RuntimeException e) {
                 throw new IllegalStateException("CALM Hub cannot read its input schema: " + e.getMessage(), e);
             }
         }
 
-        // Compiled as vertx does.
-        private static List<Pattern> patterns(Map<String, Object> schema) {
-            Set<String> patterns = new LinkedHashSet<>();
-            firstError(schema, "", (subschema, pointer) -> {
-                if (subschema.get("pattern") instanceof String pattern) {
-                    patterns.add(pattern);
-                }
-                if (subschema.get("patternProperties") instanceof Map<?, ?> named) {
-                    named.keySet().forEach(key -> patterns.add(String.valueOf(key)));
-                }
-                return null;
-            });
-            return patterns.stream().map(Pattern::compile).toList();
-        }
-
         OutputUnit validate(JsonObject instance) {
             return repository.validator(id, options).validate(instance);
         }
+    }
 
-        /**
-         * False if a pattern of the schema does not finish a match on a string or a property name of
-         * the input in time. This tries each pattern on each string, also where the schema does not
-         * apply it, so the time of the match in {@link #validate} is no longer.
-         */
-        boolean matchesInTime(JsonObject instance) {
-            if (patterns.isEmpty()) {
-                return true;
+    /** The patterns of one input schema, which Hub matches with RE2J through vertx {@code format} checks. */
+    static final class LinearPatterns {
+
+        // A user format can never have this prefix, because it is new for each schema.
+        private final String prefix = "calm-hub-" + UUID.randomUUID() + "-";
+        private final JsonSchemaOptions options;
+        private final List<Function<Object, String>> checks = new ArrayList<>();
+        private final List<Map<String, Object>> definitions = new ArrayList<>();
+        private final List<String> definitionNames = new ArrayList<>();
+        private final List<Validator> validators = new ArrayList<>();
+
+        LinearPatterns(JsonSchemaOptions options) {
+            this.options = options;
+        }
+
+        /** A copy of a published schema with no pattern keywords. */
+        Map<String, Object> copy(Map<String, Object> schema) {
+            Map<String, Object> copy = mapSubschemas(schema, this::copy);
+            List<Object> added = new ArrayList<>();
+            if (copy.remove("pattern") instanceof String pattern) {
+                added.add(format(pattern(pattern)));
             }
-            long callDeadline = System.nanoTime() + CALL_MATCH_TIME.toNanos();
-            Deque<Object> values = new ArrayDeque<>(List.of(instance));
-            try {
-                while (!values.isEmpty()) {
-                    Object value = values.pop();
-                    if (value instanceof JsonObject object) {
-                        value = object.getMap();
-                    } else if (value instanceof JsonArray array) {
-                        value = array.getList();
-                    }
-                    if (value instanceof Map<?, ?> map) {
-                        for (Map.Entry<?, ?> entry : map.entrySet()) {
-                            match(String.valueOf(entry.getKey()), callDeadline);
-                            if (entry.getValue() != null) {
-                                values.push(entry.getValue());
+            if (copy.get("patternProperties") instanceof Map<?, ?> named) {
+                copy.remove("patternProperties");
+                Object additional = copy.remove("additionalProperties");
+                Set<String> properties = copy.get("properties") instanceof Map<?, ?> map
+                        ? map.keySet().stream().map(String::valueOf).collect(Collectors.toSet()) : Set.of();
+                List<Map.Entry<com.google.re2j.Pattern, Integer>> entries = new ArrayList<>();
+                named.forEach((key, subschema) -> entries.add(Map.entry(EcmaRegex.linear(String.valueOf(key)),
+                        definition(asMap(subschema)))));
+                Integer additionalIndex = additional instanceof Map<?, ?> map ? definition(asMap(map)) : null;
+                added.add(format(patternProperties(entries, properties, additional, additionalIndex)));
+            }
+            if (!added.isEmpty()) {
+                List<Object> allOf = new ArrayList<>(copy.get("allOf") instanceof List<?> existing ? existing : List.of());
+                allOf.addAll(added);
+                copy.put("allOf", allOf);
+            }
+            return copy;
+        }
+
+        @SuppressWarnings("unchecked")
+        private static Map<String, Object> asMap(Object subschema) {
+            return (Map<String, Object>) subschema;
+        }
+
+        private Map<String, Object> format(Function<Object, String> check) {
+            checks.add(check);
+            return Map.of("format", prefix + (checks.size() - 1));
+        }
+
+        private static Function<Object, String> pattern(String pattern) {
+            com.google.re2j.Pattern regex = EcmaRegex.linear(pattern);
+            return instance -> instance instanceof String text && !regex.matcher(text).find()
+                    ? "String does not match pattern" : null;
+        }
+
+        private Function<Object, String> patternProperties(List<Map.Entry<com.google.re2j.Pattern, Integer>> entries,
+                                                           Set<String> properties, Object additional,
+                                                           Integer additionalIndex) {
+            return instance -> {
+                if (!(instance instanceof JsonObject object)) {
+                    return null;
+                }
+                for (String key : object.fieldNames()) {
+                    boolean matched = false;
+                    for (Map.Entry<com.google.re2j.Pattern, Integer> entry : entries) {
+                        if (entry.getKey().matcher(key).find()) {
+                            matched = true;
+                            String error = error(validators.get(entry.getValue()), object.getValue(key));
+                            if (error != null) {
+                                return "Property \"" + key + "\" matches pattern \"" + entry.getKey().pattern()
+                                        + "\" but does not match associated schema: " + error;
                             }
                         }
-                    } else if (value instanceof List<?> list) {
-                        list.stream().filter(Objects::nonNull).forEach(values::push);
-                    } else if (value instanceof String text) {
-                        match(text, callDeadline);
+                    }
+                    if (matched || properties.contains(key) || additional == null || Boolean.TRUE.equals(additional)) {
+                        continue;
+                    }
+                    String error = additionalIndex == null ? "it is not allowed"
+                            : error(validators.get(additionalIndex), object.getValue(key));
+                    if (error != null) {
+                        return "Property \"" + key + "\" does not match additional properties schema: " + error;
                     }
                 }
-                return true;
-            } catch (MatchTimeout e) {
-                return false;
+                return null;
+            };
+        }
+
+        private static String error(Validator validator, Object value) {
+            OutputUnit result = validator.validate(value);
+            if (Boolean.TRUE.equals(result.getValid())) {
+                return null;
+            }
+            List<OutputUnit> errors = result.getErrors() == null || result.getErrors().isEmpty()
+                    ? List.of(result) : result.getErrors();
+            // The last error is the deepest.
+            return errors.get(errors.size() - 1).getError();
+        }
+
+        private int definition(Map<String, Object> subschema) {
+            definitions.add(subschema);
+            return definitions.size() - 1;
+        }
+
+        /** Adds the moved subschemas to the root {@code $defs}, so that their local refs still resolve. */
+        void addDefinitions(Map<String, Object> root) {
+            if (definitions.isEmpty()) {
+                return;
+            }
+            Map<String, Object> defs = new LinkedHashMap<>(root.get("$defs") instanceof Map<?, ?> existing
+                    ? asMap(existing) : Map.of());
+            int next = 0;
+            for (Map<String, Object> definition : definitions) {
+                String name;
+                do {
+                    name = "calm-hub-" + next++;
+                } while (defs.containsKey(name));
+                defs.put(name, definition);
+                definitionNames.add(name);
+            }
+            root.put("$defs", defs);
+        }
+
+        void compile(SchemaRepository repository) {
+            for (String name : definitionNames) {
+                validators.add(repository.validator(JsonSchema.of(new JsonObject().put("$ref", options.getBaseUri() + "#/$defs/" + name)), options));
             }
         }
 
-        private void match(String text, long callDeadline) {
-            long deadline = Math.min(System.nanoTime() + MATCH_TIME.toNanos(), callDeadline);
-            for (Pattern pattern : patterns) {
-                pattern.matcher(new DeadlineText(text, deadline)).find();
+        String error(String instanceType, String format, Object instance) {
+            if (format == null || !format.startsWith(prefix)) {
+                return null;
             }
-        }
-    }
-
-    private static final class MatchTimeout extends RuntimeException {
-        MatchTimeout() {
-            super(null, null, false, false);
-        }
-    }
-
-    /** Text that throws {@link MatchTimeout} once the deadline passes, so a slow match stops. */
-    static final class DeadlineText implements CharSequence {
-        // System.nanoTime() on each charAt would slow each match.
-        private static final int CHECK_EVERY = 1024;
-        private final String text;
-        private final long deadline;
-        private int reads;
-
-        DeadlineText(String text, long deadline) {
-            this.text = text;
-            this.deadline = deadline;
-        }
-
-        @Override
-        public char charAt(int index) {
-            if (++reads % CHECK_EVERY == 0 && System.nanoTime() - deadline > 0) {
-                throw new MatchTimeout();
-            }
-            return text.charAt(index);
-        }
-
-        @Override
-        public int length() {
-            return text.length();
-        }
-
-        @Override
-        public CharSequence subSequence(int start, int end) {
-            return new DeadlineText(text.substring(start, end), deadline);
-        }
-
-        @Override
-        public String toString() {
-            return text;
+            return checks.get(Integer.parseInt(format.substring(prefix.length()))).apply(instance);
         }
     }
 }

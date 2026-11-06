@@ -26,11 +26,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.UnaryOperator;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -340,6 +342,40 @@ class TestExtensionToolsShould {
         assertThat(ExtensionTools.schemaError(nestedProperties(32)), containsString("nested more than 64"));
     }
 
+    @Test
+    void count_each_ref_hop_in_the_depth_limit() {
+        // Each hop adds 3 levels: properties, a and the target.
+        assertThat(ExtensionTools.schemaError(refChain(20, next -> Map.of("properties", Map.of("a", next)))), nullValue());
+        assertThat(ExtensionTools.schemaError(refChain(21, next -> Map.of("properties", Map.of("a", next)))),
+                is("/$defs/d20/properties: the schema is nested more than 64 objects and arrays deep when its $refs are "
+                        + "followed, which CALM Hub does not support"));
+        for (UnaryOperator<Map<String, Object>> shape : List.<UnaryOperator<Map<String, Object>>>of(
+                next -> Map.of("type", "object", "properties", Map.of("a", next)),
+                next -> Map.of("items", next),
+                next -> Map.of("not", next),
+                next -> next)) {
+            assertThat(ExtensionTools.schemaError(refChain(250, shape)), containsString("when its $refs are followed"));
+        }
+        // A recursive schema adds no depth for each loop.
+        assertThat(ExtensionTools.schemaError(Map.of("$ref", "#/$defs/node", "$defs", Map.of("node", Map.of("type", "object",
+                "properties", Map.of("children", Map.of("type", "array", "items", Map.of("$ref", "#/$defs/node"))))))),
+                nullValue());
+    }
+
+    // A root whose property a refs d0, each di holding a ref to d(i+1) in the given shape, and d(hops) a string.
+    private static Map<String, Object> refChain(int hops, UnaryOperator<Map<String, Object>> shape) {
+        Map<String, Object> defs = new LinkedHashMap<>();
+        for (int i = 0; i < hops; i++) {
+            defs.put("d" + i, shape.apply(Map.of("$ref", "#/$defs/d" + (i + 1))));
+        }
+        defs.put("d" + hops, Map.of("type", "string"));
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("type", "object");
+        root.put("properties", Map.of("a", Map.of("$ref", "#/$defs/d0")));
+        root.put("$defs", defs);
+        return root;
+    }
+
     private static Map<String, Object> nestedProperties(int levels) {
         Map<String, Object> schema = Map.of("type", "string");
         for (int i = 0; i < levels; i++) {
@@ -491,7 +527,7 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void refuse_an_argument_that_overflows_the_stack_of_the_pattern_check() {
+    void match_a_long_argument_that_overflows_the_stack_of_java_util_regex() {
         ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
         Map<String, Object> input = Map.of("type", "object",
                 "properties", Map.of("text", Map.of("type", "string", "pattern", "^(a|b)*$")));
@@ -499,11 +535,13 @@ class TestExtensionToolsShould {
                 Map.of("c", new ExtensionManifest.Command("r", "C", input, null, null, null)), null);
         ExtensionTools.ExtensionTool command = ExtensionTools.tools(List.of(manifest)).getFirst();
 
-        ToolResponse response = extensionTools.call(command, Map.of("text", "ab".repeat(1_000_000)));
+        when(proxyService.call(any(), any())).thenReturn(reply(200, "{}"));
 
-        assertThat(response.isError(), is(true));
-        assertThat(text(response), is("Error: CALM Hub cannot check the input against the schema of this command."));
-        verify(proxyService, never()).call(any(), any());
+        ToolResponse ok = extensionTools.call(command, Map.of("text", "ab".repeat(1_000_000)));
+        ToolResponse refused = extensionTools.call(command, Map.of("text", "ab".repeat(1_000_000) + "c"));
+
+        assertThat(ok.isError(), is(false));
+        assertThat(text(refused), containsString("/text: String does not match pattern"));
     }
 
     @Test
@@ -519,23 +557,23 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void stop_a_pattern_match_that_takes_too_long() throws Exception {
+    void match_the_input_against_slow_patterns_in_linear_time() throws Exception {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            long start = System.nanoTime();
-            ToolResponse slow = executor.submit(() -> extensionTools.call(tool("slow-pattern"),
-                    Map.of("namespace", "finos", "text", "a".repeat(60) + "!"))).get(10, TimeUnit.SECONDS);
+            String text = "a".repeat(100_000) + "!";
+            for (String property : List.of("text", "empty", "choice")) {
+                long start = System.nanoTime();
+                ToolResponse slow = executor.submit(() -> extensionTools.call(tool("slow-pattern"),
+                        Map.of("namespace", "finos", property, text))).get(10, TimeUnit.SECONDS);
 
-            assertThat(slow.isError(), is(true));
-            assertThat(text(slow), is("Error: CALM Hub cannot check the input in time: a pattern of this command takes too "
-                    + "long to match the input."));
-            assertThat(Duration.ofNanos(System.nanoTime() - start).toMillis() < 5_000, is(true));
+                assertThat(property, text(slow), containsString("\n- /" + property + ": String does not match pattern"));
+                assertThat(property, Duration.ofNanos(System.nanoTime() - start).toMillis() < 5_000, is(true));
+            }
             verify(proxyService, never()).call(any(), any());
 
-            // The same thread is free for the next call.
             when(proxyService.call(any(), any())).thenReturn(reply(200, "{}"));
             ToolResponse fast = executor.submit(() -> extensionTools.call(tool("slow-pattern"),
-                    Map.of("namespace", "finos", "text", "a".repeat(12)))).get(5, TimeUnit.SECONDS);
+                    Map.of("namespace", "finos", "text", "a".repeat(12), "choice", "aab"))).get(5, TimeUnit.SECONDS);
             assertThat(fast.isError(), is(false));
         } finally {
             executor.shutdownNow();
@@ -543,34 +581,88 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void match_the_patterns_against_property_names_and_nested_strings() {
-        ExtensionTools.InputSchema schema = tool("slow-pattern").inputValidator();
-        String slow = "a".repeat(60) + "!";
+    void check_pattern_properties_and_the_additional_properties_next_to_them() {
+        ExtensionTools.InputSchema schema = ExtensionTools.InputSchema.of("x", "c", ExtensionTools.published(Map.of(
+                "type", "object",
+                "properties", Map.of("name", Map.of("type", "string")),
+                "patternProperties", Map.of("^x-", Map.of("$ref", "#/$defs/count"), "^(.*a){12}$", Map.of("type", "string")),
+                "additionalProperties", false,
+                "propertyNames", Map.of("pattern", "^[a-z-]+$"),
+                "$defs", Map.of("count", Map.of("type", "integer")))));
+        String slow = "a".repeat(100_000);
 
-        assertThat(schema.matchesInTime(new JsonObject().put("namespace", "finos").put("text", "a".repeat(12))), is(true));
-        assertThat(schema.matchesInTime(new JsonObject().put(slow, 1)), is(false));
-        assertThat(schema.matchesInTime(new JsonObject().put("x", new JsonArray().add(new JsonObject().put("y", slow)))),
-                is(false));
-        assertThat(schema.matchesInTime(new JsonObject().put("x", new JsonArray().addNull()).putNull("y")), is(true));
-        assertThat(tool("get-service").inputValidator().matchesInTime(new JsonObject().put("service", slow)), is(true));
+        assertThat(schema.validate(new JsonObject().put("name", "n").put("x-a", 1).put(slow, "s")).getValid(), is(true));
+        assertThat(schema.validate(new JsonObject().put("x-a", "1")).getValid(), is(false));
+        assertThat(schema.validate(new JsonObject().put(slow, 1)).getValid(), is(false));
+        assertThat(schema.validate(new JsonObject().put("other", 1)).getValid(), is(false));
+        assertThat(schema.validate(new JsonObject().put("X", 1)).getValid(), is(false));
+
+        ExtensionTools.InputSchema open = ExtensionTools.InputSchema.of("x", "c", Map.of(
+                "patternProperties", Map.of("^x-", Map.of("type", "integer")),
+                "additionalProperties", Map.of("type", "string"),
+                "items", Map.of("pattern", "^a")));
+        assertThat(open.validate(new JsonObject().put("x-a", 1).put("b", "s")).getValid(), is(true));
+        assertThat(open.validate(new JsonObject().put("b", 1)).getValid(), is(false));
+        assertThat(open.validate(new JsonObject().put("x-a", "s")).getValid(), is(false));
     }
 
     @Test
-    void stop_reading_text_after_its_deadline() {
-        CharSequence late = new ExtensionTools.DeadlineText("abc", System.nanoTime() - 1);
-        CharSequence open = new ExtensionTools.DeadlineText("abc", System.nanoTime() + Duration.ofMinutes(1).toNanos());
+    void keep_the_meaning_of_a_pattern_under_any_applicator() {
+        ExtensionTools.InputSchema schema = ExtensionTools.InputSchema.of("x", "c", Map.of(
+                "properties", Map.of(
+                        "a", Map.of("anyOf", List.of(Map.of("pattern", "^x"), Map.of("pattern", "^y"))),
+                        "b", Map.of("not", Map.of("pattern", "^z")),
+                        "c", Map.of("if", Map.of("pattern", "^1"), "then", Map.of("maxLength", 1)),
+                        "d", Map.of("pattern", "^d", "allOf", List.of(Map.of("minLength", 2))))));
 
-        assertThat(open.length(), is(3));
-        assertThat(open.subSequence(1, 3).toString(), is("bc"));
-        assertThat(open.toString(), is("abc"));
-        assertThrows(RuntimeException.class, () -> {
-            for (int i = 0; i < 2048; i++) {
-                late.charAt(i % 3);
-            }
-        });
-        for (int i = 0; i < 2048; i++) {
-            open.charAt(i % 3);
-        }
+        assertThat(schema.validate(new JsonObject().put("a", "y").put("b", "a").put("c", "1").put("d", "dd")).getValid(), is(true));
+        assertThat(schema.validate(new JsonObject().put("a", "z")).getValid(), is(false));
+        assertThat(schema.validate(new JsonObject().put("b", "zz")).getValid(), is(false));
+        assertThat(schema.validate(new JsonObject().put("c", "12")).getValid(), is(false));
+        assertThat(schema.validate(new JsonObject().put("c", "22")).getValid(), is(true));
+        assertThat(schema.validate(new JsonObject().put("d", "d")).getValid(), is(false));
+        assertThat(schema.validate(new JsonObject().put("d", "ed")).getValid(), is(false));
+    }
+
+    @Test
+    void refuse_an_input_pattern_that_has_no_linear_time_form() {
+        String lookahead = "(?:|)".repeat(40) + "(?!)";
+
+        assertThat(ExtensionTools.inputSchemaError(Map.of("properties", Map.of("a", Map.of("pattern", lookahead)))),
+                is("/properties/a/pattern: '" + lookahead.substring(0, 60) + "...' cannot be in an input schema: it has a "
+                        + "lookahead, which CALM Hub cannot match in linear time"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("patternProperties", Map.of("(a)\\1", Map.of()))),
+                is("/patternProperties: the key '(a)\\1' cannot be in an input schema: it has a back reference, which "
+                        + "CALM Hub cannot match in linear time"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "(?<=a)b")), containsString("it has a lookbehind"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "[\\S]")), containsString("\\S in a character class"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "\\p{ASCII}")), containsString("the property \\p{ASCII}"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "a{1001}")), containsString("invalid repeat count"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("pattern", "(?i)a")), containsString("not an ECMA-262"));
+        // Output schemas keep the ECMA-262 rules.
+        assertThat(ExtensionTools.schemaError(Map.of("pattern", lookahead)), nullValue());
+        assertThat(ExtensionTools.inputSchemaError(Map.of("properties", Map.of("a", Map.of("pattern", "^(.*a){12}$")))),
+                nullValue());
+    }
+
+    @Test
+    void refuse_an_input_schema_whose_pattern_properties_vertx_cannot_see() {
+        Map<String, Object> patternProperties = Map.of("x-", Map.of("type", "integer"));
+
+        assertThat(ExtensionTools.inputSchemaError(Map.of("patternProperties", patternProperties,
+                        "allOf", List.of(Map.of("unevaluatedProperties", false)))),
+                is("/allOf/0/unevaluatedProperties: CALM Hub does not support unevaluatedProperties in an input schema "
+                        + "that has patternProperties"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("patternProperties", patternProperties,
+                        "properties", Map.of("a", Map.of("$ref", "#/patternProperties/x-")))),
+                containsString("/properties/a/$ref: '#/patternProperties/x-' points into patternProperties"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("patternProperties", patternProperties,
+                        "additionalProperties", Map.of("type", "string"),
+                        "properties", Map.of("a", Map.of("$ref", "#/additionalProperties")))),
+                containsString("points into patternProperties, or into the additionalProperties next to them"));
+        assertThat(ExtensionTools.inputSchemaError(Map.of("additionalProperties", Map.of("type", "string"),
+                "properties", Map.of("a", Map.of("$ref", "#/additionalProperties")))), nullValue());
+        assertThat(ExtensionTools.inputSchemaError(Map.of("unevaluatedProperties", false)), nullValue());
     }
 
     @Test

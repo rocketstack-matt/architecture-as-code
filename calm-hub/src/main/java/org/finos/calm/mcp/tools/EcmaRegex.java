@@ -1,8 +1,11 @@
 package org.finos.calm.mcp.tools;
 
+import com.google.re2j.PatternSyntaxException;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -12,6 +15,9 @@ import java.util.regex.Pattern;
  * possessive quantifiers and {@code \A} that ECMA-262 refuses. The check is strict: it can refuse a
  * rare valid pattern, but it must never accept one that a client cannot compile. The limits keep
  * the parsers of Hub, java.util.regex and the clients well inside their stacks.
+ *
+ * <p>The parser also writes the pattern in RE2 syntax, so that Hub can match caller input in linear
+ * time. Lookarounds, back references and some properties have no RE2 form with the same meaning.
  */
 final class EcmaRegex {
 
@@ -44,6 +50,27 @@ final class EcmaRegex {
             "Unified_Ideograph", "UIdeo", "Uppercase", "Upper", "Variation_Selector", "VS", "White_Space", "space",
             "XID_Continue", "XIDC", "XID_Start", "XIDS");
     private static final Pattern SCRIPT_CODE = Pattern.compile("[A-Z][a-z]{3}");
+    // RE2 names of the general categories that RE2J has with the same members. RE2's C has no Cn, and it has no LC.
+    private static final Map<String, String> CATEGORY_NAMES = Map.ofEntries(Map.entry("Control", "Cc"),
+            Map.entry("cntrl", "Cc"), Map.entry("Format", "Cf"), Map.entry("Private_Use", "Co"), Map.entry("Surrogate", "Cs"),
+            Map.entry("Letter", "L"), Map.entry("Lowercase_Letter", "Ll"), Map.entry("Modifier_Letter", "Lm"),
+            Map.entry("Other_Letter", "Lo"), Map.entry("Titlecase_Letter", "Lt"), Map.entry("Uppercase_Letter", "Lu"),
+            Map.entry("Mark", "M"), Map.entry("Combining_Mark", "M"), Map.entry("Spacing_Mark", "Mc"),
+            Map.entry("Enclosing_Mark", "Me"), Map.entry("Nonspacing_Mark", "Mn"), Map.entry("Number", "N"),
+            Map.entry("Decimal_Number", "Nd"), Map.entry("digit", "Nd"), Map.entry("Letter_Number", "Nl"),
+            Map.entry("Other_Number", "No"), Map.entry("Punctuation", "P"), Map.entry("punct", "P"),
+            Map.entry("Connector_Punctuation", "Pc"), Map.entry("Dash_Punctuation", "Pd"),
+            Map.entry("Close_Punctuation", "Pe"), Map.entry("Final_Punctuation", "Pf"),
+            Map.entry("Initial_Punctuation", "Pi"), Map.entry("Other_Punctuation", "Po"),
+            Map.entry("Open_Punctuation", "Ps"), Map.entry("Symbol", "S"), Map.entry("Currency_Symbol", "Sc"),
+            Map.entry("Modifier_Symbol", "Sk"), Map.entry("Math_Symbol", "Sm"), Map.entry("Other_Symbol", "So"),
+            Map.entry("Separator", "Z"), Map.entry("Line_Separator", "Zl"), Map.entry("Paragraph_Separator", "Zp"),
+            Map.entry("Space_Separator", "Zs"));
+    private static final Set<String> UNSUPPORTED_CATEGORIES = Set.of("C", "Other", "Cn", "Unassigned", "LC", "Cased_Letter");
+    // ECMA-262 WhiteSpace and LineTerminator. RE2's \s has only ASCII spaces.
+    private static final String SPACES = "\\x{9}-\\x{D}\\x{20}\\x{A0}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}"
+            + "\\x{202F}\\x{205F}\\x{3000}\\x{FEFF}";
+    private static final String ALL = "\\x{0}-\\x{10FFFF}";
 
     private final int[] chars;
     private int pos;
@@ -52,6 +79,11 @@ final class EcmaRegex {
     private final Set<String> names = new HashSet<>();
     private final List<String> namedRefs = new ArrayList<>();
     private int maxRef;
+    private final StringBuilder re2 = new StringBuilder();
+    // The first reason that the pattern has no RE2 form with the same meaning.
+    private String notLinear;
+    // The RE2 form of the last class escape.
+    private String classEscape;
 
     private EcmaRegex(String pattern) {
         chars = pattern.codePoints().toArray();
@@ -67,6 +99,38 @@ final class EcmaRegex {
             return null;
         } catch (IllegalArgumentException e) {
             return e.getMessage();
+        }
+    }
+
+    /** Null if {@link #linear} matches the pattern with its ECMA-262 meaning, else the reason. */
+    static String linearError(String pattern) {
+        String error = error(pattern);
+        if (error != null) {
+            return error;
+        }
+        EcmaRegex regex = new EcmaRegex(pattern);
+        regex.parse();
+        if (regex.notLinear != null) {
+            return regex.notLinear + ", which CALM Hub cannot match in linear time";
+        }
+        try {
+            com.google.re2j.Pattern.compile(regex.re2.toString());
+            return null;
+        } catch (PatternSyntaxException e) {
+            return "CALM Hub cannot match it in linear time: " + e.getDescription();
+        }
+    }
+
+    /** The pattern compiled for RE2J. Call only if {@link #linearError} is null. */
+    static com.google.re2j.Pattern linear(String pattern) {
+        EcmaRegex regex = new EcmaRegex(pattern);
+        regex.parse();
+        return com.google.re2j.Pattern.compile(regex.re2.toString());
+    }
+
+    private void notLinear(String reason) {
+        if (notLinear == null) {
+            notLinear = reason;
         }
     }
 
@@ -89,6 +153,7 @@ final class EcmaRegex {
         alternative();
         while (peek() == '|') {
             pos++;
+            re2.append('|');
             alternative();
         }
     }
@@ -102,9 +167,13 @@ final class EcmaRegex {
     private void term() {
         int c = peek();
         if (c == '^' || c == '$') {
+            // With no m flag, in both: only the start and the end of the text.
+            re2.appendCodePoint(c);
             pos++;
             noQuantifier();
         } else if (c == '\\' && (peek(1) == 'b' || peek(1) == 'B')) {
+            // ASCII word characters in both, with the u flag and no i flag.
+            re2.append('\\').appendCodePoint(peek(1));
             pos += 2;
             noQuantifier();
         } else if (c == '(') {
@@ -120,6 +189,7 @@ final class EcmaRegex {
             throw fail("groups are nested more than " + MAX_DEPTH + " deep");
         }
         if (startsWith("(?=") || startsWith("(?!") || startsWith("(?<=") || startsWith("(?<!")) {
+            notLinear(peek(2) == '<' ? "it has a lookbehind" : "it has a lookahead");
             pos += peek(2) == '<' ? 4 : 3;
             disjunction();
             expect(')');
@@ -142,8 +212,11 @@ final class EcmaRegex {
             pos++;
             groups++;
         }
+        // A match only tells if the text matches, so no group must capture.
+        re2.append("(?:");
         disjunction();
         expect(')');
+        re2.append(')');
         depth--;
         quantifier();
     }
@@ -155,11 +228,16 @@ final class EcmaRegex {
             case '\\' -> atomEscape();
             case '*', '+', '?', '{' -> throw fail("nothing to repeat");
             case ']', '}' -> throw fail("a lone " + (char) c + " must be escaped");
-            default -> pos++;
+            case '.' -> {
+                pos++;
+                re2.append("[^\\n\\r\\x{2028}\\x{2029}]");
+            }
+            default -> literal(next(), false);
         }
     }
 
     private void quantifier() {
+        int start = pos;
         int c = peek();
         if (c == '*' || c == '+' || c == '?') {
             pos++;
@@ -173,6 +251,10 @@ final class EcmaRegex {
         }
         if (isQuantifier(peek())) {
             throw fail("nothing to repeat (ECMA-262 has no possessive quantifiers)");
+        }
+        // Only ASCII digits, commas, braces and quantifier characters, which RE2 reads the same.
+        for (int i = start; i < pos; i++) {
+            re2.appendCodePoint(chars[i]);
         }
     }
 
@@ -216,22 +298,37 @@ final class EcmaRegex {
         pos++;
         int c = peek();
         if (c >= '1' && c <= '9') {
+            notLinear("it has a back reference");
             long ref = digits();
             maxRef = (int) Math.max(maxRef, ref);
         } else if (c == 'k') {
+            notLinear("it has a back reference");
             pos++;
             expect('<');
             namedRefs.add(groupName());
         } else {
-            escape(false);
+            int value = escape(false);
+            if (value >= 0) {
+                literal(value, false);
+            } else {
+                re2.append(classEscape);
+            }
         }
     }
 
     private void characterClass() {
         pos++;
-        if (peek() == '^') {
+        boolean negated = peek() == '^';
+        if (negated) {
             pos++;
         }
+        // RE2 has no empty class, so [] and [^] name all code points.
+        if (peek() == ']') {
+            pos++;
+            re2.append(negated ? "[" : "[^").append(ALL).append(']');
+            return;
+        }
+        re2.append(negated ? "[^" : "[");
         while (peek() != ']') {
             if (atEnd()) {
                 throw fail("unterminated character class");
@@ -249,18 +346,41 @@ final class EcmaRegex {
                 if (from > to) {
                     throw fail("the class range is out of order");
                 }
+                literal(from, true);
+                re2.append('-');
+                literal(to, true);
+            } else if (from >= 0) {
+                literal(from, true);
+            } else if (classEscape.startsWith("[")) {
+                // \S: RE2 has no class in a class.
+                notLinear("it has \\S in a character class");
+            } else {
+                re2.append(classEscape);
             }
         }
         pos++;
+        re2.append(']');
     }
 
     // The code point, or -1 for a class escape such as \d.
     private int classAtom() {
         if (peek() == '\\') {
             pos++;
-            return escape(true);
+            int value = escape(true);
+            if (value < 0 && classEscape.equals("[" + SPACES + "]")) {
+                classEscape = SPACES;
+            }
+            return value;
         }
         return next();
+    }
+
+    private void literal(int c, boolean inClass) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (!inClass && c == '-')) {
+            re2.appendCodePoint(c);
+        } else {
+            re2.append("\\x{").append(Integer.toHexString(c)).append('}');
+        }
     }
 
     // After the backslash. The code point, or -1 for a class escape.
@@ -271,11 +391,21 @@ final class EcmaRegex {
         int start = pos - 1;
         int c = next();
         switch (c) {
-            case 'd', 'D', 's', 'S', 'w', 'W' -> {
+            case 'd', 'D', 'w', 'W' -> {
+                // ASCII in both, with the u flag and no i flag.
+                classEscape = "\\" + (char) c;
+                return -1;
+            }
+            case 's' -> {
+                classEscape = "[" + SPACES + "]";
+                return -1;
+            }
+            case 'S' -> {
+                classEscape = "[^" + SPACES + "]";
                 return -1;
             }
             case 'p', 'P' -> {
-                property();
+                classEscape = "\\" + (char) c + "{" + property() + "}";
                 return -1;
             }
             case 'f' -> {
@@ -360,7 +490,8 @@ final class EcmaRegex {
         return value;
     }
 
-    private void property() {
+    // The RE2 name of the property.
+    private String property() {
         int start = pos - 2;
         if (peek() != '{') {
             throw failAt(start, "\\p and \\P must be followed by {");
@@ -377,20 +508,36 @@ final class EcmaRegex {
         String expression = sb.toString();
         int equals = expression.indexOf('=');
         boolean valid;
+        String category = expression;
+        String script = null;
         if (equals < 0) {
             valid = GENERAL_CATEGORIES.contains(expression) || BINARY_PROPERTIES.contains(expression);
         } else {
             String name = expression.substring(0, equals);
             String value = expression.substring(equals + 1);
+            category = value;
             valid = switch (name) {
                 case "General_Category", "gc" -> GENERAL_CATEGORIES.contains(value);
-                case "Script", "sc", "Script_Extensions", "scx" -> isScript(value);
+                case "Script", "sc", "Script_Extensions", "scx" -> {
+                    category = null;
+                    // Script_Extensions has more members than the script.
+                    script = name.startsWith("Script_") || name.equals("scx") ? null : value;
+                    yield isScript(value);
+                }
                 default -> false;
             };
         }
         if (!valid) {
             throw failAt(start, "\\p{" + expression + "} is not an ECMA-262 Unicode property");
         }
+        if (script != null && !SCRIPT_CODE.matcher(script).matches()) {
+            return script;
+        }
+        if (category != null && GENERAL_CATEGORIES.contains(category) && !UNSUPPORTED_CATEGORIES.contains(category)) {
+            return CATEGORY_NAMES.getOrDefault(category, category);
+        }
+        notLinear("it has the property \\p{" + expression + "}");
+        return "L";
     }
 
     // ECMA-262 names are case-sensitive: the Unicode name (Old_Italic) or the ISO 15924 code (Ital).

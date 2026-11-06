@@ -204,15 +204,17 @@ class TestExtensionToolsMcpShould {
 
     @Test
     @TestSecurity(user = "alice")
-    void return_a_tool_error_when_a_pattern_match_takes_too_long() {
+    void match_slow_patterns_in_linear_time() {
         when(mockUserAccessStore.getGrantsForUser("alice"))
                 .thenReturn(List.of(new UserAccess("alice", UserAccess.Permission.read, "finos")));
 
-        JsonObject result = callTool("ext_mcp-test_slow-pattern",
-                new JsonObject().put("namespace", "finos").put("text", "a".repeat(60) + "!"));
+        JsonObject result = callTool("ext_mcp-test_slow-pattern", new JsonObject().put("namespace", "finos")
+                .put("text", "a".repeat(100_000) + "!").put("empty", "a".repeat(100_000)).put("choice", "a".repeat(100_000)));
 
         assertThat(result.getBoolean("isError"), is(true));
-        assertThat(text(result), containsString("cannot check the input in time"));
+        assertThat(text(result), containsString("/text: String does not match pattern"));
+        assertThat(text(result), containsString("/empty: String does not match pattern"));
+        assertThat(text(result), containsString("/choice: String does not match pattern"));
         assertThat(backend.received(), nullValue());
         backend.reply(FixtureBackend.Reply.json(200, "{}"));
         JsonObject next = callTool("ext_mcp-test_slow-pattern", new JsonObject().put("namespace", "finos").put("text", "a".repeat(12)));
