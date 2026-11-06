@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { DecoratorOverlayContext } from '../../../context/DecoratorOverlayContext.js';
+import { fakeDecorator, fakeView } from '../../../../test-support/fake-overlays.js';
+import { extensionMarkerColour } from '../../../../extensions/extensionIdentity.js';
 import { OverlayBadge, OverlayEdgeBadge } from './OverlayBadge.js';
 import { OVERLAY_STYLES, overlayOutline } from './overlayStyle.js';
 import { BUILTIN_DECORATOR_VIEWS } from '../../../../test-support/decorator-views.js';
@@ -46,5 +49,82 @@ describe('overlayOutline', () => {
         expect(overlayOutline('ok')).toBeUndefined();
         expect(overlayOutline('info')).toBeUndefined();
         expect(overlayOutline(undefined)).toBeUndefined();
+    });
+});
+
+describe('OverlayBadge details', () => {
+    const view = fakeView('release-tracker', 'release-risk', 'Release tracker');
+    const entry = (id: string, value: string, status: OverlayStatus) => ({
+        decorator: fakeDecorator(id, {}),
+        value,
+        status,
+        label: `Summary ${id}`,
+        time: '2026-11-06T10:00:00Z',
+    });
+    const riskShown = { view, overlay: { status: 'error' as const, value: 'high', entries: [entry('d1', 'high', 'error'), entry('d2', 'low', 'ok')] } };
+
+    function renderBadge(onOpenView = vi.fn(), onNodeClick = vi.fn()) {
+        render(
+            <DecoratorOverlayContext.Provider value={{ overlays: [], hiddenViews: new Set(), toggleView: vi.fn(), onOpenView }}>
+                <div onClick={onNodeClick}>
+                    <OverlayBadge shown={riskShown} presenting={false} />
+                </div>
+            </DecoratorOverlayContext.Provider>
+        );
+        return { onOpenView, onNodeClick };
+    }
+
+    it('names the view and extension, and shows the extension marker', () => {
+        renderBadge();
+        const badge = screen.getByTestId('overlay-badge');
+        expect(badge).toHaveAccessibleName('View release-risk · Release tracker: High');
+        expect(screen.getByTestId('overlay-marker').dataset.colour).toBe(extensionMarkerColour('release-tracker'));
+    });
+
+    it('shows the extension, view, status and tone, label and time on a click, without selecting the node', () => {
+        const { onNodeClick } = renderBadge();
+        fireEvent.click(screen.getByTestId('overlay-badge'));
+        const details = screen.getByRole('dialog', { name: 'View release-risk · Release tracker' });
+        expect(details).toHaveTextContent('ExtensionRelease tracker');
+        expect(details).toHaveTextContent('ViewView release-risk');
+        const entries = screen.getAllByTestId('overlay-badge-entry');
+        expect(entries[0]).toHaveTextContent('High → Error');
+        expect(entries[0]).toHaveTextContent('Summary d1');
+        expect(entries[0]).toHaveTextContent(new Date('2026-11-06T10:00:00Z').toLocaleString());
+        expect(entries[1]).toHaveTextContent('Low → OK');
+        expect(onNodeClick).not.toHaveBeenCalled();
+        expect(screen.getByTestId('overlay-badge')).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('links to the view list', () => {
+        const { onOpenView } = renderBadge();
+        fireEvent.click(screen.getByTestId('overlay-badge'));
+        fireEvent.click(screen.getByRole('button', { name: 'View all View release-risk' }));
+        expect(onOpenView).toHaveBeenCalledWith(view);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('closes on Escape, on a press outside, and on a second click', () => {
+        renderBadge();
+        const badge = screen.getByTestId('overlay-badge');
+        fireEvent.click(badge);
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+        fireEvent.click(badge);
+        fireEvent.pointerDown(document.body);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+        fireEvent.click(badge);
+        fireEvent.pointerDown(badge);
+        fireEvent.click(badge);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('marks a built-in view in the details', () => {
+        const builtIn = { ...riskShown, view: fakeView('deployment', 'deployment', 'Deployments') };
+        render(<OverlayBadge shown={builtIn} presenting={false} />);
+        fireEvent.click(screen.getByTestId('overlay-badge'));
+        expect(screen.getByRole('dialog')).toHaveTextContent('Built-in (Deployments)');
     });
 });

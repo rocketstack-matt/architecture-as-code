@@ -5,9 +5,12 @@ import {
     overlayByElement,
     overlayStatus,
     statusText,
+    viewKey,
+    viewTitle,
     worstStatus,
 } from './overlayEngine.js';
 import { BUILTIN_DECORATOR_VIEWS } from '../../test-support/decorator-views.js';
+import { fakeDecorator, fakeView } from '../../test-support/fake-overlays.js';
 import type { Decorator, OverlayDecoratorView } from '../contracts/contracts.js';
 
 const viewById = (id: string) => BUILTIN_DECORATOR_VIEWS.find((v) => v.id === id) as OverlayDecoratorView;
@@ -235,5 +238,22 @@ describe('helpers', () => {
         expect(worstStatus(['ok', 'info', 'warn'])).toBe('warn');
         expect(worstStatus(['ok', 'error'])).toBe('error');
         expect(worstStatus([])).toBeUndefined();
+    });
+});
+
+describe('view identity', () => {
+    it('keys a view by its extension, and names both', () => {
+        const view = fakeView('release-tracker', 'release-risk', 'Release tracker');
+        expect(viewKey(view)).toBe('release-tracker/release-risk');
+        expect(viewTitle(view)).toBe('View release-risk · Release tracker');
+        expect(viewTitle(fakeView('deployment', 'deployment'))).toBe('View deployment · Built-in');
+        expect(viewKey({ ...view, source: undefined })).toBe('release-risk');
+        expect(viewTitle({ ...view, source: undefined })).toBe('View release-risk');
+    });
+
+    it('keeps the raw time of each entry', () => {
+        const view = fakeView('x');
+        const result = overlayByElement(view, [fakeDecorator('d1', { status: 'high', summary: 'Risky', at: '2026-11-06T10:00:00Z' })]);
+        expect(result.get('n1')!.entries[0]).toMatchObject({ value: 'high', status: 'error', label: 'Risky', time: '2026-11-06T10:00:00Z' });
     });
 });
