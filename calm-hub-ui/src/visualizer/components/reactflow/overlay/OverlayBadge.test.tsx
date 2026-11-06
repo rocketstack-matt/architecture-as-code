@@ -4,7 +4,7 @@ import { DecoratorOverlayContext } from '../../../context/DecoratorOverlayContex
 import { fakeDecorator, fakeView } from '../../../../test-support/fake-overlays.js';
 import { extensionMarkerColour } from '../../../../extensions/extensionIdentity.js';
 import { OverlayBadge, OverlayEdgeBadge } from './OverlayBadge.js';
-import { detailsPosition } from './OverlayBadgeDetails.js';
+import { detailsPosition } from './detailsPosition.js';
 import { OVERLAY_STYLES, overlayOutline } from './overlayStyle.js';
 import { BUILTIN_DECORATOR_VIEWS } from '../../../../test-support/decorator-views.js';
 import type { OverlayDecoratorView, OverlayStatus } from '../../../contracts/contracts.js';
