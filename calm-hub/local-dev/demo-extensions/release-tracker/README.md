@@ -35,4 +35,6 @@ The detail panel has data for the nodes `web-app`, `api-gateway`, `user-service`
 `database` and `message-queue`. To see the overlay, add a decorator of type `release-risk` with
 `data.risk` set to `low`, `medium` or `high`, and `data.summary` set to a short text.
 
-Set `PORT`, `CALM_HUB_URL` or `CALM_HUB_ISSUER` to change the defaults.
+Set `PORT` or `CALM_HUB_URL` (where the backend gets the JWKS) to change the defaults. The backend
+accepts only the issuer `http://localhost:8080`, which is the default of `calm.hub.base-url`. If you
+set `calm.hub.base-url`, set `CALM_HUB_ISSUER` to the same value.

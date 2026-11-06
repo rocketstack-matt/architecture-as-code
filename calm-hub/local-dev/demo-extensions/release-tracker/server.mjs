@@ -5,7 +5,8 @@ import { createVerifier } from '../../extensions/example-services/identity.mjs';
 
 const PORT = Number(process.env.PORT ?? 8092);
 const HUB_URL = process.env.CALM_HUB_URL ?? 'http://localhost:8080';
-const ISSUER = process.env.CALM_HUB_ISSUER ?? HUB_URL;
+// Hub signs `iss` with calm.hub.base-url, whatever address the JWKS comes from.
+const ISSUER = process.env.CALM_HUB_ISSUER ?? 'http://localhost:8080';
 
 const verifyAssertion = createVerifier({
     issuer: ISSUER,
@@ -122,4 +123,4 @@ createServer(async (req, res) => {
     console.log(`${req.method} ${url.pathname}${url.search} for ${claims.sub}: ${reply ? 200 : 404}`);
     res.writeHead(reply ? 200 : 404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(reply ?? { error: 'not found' }));
-}).listen(PORT, '127.0.0.1', () => console.log(`release-tracker backend on ${PORT}`));
+}).listen(PORT, '127.0.0.1', () => console.log(`release-tracker backend on http://localhost:${PORT}, trusting issuer ${ISSUER}`));
