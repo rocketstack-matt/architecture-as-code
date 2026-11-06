@@ -12,9 +12,11 @@ import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
+import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.store.DecoratorStore;
+import org.finos.calm.store.util.DecoratorTimestamps;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,7 +24,7 @@ import java.util.Optional;
 /**
  * The write rules for decorators, shared by REST and MCP. A reserved type can only be written by
  * its configured principals, a decorator whose {@code $schema} Hub knows must match it, and a reserved
- * type is append-only.
+ * type is append-only. A client may not send the Hub-owned times.
  */
 @ApplicationScoped
 public class DecoratorWriteService {
@@ -47,8 +49,10 @@ public class DecoratorWriteService {
     }
 
     public int createDecorator(String principal, String namespace, String decoratorJson)
-            throws NamespaceNotFoundException, ReservedDecoratorTypeException, DecoratorSchemaValidationException {
+            throws NamespaceNotFoundException, ReservedDecoratorTypeException, DecoratorSchemaValidationException,
+            HubOwnedDecoratorFieldException {
         JsonObject decorator = parse(decoratorJson);
+        rejectHubOwnedFields(decorator);
         requireWriter(principal, typeOf(decorator));
         requireValid(decorator);
         return decoratorStore.createDecorator(namespace, decoratorJson);
@@ -62,8 +66,9 @@ public class DecoratorWriteService {
      */
     public int updateDecorator(String principal, String namespace, int id, String decoratorJson)
             throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException,
-            ReservedDecoratorTypeException, DecoratorSchemaValidationException {
+            ReservedDecoratorTypeException, DecoratorSchemaValidationException, HubOwnedDecoratorFieldException {
         JsonObject decorator = parse(decoratorJson);
+        rejectHubOwnedFields(decorator);
         Optional<Decorator> existing = decoratorStore.getDecoratorById(namespace, id);
         if (existing.isPresent()) {
             requireWriter(principal, existing.get().getType());
@@ -96,6 +101,14 @@ public class DecoratorWriteService {
             return;
         }
         decoratorStore.deleteDecorator(namespace, id);
+    }
+
+    private static void rejectHubOwnedFields(JsonObject decorator) throws HubOwnedDecoratorFieldException {
+        for (String field : List.of(DecoratorTimestamps.CREATION_DATE_TIME_FIELD, DecoratorTimestamps.UPDATE_DATE_TIME_FIELD)) {
+            if (decorator.containsKey(field)) {
+                throw new HubOwnedDecoratorFieldException(field);
+            }
+        }
     }
 
     private void requireWriter(String principal, String type) throws ReservedDecoratorTypeException {

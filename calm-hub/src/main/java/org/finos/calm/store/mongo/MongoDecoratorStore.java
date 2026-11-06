@@ -15,15 +15,19 @@ import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
 import org.finos.calm.store.util.DecoratorHistoryChain;
+import org.finos.calm.store.util.DecoratorTimestamps;
 import org.finos.calm.store.util.MongoUpsertPush;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static org.finos.calm.store.util.DecoratorTimestamps.CREATION_DATE_TIME_FIELD;
+import static org.finos.calm.store.util.DecoratorTimestamps.SUPERSEDED_DATE_TIME_FIELD;
+import static org.finos.calm.store.util.DecoratorTimestamps.UPDATE_DATE_TIME_FIELD;
 import io.quarkus.arc.lookup.LookupIfProperty;
 
 /**
@@ -36,7 +40,7 @@ public class MongoDecoratorStore implements DecoratorStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDecoratorStore.class);
     private static final String DECORATOR_ID_FIELD = "decoratorId";
-    // Hub-owned history links, stored beside the decorator rather than in it.
+    // Hub-owned history links and times, stored beside the decorator rather than in it.
     private static final String SUPERSEDES_FIELD = "supersedes";
     private static final String SUPERSEDED_BY_FIELD = "supersededBy";
     private final MongoCollection<Document> decoratorCollection;
@@ -110,9 +114,8 @@ public class MongoDecoratorStore implements DecoratorStore {
 
         return decorators.stream()
                 .filter(decoratorDoc -> Integer.valueOf(id).equals(decoratorDoc.getInteger("decoratorId")))
-                .map(decoratorDoc -> decoratorDoc.get("decorator", Document.class))
-                .filter(Objects::nonNull)
-                .map(Decorator::fromDocument)
+                .filter(decoratorDoc -> decoratorDoc.get("decorator", Document.class) != null)
+                .map(MongoDecoratorStore::toDecorator)
                 .findFirst();
     }
 
@@ -122,8 +125,11 @@ public class MongoDecoratorStore implements DecoratorStore {
 
         Document parsedDecorator = Document.parse(decoratorJson);
         int id = counterStore.getNextDecoratorSequenceValue();
+        String now = DecoratorTimestamps.now();
         Document decoratorDocument = new Document("decoratorId", id)
-                .append("decorator", parsedDecorator);
+                .append("decorator", parsedDecorator)
+                .append(CREATION_DATE_TIME_FIELD, now)
+                .append(UPDATE_DATE_TIME_FIELD, now);
 
         MongoUpsertPush.pushWithDuplicateRetry(decoratorCollection,
                 Filters.eq("namespace", namespace),
@@ -142,7 +148,9 @@ public class MongoDecoratorStore implements DecoratorStore {
         long modified = decoratorCollection.updateOne(
                 Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
                         Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false)))),
-                Updates.set("decorators.$.decorator", parsedDecorator)
+                Updates.combine(
+                        Updates.set("decorators.$.decorator", parsedDecorator),
+                        Updates.set("decorators.$." + UPDATE_DATE_TIME_FIELD, DecoratorTimestamps.now()))
         ).getModifiedCount();
 
         if (modified == 0) {
@@ -159,17 +167,20 @@ public class MongoDecoratorStore implements DecoratorStore {
 
         Document parsedDecorator = Document.parse(decoratorJson);
         int newId = counterStore.getNextDecoratorSequenceValue();
+        String now = DecoratorTimestamps.now();
 
         // Replace the links and append the successor in one atomic namespace-document update.
         Document successor = new Document(DECORATOR_ID_FIELD, newId)
                 .append("decorator", parsedDecorator)
-                .append(SUPERSEDES_FIELD, id);
+                .append(SUPERSEDES_FIELD, id)
+                .append(CREATION_DATE_TIME_FIELD, now)
+                .append(UPDATE_DATE_TIME_FIELD, now);
         Document marked = new Document("$map", new Document("input", "$decorators")
                 .append("as", "entry")
                 .append("in", new Document("$cond", List.of(
                         new Document("$eq", List.of("$$entry.decoratorId", id)),
                         new Document("$mergeObjects", List.of("$$entry",
-                                new Document(SUPERSEDED_BY_FIELD, newId))),
+                                new Document(SUPERSEDED_BY_FIELD, newId).append(SUPERSEDED_DATE_TIME_FIELD, now))),
                         "$$entry"))));
         List<Document> update = List.of(new Document("$set", new Document("decorators",
                 new Document("$concatArrays", List.of(marked,
@@ -270,8 +281,15 @@ public class MongoDecoratorStore implements DecoratorStore {
                         doc.getInteger(DECORATOR_ID_FIELD),
                         doc.getInteger(SUPERSEDES_FIELD),
                         doc.getInteger(SUPERSEDED_BY_FIELD),
-                        Decorator.fromDocument(doc.get("decorator", Document.class))))
+                        doc.getString(SUPERSEDED_DATE_TIME_FIELD),
+                        toDecorator(doc)))
                 .toList();
+    }
+
+    private static Decorator toDecorator(Document entry) {
+        Decorator decorator = Decorator.fromDocument(entry.get("decorator", Document.class));
+        return decorator == null ? null
+                : decorator.withTimestamps(entry.getString(CREATION_DATE_TIME_FIELD), entry.getString(UPDATE_DATE_TIME_FIELD));
     }
 
     private Stream<Document> streamCurrent(List<Document> decorators) {
@@ -292,10 +310,11 @@ public class MongoDecoratorStore implements DecoratorStore {
 
     private List<Decorator> filterDecoratorsToValues(List<Document> decorators, String target, String type) {
         return streamCurrent(decorators)
-                .map(doc -> doc.get("decorator", Document.class))
-                .filter(Objects::nonNull)
-                .filter(decorator -> matchesFilters(decorator, target, type))
-                .map(Decorator::fromDocument)
+                .filter(doc -> {
+                    Document decorator = doc.get("decorator", Document.class);
+                    return decorator != null && matchesFilters(decorator, target, type);
+                })
+                .map(MongoDecoratorStore::toDecorator)
                 .collect(Collectors.toList());
     }
 
