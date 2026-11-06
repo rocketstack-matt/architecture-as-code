@@ -1,0 +1,66 @@
+{
+  "id": "stride-threats",
+  "version": "0.1.0",
+  "hubApi": 0,
+  "name": "STRIDE threat model",
+  "description": "A demo extension: STRIDE threats, their severity and mitigations for architectures.",
+  "provider": "Demo security",
+  "routes": [
+    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated" },
+    { "id": "tab", "method": "GET", "path": "/tab", "scope": "authenticated" },
+    { "id": "card", "method": "GET", "path": "/card", "scope": "authenticated" },
+    { "id": "element", "method": "GET", "path": "/element", "scope": "authenticated" },
+    { "id": "start-assessment", "method": "POST", "path": "/assessments", "scope": "authenticated" },
+    { "id": "threats", "method": "GET", "path": "/threats", "scope": "authenticated", "readOnly": true }
+  ],
+  "commands": {
+    "list-threats": {
+      "route": "threats",
+      "description": "List the STRIDE threats of the demo model, with their element, category, severity and status",
+      "input": { "type": "object", "properties": {} },
+      "output": {
+        "type": "object",
+        "properties": {
+          "threats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "element": { "type": "string" },
+                "category": { "type": "string" },
+                "severity": { "type": "string" },
+                "status": { "type": "string" }
+              },
+              "required": ["id", "element", "category", "severity", "status"]
+            }
+          }
+        }
+      },
+      "destructive": false,
+      "idempotent": true
+    }
+  },
+  "contributes": {
+    "screen": [ { "id": "threats", "title": "Threat model", "route": "screen" } ],
+    "designer-tab": [ { "id": "threats", "title": "Threats", "route": "tab" } ],
+    "landing-card": [ { "id": "posture", "title": "Threat posture", "route": "card" } ],
+    "detail-panel": [ { "id": "threats", "title": "STRIDE threats", "route": "element" } ],
+    "action": [ { "id": "start-assessment", "title": "Start STRIDE assessment", "route": "start-assessment" } ],
+    "decorator-views": [
+      {
+        "id": "stride-severity",
+        "match": { "type": "threat-model" },
+        "label": "STRIDE threats",
+        "overlay": {
+          "status": "/severity",
+          "map": { "low": "ok", "medium": "warn", "high": "error", "critical": "error" },
+          "default": "info",
+          "label": "/summary",
+          "key": "/threat-id",
+          "time": "/assessed-at"
+        }
+      }
+    ]
+  }
+}

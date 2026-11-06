@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -308,6 +309,21 @@ class TestExtensionManifestLoaderShould {
         List<ExtensionManifest> manifests = loader.loadDirectory(Path.of("local-dev/extensions"));
 
         assertThat(manifests.stream().map(ExtensionManifest::id).toList(), contains("example-services"));
+    }
+
+    @Test
+    void load_both_demo_manifests_with_every_ui_extension_point() {
+        List<ExtensionManifest> manifests = loader.loadDirectory(Path.of("local-dev/demo-extensions"));
+
+        assertThat(manifests.stream().map(ExtensionManifest::id).toList(), containsInAnyOrder("release-tracker", "stride-threats"));
+        for (ExtensionManifest manifest : manifests) {
+            assertThat(manifest.id(), manifest.contributes().byRoutePoint().keySet(),
+                    contains("action", "designer-tab", "detail-panel", "landing-card", "screen"));
+            assertThat(manifest.id(), manifest.contributes().decoratorViews(), hasSize(1));
+            assertThat(manifest.id(), manifest.routes().stream().filter(r -> r.path().contains("{")).toList(), empty());
+        }
+        ExtensionManifest stride = manifests.stream().filter(m -> m.id().equals("stride-threats")).findFirst().orElseThrow();
+        assertThat(stride.contributes().decoratorViews().get(0).match().type(), equalTo("threat-model"));
     }
 
     @Test
