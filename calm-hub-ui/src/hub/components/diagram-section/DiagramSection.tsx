@@ -245,7 +245,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     // A tab id no entry registers is dropped from the URL, so a copied link does not keep it. A hidden tab such as
     // used-by is kept, because it can become visible when the pattern summary loads.
     const requestedTab = searchParams.get('tab');
-    const unknownTab = requestedTab !== null && !DIAGRAM_TABS.some((tab) => tab.id === requestedTab);
+    const unknownTab = requestedTab !== null && !registeredTabs.some((tab) => tab.id === requestedTab);
     useEffect(() => {
         if (!unknownTab) return;
         setSearchParams(

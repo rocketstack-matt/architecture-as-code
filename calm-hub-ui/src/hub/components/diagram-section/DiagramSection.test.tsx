@@ -6,6 +6,17 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { BreadcrumbItem, Data } from '../../../model/calm.js';
 import { saveNodePositions } from '../../../visualizer/services/node-position-service.js';
 import type { Node } from 'reactflow';
+import { ExtensionsContext } from '../../../components/extensions/ExtensionsContext.js';
+import { ExtensionService } from '../../../service/extension-service.js';
+import type { ExtensionSummary } from '../../../model/extensions.js';
+
+const releaseTracker: ExtensionSummary = {
+    id: 'release-tracker',
+    name: 'Release tracker',
+    hubApi: 0,
+    routes: [{ id: 'tab', method: 'GET', path: '/tab', scope: 'authenticated', readOnly: false }],
+    contributes: { 'designer-tab': [{ id: 'releases', title: 'Releases', route: 'tab' }] },
+};
 
 const calmServiceMock = {
     fetchArchitectureDecorators: vi.fn().mockResolvedValue([]),
@@ -593,6 +604,29 @@ describe('DiagramSection', () => {
             );
 
             await waitFor(() => expect(screen.getByTestId('search').textContent).toBe('?type=deployment'));
+        });
+
+        it('keeps an extension tab selected after a click, and does not cancel its request', async () => {
+            const call = vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, title: 'Releases', blocks: [] });
+            function SearchProbe() {
+                return <div data-testid="search">{useLocation().search}</div>;
+            }
+            render(
+                <MemoryRouter>
+                    <ExtensionsContext.Provider value={[releaseTracker]}>
+                        <DiagramSection data={architectureData} />
+                        <SearchProbe />
+                    </ExtensionsContext.Provider>
+                </MemoryRouter>
+            );
+
+            await userEvent.click(screen.getByRole('tab', { name: 'Releases' }));
+
+            expect(await screen.findByRole('heading', { name: 'Releases' })).toBeInTheDocument();
+            expect(screen.getByTestId('search').textContent).toContain('tab=');
+            expect(screen.queryByTestId('drawer')).not.toBeInTheDocument();
+            expect((call.mock.calls[0][3] as AbortSignal).aborted).toBe(false);
+            call.mockRestore();
         });
 
         it('keeps a known tab that is hidden for now in the URL', () => {
