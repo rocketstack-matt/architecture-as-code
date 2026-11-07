@@ -46,7 +46,7 @@ export function extensionProxyPath(extensionId: string, routePath: string): stri
 /**
  * Maps a command input to a request on the route (ADR 0012). Input properties that match a
  * `{param}` fill the path. The rest go to the query for GET and DELETE, and to the JSON body otherwise.
- * Hub validates the input, so this checks only what it needs to build the request.
+ * The extension validates the input (the REST proxy does not), so this checks only what it needs to build the request.
  * @throws Error when a path parameter is missing, is not a string, number or boolean, is a dot segment or has a slash.
  */
 export function buildExtensionRequest(extensionId: string, route: HubExtensionRoute, input: Record<string, unknown>): HubExtensionRequest {

@@ -1,0 +1,115 @@
+---
+id: calm-hub-extension-access
+title: Extension Access
+sidebar_label: Extension Access
+sidebar_position: 6
+---
+
+# Extension Access
+
+This page gives who can call an extension, what CALM Hub tells the extension about the caller, and
+what CALM Hub trusts. For the settings, see [Extensions](index.md#extensions).
+
+## Who can call a route
+
+Each route in the manifest has a `scope`. CALM Hub checks it on each call, from the UI, the CLI,
+MCP or any other client, with the same rules as for its own resources (see
+[CALM Hub Entitlements](../working-with-calm/calm-hub-entitlements.md)).
+
+| Scope | The caller must | Path |
+|---|---|---|
+| `authenticated` | Be signed in | Any |
+| `read` | Read the namespace and each of its parent namespaces | Has `{namespace}` |
+| `write` | Write the namespace or one of its parent namespaces | Has `{namespace}` |
+| `admin` | Administer the namespace or one of its parent namespaces | Has `{namespace}` |
+| `domain_read`, `domain_write`, `domain_admin` | Have that permission on the domain | Has `{domain}` |
+| `global_admin` | Be a global admin | Any |
+
+- CALM Hub takes the namespace and the domain only from the path, never from the query or the body.
+- A signed-out caller gets `401`. A signed-in caller without the scope gets `403`. CALM Hub does not
+  call the backend.
+- On a read-only Hub, only `GET` and `readOnly` routes run. Any other call to a declared route gets
+  `405`. A path with an encoded slash, `..` or `%` also gets `405`.
+- CALM Hub refuses an encoded slash (`%2F`, also double-encoded) in a route path with `400`, and does
+  not call the backend.
+- `GET /api/calm/extensions` and the blocks schema also need a signed-in user.
+  `GET /api/calm/auth/jwks` is public.
+
+### Public read
+
+With `calm.auth.allow-public-read=true`, a signed-out visitor still gets `401` on each extension
+route, also on a `read` or `authenticated` route. Public read means that each signed-in user can
+read every namespace. CALM Hub's own resources work the same way.
+
+### Authentication off
+
+With `calm.auth.enabled=false`, every caller is one shared principal and a global admin. Thus CALM
+Hub does not start with an enabled extension that has routes, unless
+`calm.extensions.allow-without-auth=true`. Use that setting only for local development.
+
+## The identity assertion
+
+CALM Hub never sends the caller's token or cookies to the extension. For each call, it sends a JWT
+that it signs, in the `X-Calm-Hub-Identity` header. The public keys are at
+`GET /api/calm/auth/jwks`.
+
+| Claim | Value |
+|---|---|
+| `iss` | The CALM Hub base URL (`calm.hub.base-url`) |
+| `aud` | The extension id |
+| `sub` | The user. When `auth` is `none`, one shared principal |
+| `auth` | `none`, `oidc` or `proxy` |
+| `iat`, `exp` | Issue and expiry time. The lifetime is `calm.extensions.identity.ttl-seconds`, by default 60 seconds |
+| `jti` | A unique id for this call. The audit log records it |
+| `htm`, `htp` | The method, and the path and query relative to the backend URL. CALM Hub sorts the query by name |
+| `hubApi`, `route`, `scope` | The manifest `hubApi`, the route `id`, and the route `scope` |
+| `ns` | The namespace that CALM Hub checked, when the path has one |
+
+### Verify it
+
+Verify each request with the JWKS only:
+
+- the header `typ` is `calm-ext+jwt`, and `alg` is `RS256` or `ES256` and equals the `alg` of the
+  key with that `kid`. Load the JWKS again for an unknown `kid`
+- the signature is valid
+- `iss` is the CALM Hub base URL, `aud` is your extension id, and `exp` is not past
+- `htm` is the request method, and `htp` is the path and query that you received
+- each `jti` is used one time
+
+[`identity.mjs`](https://github.com/finos/architecture-as-code/blob/main/calm-hub/local-dev/extensions/example-services/identity.mjs)
+does these checks with no dependencies. The [tutorial](../tutorials/advanced/hub-extension.md#verify-the-identity-assertion)
+gives the reason for each check.
+
+### What Hub checks
+
+CALM Hub checked the route scope for `ns`, and nothing more. It does not check the query, the
+body, or the UI context. If your extension reads data with a service account, return only what
+`sub` may see in `ns`.
+
+### When the extension calls CALM Hub
+
+CALM Hub refuses its own assertion as a credential. An extension that calls CALM Hub uses its own
+service account, with the fewest grants that it needs.
+
+## Trust model
+
+Extension manifests are trusted operator configuration, as `application.properties` is. CALM Hub
+reads them one time at start-up, and nothing changes them at runtime. No API adds an extension.
+
+CALM Hub checks the manifests for usual mistakes at start-up, but it does not defend against a bad
+manifest: for example a schema that is made to be slow, or a backend URL to a bad host. To fix such
+a problem, correct the manifest.
+
+CALM Hub bounds only the cost that a caller controls:
+
+| Limit | Default |
+|---|---|
+| Request body | 1 MiB, then `413` |
+| Reply body | 1 MiB, then `502` |
+| Connect and request timeouts | 5 and 10 seconds, then `504` |
+| MCP arguments | 1 MiB of JSON, and patterns that match in linear time |
+
+The [MCP extension tools](mcp-and-api.md#extension-tools) page gives the MCP rules.
+
+In `proxy-auth` mode, any client that reaches CALM Hub directly can set `Remote-User`. Make CALM Hub
+listen only on loopback or behind the proxy.

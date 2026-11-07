@@ -6,6 +6,8 @@ title: Hub extension blocks
 A Tier 1 extension returns JSON. Hub draws the content; no extension code runs in the browser.
 Use `hubApi: 0`. Get the reply schema from
 `GET /api/calm/extensions/schema/0/blocks.schema.json`.
+For an example of each block and table cell, see the [blocks reference](../calm-hub/extension-blocks.md).
+For the fields of each extension point, see the [extension point reference](../calm-hub/extension-points.md).
 
 Declare a route and reference its `id` from a contribution:
 
