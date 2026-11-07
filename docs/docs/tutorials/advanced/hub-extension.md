@@ -156,14 +156,19 @@ secret.
 
 ## Step 4: Configure CALM Hub
 
-CALM Hub needs four settings for this extension:
+CALM Hub needs five settings for this extension:
 
 | Setting | Value |
 |---|---|
 | `calm.extensions.dir` | The folder that holds one folder for each extension |
+| `calm.extensions."stride-threats".enabled` | `false`. The folder also holds a second demo, which this tutorial does not use |
 | `calm.extensions."release-tracker".backend-url` | The base URL of the backend |
 | `calm.extensions.identity.private-key-location` | The private key from step 3 |
 | `calm.extensions.identity.public-key-locations` | The public key from step 3 |
+
+CALM Hub does not start if an enabled extension has routes but no backend URL, so the commands below
+turn off `stride-threats`. To run both demos, see the
+[demo-extensions README](https://github.com/finos/architecture-as-code/blob/main/calm-hub/local-dev/demo-extensions/README.md).
 
 The standalone profile has authentication off. CALM Hub then refuses to start with an extension
 that has routes, because every caller would be a global admin. For local development only, set
@@ -175,6 +180,7 @@ that has routes, because every caller would be a global admin. For local develop
 ../mvnw quarkus:dev -Pstandalone,server-only \
   -Dcalm.extensions.dir=local-dev/demo-extensions \
   -Dcalm.extensions.release-tracker.backend-url=http://localhost:8092 \
+  -Dcalm.extensions.stride-threats.enabled=false \
   -Dcalm.extensions.identity.private-key-location=../sandbox/keys/hub-private.pem \
   -Dcalm.extensions.identity.public-key-locations=../sandbox/keys/hub-public.pem \
   -Dcalm.extensions.allow-without-auth=true \
@@ -192,6 +198,7 @@ Each setting is also an environment variable. In the name, the quotes and the do
 ```bash
 export CALM_EXTENSIONS_DIR=local-dev/demo-extensions
 export CALM_EXTENSIONS__RELEASE_TRACKER__BACKEND_URL=http://localhost:8092
+export CALM_EXTENSIONS__STRIDE_THREATS__ENABLED=false
 export CALM_EXTENSIONS_IDENTITY_PRIVATE_KEY_LOCATION=../sandbox/keys/hub-private.pem
 export CALM_EXTENSIONS_IDENTITY_PUBLIC_KEY_LOCATIONS=../sandbox/keys/hub-public.pem
 export CALM_EXTENSIONS_ALLOW_WITHOUT_AUTH=true
@@ -213,6 +220,7 @@ docker run --rm --network host \
   -v "$PWD/../sandbox/keys:/keys:ro" \
   -e CALM_EXTENSIONS_DIR=/extensions \
   -e CALM_EXTENSIONS__RELEASE_TRACKER__BACKEND_URL=http://localhost:8092 \
+  -e CALM_EXTENSIONS__STRIDE_THREATS__ENABLED=false \
   -e CALM_EXTENSIONS_IDENTITY_PRIVATE_KEY_LOCATION=/keys/hub-private.pem \
   -e CALM_EXTENSIONS_IDENTITY_PUBLIC_KEY_LOCATIONS=/keys/hub-public.pem \
   -e CALM_EXTENSIONS_ALLOW_WITHOUT_AUTH=true \
