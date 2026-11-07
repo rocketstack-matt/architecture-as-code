@@ -25,6 +25,7 @@ import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -315,9 +316,25 @@ class TestExtensionManifestLoaderShould {
     void load_the_demo_manifest_with_a_resource_route() {
         List<ExtensionManifest> manifests = loader.loadDirectory(Path.of("local-dev/demo-extensions"));
 
-        assertThat(manifests.stream().map(ExtensionManifest::id).toList(), contains("release-tracker"));
-        assertThat(manifests.get(0).routes().stream().filter(r -> r.id().equals("tab")).findFirst().orElseThrow().path(),
+        assertThat(manifests.stream().map(ExtensionManifest::id).toList(), hasItem("release-tracker"));
+        ExtensionManifest releases = manifests.stream().filter(m -> m.id().equals("release-tracker")).findFirst().orElseThrow();
+        assertThat(releases.routes().stream().filter(r -> r.id().equals("tab")).findFirst().orElseThrow().path(),
                 is("/tab/{resourceType}/{resourceId}"));
+    }
+
+    @Test
+    void load_both_demo_manifests_with_every_ui_extension_point() {
+        List<ExtensionManifest> manifests = loader.loadDirectory(Path.of("local-dev/demo-extensions"));
+
+        assertThat(manifests.stream().map(ExtensionManifest::id).toList(), containsInAnyOrder("release-tracker", "stride-threats"));
+        for (ExtensionManifest manifest : manifests) {
+            assertThat(manifest.id(), manifest.contributes().byRoutePoint().keySet(),
+                    contains("action", "designer-tab", "detail-panel", "landing-card", "screen"));
+            assertThat(manifest.id(), manifest.contributes().decoratorViews(), hasSize(1));
+        }
+        ExtensionManifest stride = manifests.stream().filter(m -> m.id().equals("stride-threats")).findFirst().orElseThrow();
+        assertThat(stride.routes().stream().filter(r -> r.path().contains("{")).toList(), empty());
+        assertThat(stride.contributes().decoratorViews().get(0).match().type(), equalTo("threat-model"));
     }
 
     @Test
