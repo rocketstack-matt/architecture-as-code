@@ -109,5 +109,5 @@ off, set `calm.extensions."deployment".enabled=false`, or the same for `control-
 The legend row reads `Security scan · Security scan` (the view label, then the extension name).
 Each extension gets a colour marker, derived from its id, on its badges and legend rows. The legend
 switches each view, and all the views of one extension, on or off. When the browser has no stored
-choice, only the first three views in registry order are on. Set
-`calm.extensions."scanner".order` to move a view up.
+choice, only the first three views in registry order that draw on the diagram are on. The built-in views
+have `order` 0, so set `calm.extensions."scanner".order=-1` to move a view above them.

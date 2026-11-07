@@ -291,7 +291,7 @@ From the repository root, list the extensions, describe the command, and run it:
 node cli/dist/index.js hub extensions list -c http://localhost:8080 -f pretty
 node cli/dist/index.js hub extensions describe release-tracker list-releases -c http://localhost:8080
 node cli/dist/index.js hub ext release-tracker list-releases -c http://localhost:8080
-# {"releases":[{"version":"2.4.0","status":"in-progress","date":"2026-11-06"},...
+# Prints the releases as indented JSON
 ```
 
 With `calm.mcp.enabled=true`, the same command is the MCP tool `ext_release-tracker_list-releases`.

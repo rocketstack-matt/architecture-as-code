@@ -56,9 +56,9 @@ a query parameter.
 | `resourceType` | `architectures` or `patterns` | `designer-tab`, `detail-panel`, `action` |
 | `resourceId` | The resource id, for example `1` | `designer-tab`, `detail-panel`, `action` |
 | `version` | The version on screen, for example `1.0.0` | `designer-tab`, `detail-panel`, `action` |
-| `selectedElement` | The `unique-id` of the selected node | `detail-panel`, and `designer-tab` and `action` when a node is selected |
+| `selectedElement` | The `unique-id` of the selected element | `detail-panel` for a node, and `designer-tab` and `action` for a node or a relationship |
 
-CALM Hub does not check the context. A user can send any value, so check that the user may see the
+CALM Hub checks only the format of a `{namespace}` or `{domain}` path value. A user can send any value, so check that the user may see the
 data that you return (see [Extension access](extension-access.md#what-hub-checks)).
 
 ## screen
@@ -98,7 +98,7 @@ A compact card in the **Extensions** section of the home page.
 
 - Hub calls only the first `landing-card` of an extension.
 - The card shows the extension `name` and `provider`, and a headline from the reply: the first
-  three items of the first `stats` block. With no `stats` block, it shows the text of the first
+  three items of the first `stats` block. With no `stats` items, it shows the text of the first
   `alert` block, on one line. Hub does not show other blocks on the card.
 - A card gets no context. If the call fails, the card shows no headline.
 - An extension with a `screen` and no `landing-card` also gets a card, with no headline.
@@ -188,8 +188,8 @@ Commands that the CLI and MCP can run, keyed by name. The name uses lowercase le
 - The CLI runs a command with `calm hub ext <id> <command>`. List and describe commands with
   `calm hub extensions list` and `calm hub extensions describe <id> [command]`. See
   [Running extension commands](../calm-cli/hub.md#running-extension-commands).
-- With `calm.mcp.enabled=true`, each command is the MCP tool `ext_<id>_<command>`. The name must
-  have at most 64 characters. The schemas must use the subset in
+- With `calm.mcp.enabled=true`, each command is the MCP tool `ext_<id>_<command>`. CALM Hub does
+  not start if the name has more than 64 characters, also with MCP off. The schemas must use the subset in
   [Extension tools](mcp-and-api.md#extension-tools), or the command gets no tool.
 - Input properties that match a placeholder fill the path. The others go to the query for `GET` and
   `DELETE`, and to the JSON body for other methods.
