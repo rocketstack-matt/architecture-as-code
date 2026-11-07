@@ -436,9 +436,10 @@ All four workflows:
   refuses a bearer token with `typ: calm-ext+jwt` in every auth mode
 - Tests generate key pairs at run time (`ExtensionTestKeys`); `*.pem` is git-ignored. `FixtureBackend` is a
   loopback backend for proxy tests
-- Try it: see `local-dev/extensions/example-services/README.md`. `local-dev/demo-extensions/release-tracker/` is a
-  demo that uses every UI extension point. Keep it out of `local-dev/extensions`: it has routes, so a Hub that loads
-  it without its `backend-url` does not start
+- Try it: see `local-dev/extensions/example-services/README.md`. `local-dev/demo-extensions/` holds two demos
+  (release-tracker and stride-threats) that each use every UI extension point, to test how extensions share the UI.
+  Keep them out of `local-dev/extensions`: they have routes, so a Hub that loads one without its `backend-url` does
+  not start
 
 ### Read-Only Deployment Mode
 - `calm.readonly=true` opens Nitrite with `readOnly(true)` and installs
