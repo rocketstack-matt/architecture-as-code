@@ -214,9 +214,27 @@ In `application.properties`, quote the extension id: `calm.extensions."release-t
 
 ### With Docker
 
-Give the container the same environment variables, and mount the manifests and the keys. The image
-runs as user `185`, so that user must be able to read the files. This example uses the host network
-(Linux only), so that the container and the backend reach each other on `localhost`:
+The published `finos/calm-hub:latest-read-only-static` image has no extensions until a build that
+includes them is published. Until then, build the image from your checkout. The script runs the
+Maven build first:
+
+```bash
+bash build-readonly-image.sh
+```
+
+The image runs as user `185`, so that user must be able to read the keys. `openssl genpkey` writes
+the private key with mode `600`, and CALM Hub then stops at start with `Cannot read the key file`.
+For local development only, let all users read the key:
+
+```bash
+chmod 644 ../sandbox/keys/hub-private.pem
+```
+
+Do not do this in production: give the key to user `185`, for example with a secret mount.
+
+Give the container the same environment variables, and mount the manifests and the keys. This
+example uses the host network (Linux only), so that the container and the backend reach each other
+on `localhost`:
 
 ```bash
 docker run --rm --network host \
@@ -228,7 +246,7 @@ docker run --rm --network host \
   -e CALM_EXTENSIONS_IDENTITY_PRIVATE_KEY_LOCATION=/keys/hub-private.pem \
   -e CALM_EXTENSIONS_IDENTITY_PUBLIC_KEY_LOCATIONS=/keys/hub-public.pem \
   -e CALM_EXTENSIONS_ALLOW_WITHOUT_AUTH=true \
-  finos/calm-hub:latest-read-only-static
+  calm-hub:read-only-static
 ```
 
 The read-only images sign `iss` with `https://hub.calm.finos.org`, so start the backend with
