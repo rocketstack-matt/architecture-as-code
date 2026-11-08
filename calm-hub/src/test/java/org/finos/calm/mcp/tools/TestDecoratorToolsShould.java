@@ -26,6 +26,7 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -464,7 +465,21 @@ class TestDecoratorToolsShould {
         assertThat(response.isError(), is(true));
         assertThat(text(response), containsString("- /data/status: bad status"));
         assertThat(text(response), containsString("- (root): missing property"));
+        assertThat(text(response), not(containsString("more")));
         verifyNoInteractions(decoratorStore);
+    }
+
+    @Test
+    void return_the_first_20_schema_errors_and_the_count_of_the_rest() {
+        when(mockSchemaValidator.validate(any())).thenReturn(IntStream.range(0, 22)
+                .mapToObj(i -> new DecoratorSchemaError("/target-type/" + i, "bad value")).toList());
+
+        ToolResponse response = decoratorTools.createDecorator("workshop", "{\"type\":\"deployment\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("- /target-type/19: bad value"));
+        assertThat(text(response), not(containsString("/target-type/20")));
+        assertThat(text(response), containsString("- and 2 more"));
     }
 
     @Test

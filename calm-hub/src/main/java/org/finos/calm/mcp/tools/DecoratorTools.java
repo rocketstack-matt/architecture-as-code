@@ -251,6 +251,9 @@ public class DecoratorTools {
         StringBuilder sb = new StringBuilder("Error: Decorator does not match its $schema:\n");
         e.getErrors().forEach(error -> sb.append("- ").append(error.location().isEmpty() ? "(root)" : error.location())
                 .append(": ").append(error.error()).append("\n"));
+        if (e.getMoreErrors() > 0) {
+            sb.append("- and ").append(e.getMoreErrors()).append(" more\n");
+        }
         return ToolResponse.error(sb.toString());
     }
 }

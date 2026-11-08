@@ -205,7 +205,7 @@ public class DecoratorResource {
             return CalmResourceErrorResponses.reservedDecoratorTypeResponse(e.getType());
         } catch (DecoratorSchemaValidationException e) {
             logger.warn("Decorator does not match its $schema when creating a decorator in namespace [{}]", namespace);
-            return CalmResourceErrorResponses.decoratorSchemaValidationResponse(e.getErrors());
+            return CalmResourceErrorResponses.decoratorSchemaValidationResponse(e);
         }
     }
 
@@ -261,7 +261,7 @@ public class DecoratorResource {
             return CalmResourceErrorResponses.reservedDecoratorTypeResponse(e.getType());
         } catch (DecoratorSchemaValidationException e) {
             logger.warn("Decorator [{}] in namespace [{}] does not match its $schema when updating", id, namespace);
-            return CalmResourceErrorResponses.decoratorSchemaValidationResponse(e.getErrors());
+            return CalmResourceErrorResponses.decoratorSchemaValidationResponse(e);
         }
     }
 

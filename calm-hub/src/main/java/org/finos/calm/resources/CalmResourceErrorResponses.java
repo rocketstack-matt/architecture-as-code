@@ -1,9 +1,10 @@
 package org.finos.calm.resources;
 
 import jakarta.ws.rs.core.Response;
-import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.ResourceType;
+import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -66,15 +67,19 @@ public class CalmResourceErrorResponses {
     }
 
     // The errors can quote decorator values, so each one is sanitized.
-    public static Response decoratorSchemaValidationResponse(List<DecoratorSchemaError> errors) {
-        List<Map<String, String>> body = errors.stream()
+    public static Response decoratorSchemaValidationResponse(DecoratorSchemaValidationException exception) {
+        List<Map<String, String>> errors = exception.getErrors().stream()
                 .map(error -> Map.of(
                         "location", ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(error.location()),
                         "error", ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(error.error())))
                 .toList();
-        return Response.status(Response.Status.BAD_REQUEST)
-                .entity(Map.of("error", "Decorator does not match its $schema", "errors", body))
-                .build();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "Decorator does not match its $schema");
+        body.put("errors", errors);
+        if (exception.getMoreErrors() > 0) {
+            body.put("moreErrors", exception.getMoreErrors());
+        }
+        return Response.status(Response.Status.BAD_REQUEST).entity(body).build();
     }
 
     /**

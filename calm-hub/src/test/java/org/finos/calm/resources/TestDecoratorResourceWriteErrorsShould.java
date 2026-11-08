@@ -11,10 +11,13 @@ import org.finos.calm.services.DecoratorWriteService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -53,6 +56,24 @@ class TestDecoratorResourceWriteErrorsShould {
     }
 
     @Test
+    void return_the_first_20_schema_errors_and_the_count_of_the_rest() throws Exception {
+        when(decoratorWriteService.createDecorator(any(), eq("finos"), anyString()))
+                .thenThrow(new DecoratorSchemaValidationException(IntStream.range(0, 23)
+                        .mapToObj(i -> new DecoratorSchemaError("/target-type/" + i, "must be one of the enum values")).toList()));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(DECORATOR_JSON)
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body("errors", hasSize(20))
+                .body("errors[19].location", equalTo("/target-type/19"))
+                .body("moreErrors", equalTo(3));
+    }
+
+    @Test
     void return_400_with_the_errors_when_update_does_not_match_its_schema() throws Exception {
         when(decoratorWriteService.updateDecorator(any(), eq("finos"), eq(1), anyString()))
                 .thenThrow(new DecoratorSchemaValidationException(List.of(
@@ -67,7 +88,8 @@ class TestDecoratorResourceWriteErrorsShould {
                 .statusCode(400)
                 .body("error", equalTo("Decorator does not match its $schema"))
                 .body("errors.location", contains("/target-type"))
-                .body("errors.error", contains("required property is missing"));
+                .body("errors.error", contains("required property is missing"))
+                .body("moreErrors", nullValue());
     }
 
     @Test
