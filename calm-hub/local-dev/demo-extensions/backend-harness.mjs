@@ -1,7 +1,7 @@
 // Starts a demo backend as a child process, with a fake Hub that serves the JWKS, and sends
 // requests that carry a signed identity assertion.
 import { spawn } from 'node:child_process';
-import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 
@@ -36,11 +36,12 @@ export async function startBackend(serverUrl, audience) {
         child.on('exit', (code) => reject(new Error(`backend exited with ${code}`)));
     });
 
-    function assertion(method, pathAndQuery) {
+    function assertion(method, pathAndQuery, body) {
         const now = Math.floor(Date.now() / 1000);
         const header = { alg: 'RS256', typ: 'calm-ext+jwt', kid: 'test' };
+        const bdh = body ? createHash('sha256').update(body).digest('base64url') : undefined;
         const claims = { iss: ISSUER, sub: 'alice', aud: audience, iat: now, exp: now + 60, jti: randomUUID(),
-            htm: method, htp: pathAndQuery };
+            htm: method, htp: pathAndQuery, bdh };
         const input = [header, claims].map((part) => Buffer.from(JSON.stringify(part)).toString('base64url')).join('.');
         return `${input}.${sign('sha256', Buffer.from(input), privateKey).toString('base64url')}`;
     }
@@ -48,7 +49,7 @@ export async function startBackend(serverUrl, audience) {
     return {
         request: (method, path, body) => fetch(`http://127.0.0.1:${port}${path}`, {
             method,
-            headers: { 'X-Calm-Hub-Identity': assertion(method, path), 'Content-Type': 'application/json' },
+            headers: { 'X-Calm-Hub-Identity': assertion(method, path, body), 'Content-Type': 'application/json' },
             body,
         }),
         stop: () => {

@@ -2,7 +2,8 @@ package org.finos.calm.extensions;
 
 /**
  * The request-bound claims of one identity assertion (ADR 0010). Hub adds {@code iss}, {@code iat}
- * and {@code exp} when it signs. {@code ns} is null when the route has no {@code {namespace}}.
+ * and {@code exp} when it signs, and {@code bdh} when there is a body. {@code ns} is null unless Hub
+ * checked the namespace: when the route scope is {@code read}, {@code write} or {@code admin}.
  */
 public record ExtensionAssertion(
         String sub,

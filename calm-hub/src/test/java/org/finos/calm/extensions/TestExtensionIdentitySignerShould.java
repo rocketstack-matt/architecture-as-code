@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.time.Clock;
@@ -58,7 +59,7 @@ class TestExtensionIdentitySignerShould {
         properties.put("calm.hub.base-url", "https://hub.example.com");
         ExtensionIdentitySigner signer = signer();
 
-        String token = signer.sign(ASSERTION);
+        String token = signer.sign(ASSERTION, new byte[0]);
 
         JsonNode header = part(token, 0);
         assertThat(header.get("alg").asText(), is("RS256"));
@@ -91,7 +92,7 @@ class TestExtensionIdentitySignerShould {
         useKeys(keys.privateKey(), keys.publicKey());
         ExtensionIdentitySigner signer = signer();
 
-        String token = signer.sign(ASSERTION);
+        String token = signer.sign(ASSERTION, new byte[0]);
 
         assertThat(part(token, 0).get("alg").asText(), is("ES256"));
         assertThat(signature(token).length, is(64));
@@ -109,10 +110,25 @@ class TestExtensionIdentitySignerShould {
         useKeys(keys.privateKey(), keys.publicKey());
 
         String token = signer().sign(new ExtensionAssertion("alice", "team-services", "jti-2", "none", 0,
-                "screen", "authenticated", null, "GET", "/screen"));
+                "screen", "authenticated", null, "GET", "/screen"), null);
 
         assertThat(part(token, 1).has("ns"), is(false));
+        assertThat(part(token, 1).has("bdh"), is(false));
         assertThat(part(token, 1).get("iss").asText(), is("http://localhost:8080"));
+    }
+
+    @Test
+    void bind_a_body_with_its_base64url_sha256() throws Exception {
+        ExtensionTestKeys.KeyFiles keys = ExtensionTestKeys.rsa(tempDir, "hub");
+        useKeys(keys.privateKey(), keys.publicKey());
+        byte[] body = "{\"name\":\"x\"}".getBytes(StandardCharsets.UTF_8);
+
+        String token = signer().sign(ASSERTION, body);
+
+        String expected = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(MessageDigest.getInstance("SHA-256").digest(body));
+        assertThat(part(token, 1).get("bdh").asText(), is(expected));
+        assertThat(part(signer().sign(ASSERTION, new byte[0]), 1).has("bdh"), is(false));
     }
 
     @Test
@@ -121,7 +137,7 @@ class TestExtensionIdentitySignerShould {
         useKeys(keys.privateKey(), keys.publicKey());
         properties.put("calm.extensions.identity.ttl-seconds", "300");
 
-        String token = signer().sign(ASSERTION);
+        String token = signer().sign(ASSERTION, new byte[0]);
 
         assertThat(part(token, 1).get("exp").asLong(), is(NOW + 300));
     }
@@ -160,7 +176,7 @@ class TestExtensionIdentitySignerShould {
         ExtensionIdentitySigner signer = signer();
 
         assertThat(signer.publicKeys(), empty());
-        assertThrows(IllegalStateException.class, () -> signer.sign(ASSERTION));
+        assertThrows(IllegalStateException.class, () -> signer.sign(ASSERTION, new byte[0]));
     }
 
     @Test
@@ -253,7 +269,7 @@ class TestExtensionIdentitySignerShould {
     void recognise_an_assertion_by_its_type_only() throws Exception {
         ExtensionTestKeys.KeyFiles keys = ExtensionTestKeys.rsa(tempDir, "hub");
         useKeys(keys.privateKey(), keys.publicKey());
-        String token = signer().sign(ASSERTION);
+        String token = signer().sign(ASSERTION, new byte[0]);
         String otherType = encode("{\"alg\":\"RS256\",\"typ\":\"JWT\"}") + ".e30.sig";
         String forged = encode("{\"alg\":\"none\",\"typ\":\"CALM-EXT+JWT\"}") + ".e30.";
 

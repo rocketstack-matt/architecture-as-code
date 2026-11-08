@@ -1,7 +1,7 @@
 // Run with: node --test calm-hub/local-dev/extensions/example-services/identity.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { createVerifier } from './identity.mjs';
 
 const NOW = 1_800_000_000;
@@ -58,4 +58,17 @@ test('rejects a forged, misdirected, stale or replayed assertion', async () => {
     const once = token({ claims: { jti: 'same' } });
     await verify(once, request);
     await assert.rejects(verify(once, request), { message: 'replayed' });
+});
+
+test('binds a request body with bdh', async () => {
+    const verify = verifier();
+    const body = Buffer.from('{"name":"refunds"}');
+    const bdh = createHash('sha256').update(body).digest('base64url');
+    const post = { method: 'POST', pathAndQuery: '/namespaces/finos/services', body };
+    const claims = { htm: 'POST', htp: '/namespaces/finos/services', bdh };
+
+    assert.equal((await verify(token({ claims }), post)).bdh, bdh);
+    await assert.rejects(verify(token({ claims }), { ...post, body: Buffer.from('{"name":"other"}') }), { message: 'wrong body' });
+    await assert.rejects(verify(token({ claims: { ...claims, bdh: undefined } }), post), { message: 'wrong body' });
+    await assert.rejects(verify(token({ claims: { bdh } }), { ...request, body: Buffer.alloc(0) }), { message: 'wrong body' });
 });

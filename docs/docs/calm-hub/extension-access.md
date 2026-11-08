@@ -29,9 +29,13 @@ MCP or any other client, with the same rules as for its own resources (see
 - A signed-out caller gets `401`. A signed-in caller without the scope gets `403`. CALM Hub does not
   call the backend.
 - On a read-only Hub, only `GET` and `readOnly` routes run. Any other call to a declared route gets
-  `405`. A path with an encoded slash, `..` or `%` also gets `405`.
+  `405`. A non-`GET` call with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`, `//` or `@` in the path
+  also gets `405`, not `400`.
 - CALM Hub refuses an encoded slash (`%2F`, also double-encoded) in a route path with `400`, and does
   not call the backend.
+- CALM Hub gives `415` to a `POST` with no `application/json` or other `+json` `Content-Type`, also
+  when it has no body, and to a body of another type for the other methods. It does this before it
+  signs the assertion. Thus a cross-site form or fetch cannot call a route as the user.
 - `GET /api/calm/extensions` and the blocks schema also need a signed-in user.
   `GET /api/calm/auth/jwks` is public.
 
@@ -63,7 +67,8 @@ that it signs, in the `X-Calm-Hub-Identity` header. The public keys are at
 | `jti` | A unique id for this call. The audit log records it |
 | `htm`, `htp` | The method, and the path and query relative to the backend URL. CALM Hub sorts the query by name |
 | `hubApi`, `route`, `scope` | The manifest `hubApi`, the route `id`, and the route `scope` |
-| `ns` | The namespace that CALM Hub checked, when the path has one |
+| `ns` | The namespace that CALM Hub checked. Only for a `read`, `write` or `admin` route |
+| `bdh` | The base64url SHA-256 of the request body. Only when there is a body |
 
 ### Verify it
 
@@ -73,7 +78,10 @@ Verify each request with the JWKS only:
   key with that `kid`. Load the JWKS again for an unknown `kid`
 - the signature is valid
 - `iss` is the CALM Hub base URL, `aud` is your extension id, and `exp` is not past
-- `htm` is the request method, and `htp` is the path and query that you received
+- `htm` is the request method, and `htp` is the path and query that you received, relative to the
+  backend URL. For example, with the backend URL `https://svc.internal/base`, a request for
+  `/base/screen` has the `htp` `/screen`
+- `bdh` is the SHA-256 of the body that you received, and is absent when there is no body
 - each `jti` is used one time
 
 [`identity.mjs`](https://github.com/finos/architecture-as-code/blob/main/calm-hub/local-dev/extensions/example-services/identity.mjs)
@@ -82,9 +90,10 @@ gives the reason for each check.
 
 ### What Hub checks
 
-CALM Hub checked the route scope for `ns`, and nothing more. It does not check the query, the
-body, or the UI context. If your extension reads data with a service account, return only what
-`sub` may see in `ns`.
+For a `read`, `write` or `admin` route, CALM Hub checked the route scope for `ns`, and nothing
+more. For another scope, CALM Hub did not check a namespace, and does not send `ns`: do not trust a
+namespace from the path. It does not check the query, the body, or the UI context. If your extension
+reads data with a service account, return only what `sub` may see in `ns`.
 
 ### When the extension calls CALM Hub
 

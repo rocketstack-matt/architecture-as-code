@@ -16,9 +16,11 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -70,6 +72,7 @@ public class ExtensionRegistry {
 
         List<String> errors = new ArrayList<>();
         Set<String> ids = new HashSet<>();
+        Map<String, String> viewOwners = new HashMap<>();
         List<RegisteredExtension> enabled = new ArrayList<>();
         for (ExtensionManifest manifest : manifests) {
             String id = manifest.id();
@@ -85,6 +88,15 @@ public class ExtensionRegistry {
             if (!isEnabled.orElse(true)) {
                 LOG.info("Extension {} is disabled", id);
                 continue;
+            }
+            // The UI finds some views by id alone, such as the built-in control-evaluation view.
+            List<ExtensionManifest.DecoratorView> views = manifest.contributes().decoratorViews();
+            for (ExtensionManifest.DecoratorView view : views == null ? List.<ExtensionManifest.DecoratorView>of() : views) {
+                String owner = viewOwners.putIfAbsent(view.id(), id);
+                if (owner != null) {
+                    errors.add("decorator view id '" + view.id() + "' is declared by extensions '" + owner + "' and '"
+                            + id + "'");
+                }
             }
             if (!manifest.routes().isEmpty() && backendUrl.isEmpty()) {
                 errors.add(key(id, "backend-url") + " must be set, because extension '" + id + "' is enabled and has routes");

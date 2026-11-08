@@ -170,7 +170,6 @@ public class ExtensionManifestLoader {
 
     private static void checkRoutes(ExtensionManifest manifest, List<String> problems) {
         Set<String> ids = new HashSet<>();
-        Set<String> templates = new HashSet<>();
         for (ExtensionManifest.Route route : manifest.routes()) {
             String where = "route '" + route.id() + "'";
             if (!ids.add(route.id())) {
@@ -185,11 +184,6 @@ public class ExtensionManifestLoader {
             if (new HashSet<>(params).size() != params.size()) {
                 problems.add(where + " path has a parameter more than once");
             }
-            // {a} and {b} in the same place match the same requests.
-            String template = route.method() + " " + PATH_PARAM.matcher(route.path()).replaceAll("{}");
-            if (!templates.add(template)) {
-                problems.add(where + " has the same method and path as another route");
-            }
             if (NAMESPACE_SCOPES.contains(route.scope()) && !params.contains("namespace")) {
                 problems.add(where + " has scope '" + route.scope() + "', so its path needs a {namespace} parameter");
             }
@@ -197,6 +191,54 @@ public class ExtensionManifestLoader {
                 problems.add(where + " has scope '" + route.scope() + "', so its path needs a {domain} parameter");
             }
         }
+        checkAmbiguousRoutes(manifest.routes(), problems);
+    }
+
+    /**
+     * The matcher takes the route with more literal segments. When two routes can match one path and
+     * have the same number, the manifest order would choose the scope, so Hub refuses them.
+     */
+    private static void checkAmbiguousRoutes(List<ExtensionManifest.Route> routes, List<String> problems) {
+        for (int j = 1; j < routes.size(); j++) {
+            for (int i = 0; i < j; i++) {
+                ExtensionManifest.Route first = routes.get(i);
+                ExtensionManifest.Route second = routes.get(j);
+                if (!first.method().equals(second.method())) {
+                    continue;
+                }
+                String[] a = first.path().split("/", -1);
+                String[] b = second.path().split("/", -1);
+                if (a.length != b.length) {
+                    continue;
+                }
+                boolean overlap = true;
+                boolean samePlaces = true;
+                int literalsA = 0;
+                int literalsB = 0;
+                for (int k = 0; k < a.length && overlap; k++) {
+                    boolean paramA = isParam(a[k]);
+                    boolean paramB = isParam(b[k]);
+                    literalsA += paramA ? 0 : 1;
+                    literalsB += paramB ? 0 : 1;
+                    samePlaces &= paramA == paramB;
+                    // A parameter does not match an empty segment.
+                    overlap = paramA ? !b[k].isEmpty() : paramB ? !a[k].isEmpty() : a[k].equals(b[k]);
+                }
+                if (!overlap || literalsA != literalsB) {
+                    continue;
+                }
+                // {a} and {b} in the same place match the same requests.
+                String where = "route '" + second.id() + "'";
+                problems.add(samePlaces
+                        ? where + " has the same method and path as another route"
+                        : where + " and route '" + first.id() + "' can match the same path with the same number of "
+                                + "literal segments, so neither takes priority");
+            }
+        }
+    }
+
+    private static boolean isParam(String segment) {
+        return segment.length() > 2 && segment.startsWith("{") && segment.endsWith("}");
     }
 
     private static void checkCommands(ExtensionManifest manifest, List<String> problems) {

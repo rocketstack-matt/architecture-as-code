@@ -106,6 +106,7 @@ public class ExtensionProxyResource {
             return Response.status(e.status())
                     .type(MediaType.APPLICATION_JSON)
                     .entity(Map.of("error", e.getMessage()))
+                    .header("Cache-Control", "private")
                     .header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
                     .build();
         }

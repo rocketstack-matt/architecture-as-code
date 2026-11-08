@@ -76,7 +76,7 @@ parameter cannot contain a slash, so the route cannot use `{resource}` (`archite
 
 | Field | Purpose |
 |---|---|
-| `routes` | Every call that CALM Hub can send to the backend. CALM Hub refuses all other paths. `scope` is the permission that the caller must have |
+| `routes` | Every call that CALM Hub can send to the backend. CALM Hub refuses all other paths. `scope` is the permission that the caller must have. When two routes match a path, the route with more literal segments wins. CALM Hub does not start if they have the same number |
 | `commands` | Commands for the CLI and MCP. Each names a route |
 | `contributes` | What the Hub UI shows. Each entry names a route, except `decorator-views` |
 | `readOnly` | `true` when the route changes nothing. CALM Hub does not audit it, and a read-only Hub still allows it |
@@ -120,8 +120,10 @@ const verifyAssertion = createVerifier({
     fetchJwks: async () => (await fetch('http://localhost:8080/api/calm/auth/jwks')).json(),
 });
 
-// For each request:
-const claims = await verifyAssertion(req.headers['x-calm-hub-identity'], { method: req.method, pathAndQuery: req.url });
+// For each request. pathAndQuery is relative to the backend URL: req.url only when the
+// backend URL has no path. body is the raw request body, read before the check.
+const claims = await verifyAssertion(req.headers['x-calm-hub-identity'],
+    { method: req.method, pathAndQuery: req.url, body });
 // claims.sub is the user. If this throws, reply 401.
 ```
 
@@ -134,7 +136,8 @@ const claims = await verifyAssertion(req.headers['x-calm-hub-identity'], { metho
 | `iss` is the CALM Hub base URL | Refuses assertions from another Hub |
 | `aud` is your extension id | Refuses an assertion that CALM Hub made for another extension |
 | `exp` is not past, `iat` is not in the future | Limits the time that a stolen assertion is useful |
-| `htm` and `htp` equal the method, path and query that you received | Binds the assertion to this request, so that nobody can use it for another route |
+| `htm` and `htp` equal the method, path and query that you received, relative to the backend URL | Binds the assertion to this request, so that nobody can use it for another route |
+| `bdh` is the SHA-256 of the body, and is absent with no body | Stops a change to the body of a request |
 | Each `jti` is used one time | Stops a replay of the same request |
 
 `identity.mjs` allows 30 seconds of clock skew. For the other claims, see

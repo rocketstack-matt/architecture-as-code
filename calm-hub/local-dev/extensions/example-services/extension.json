@@ -48,7 +48,7 @@
     ],
     "decorator-views": [
       {
-        "id": "control-evaluation",
+        "id": "services-control-evaluation",
         "match": { "type": "control-evaluation" },
         "label": "Control evaluations",
         "overlay": {
