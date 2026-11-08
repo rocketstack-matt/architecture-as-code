@@ -188,6 +188,8 @@ Evaluations panel read control-evaluation fields, so they stay tied to that view
 `ExtensionService` uses its own axios instance, not `apiClient`, so a registry or extension call failure does not
 open the global auth or outage page. The shared `extensionService` loads the registry one time for
 `ExtensionsProvider` and `useDecoratorViews()`. After a failed load, the next call tries again.
+`useExtensionsStatus()` gives `loading`, `loaded` or `failed`. Use it where an empty list must not mean "no
+extension", for example `ExtensionScreenPage` on a deep link.
 
 ### Extension UI layout
 
