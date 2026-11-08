@@ -252,7 +252,7 @@ CALM Hub makes one tool for each command of an enabled [extension](index.md#exte
 - `readOnlyHint` is true for a `GET` or `readOnly` route. `destructiveHint` and `idempotentHint` come from the command. With no hint, a write is destructive and not idempotent.
 - Each call goes through the extension proxy, with the same scope, read-only, audit and size rules as a REST call. CALM Hub checks the scope when the tool is called. A user sees every tool, also one that they cannot call.
 - A read-only CALM Hub makes no tool for a command whose route it cannot run.
-- Arguments that fill a `{param}` go in the path, percent-encoded. A value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@` or a control character, the parts that the REST proxy refuses. Thus a value such as `%61dmin` or `a/../b` is a tool error. The rest go to the query for `GET` and `DELETE`, and to the JSON body for other methods. A path and query longer than 4096 characters is a tool error, as it is for a REST call.
+- Arguments that fill a `{param}` go in the path, percent-encoded. A value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@` or a control character, the parts that the REST proxy refuses. Thus a value such as `%61dmin` or `a/../b` is a tool error. The rest go to the query for `GET` and `DELETE`, and to the JSON body for other methods. The path and query must be at most 4096 characters, or the call is a tool error.
 - A `2xx` reply is the result: structured content and the same JSON as text if the command has an output schema, otherwise text. Any other reply is a tool error.
 
 ### Example Tool Call

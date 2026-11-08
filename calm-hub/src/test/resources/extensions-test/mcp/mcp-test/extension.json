@@ -11,7 +11,8 @@
     { "id": "remove-service", "method": "DELETE", "path": "/namespaces/{namespace}/services/{name}", "scope": "write" },
     { "id": "service", "method": "GET", "path": "/services/{service}", "scope": "authenticated" },
     { "id": "service-admin", "method": "GET", "path": "/services/admin", "scope": "global_admin" },
-    { "id": "search", "method": "POST", "path": "/search", "scope": "authenticated", "readOnly": true }
+    { "id": "search", "method": "POST", "path": "/search", "scope": "authenticated", "readOnly": true },
+    { "id": "slow-search", "method": "POST", "path": "/namespaces/{namespace}/slow-search", "scope": "read", "readOnly": true }
   ],
   "commands": {
     "get-service": {
@@ -187,8 +188,8 @@
       "output": { "type": "object", "properties": { "a": { "$ref": "#/$defs/a%2Fnot" } }, "$defs": { "a": { "not": {} } } }
     },
     "slow-pattern": {
-      "route": "services",
-      "description": "List services with patterns that java.util.regex matches slowly",
+      "route": "slow-search",
+      "description": "Search with patterns that java.util.regex matches slowly",
       "input": {
         "type": "object",
         "properties": {

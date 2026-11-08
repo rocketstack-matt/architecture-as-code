@@ -531,7 +531,7 @@ class TestExtensionToolsShould {
 
     @Test
     void match_a_long_argument_that_overflows_the_stack_of_java_util_regex() {
-        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "POST", "/r", "authenticated", false);
         Map<String, Object> input = Map.of("type", "object",
                 "properties", Map.of("text", Map.of("type", "string", "pattern", "^(a|b)*$")));
         ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
@@ -595,7 +595,7 @@ class TestExtensionToolsShould {
     }
 
     private static ExtensionTools.ExtensionTool textCommand(String pattern) {
-        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "POST", "/r", "authenticated", false);
         Map<String, Object> input = Map.of("type", "object",
                 "properties", Map.of("text", Map.of("type", "string", "pattern", pattern)));
         ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
