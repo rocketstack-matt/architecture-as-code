@@ -130,7 +130,7 @@ Some decorator types are drawn on the diagram as an overlay. Each node or relati
 | Control evaluations | `control-evaluation` | The latest result of each control: see [Control Evaluations](#control-evaluations) |
 | Deployments | `deployment` | The status of the latest deployment, by `start-time`: completed (OK), pending or in progress (Info), rolled back (Warning), failed (Error) |
 
-The legend at the bottom of the diagram lists each overlay that has decorators on screen, with how many elements show each status. Clear an overlay's checkbox to hide it. On a narrow screen, the legend is closed: tap **Overlays** to open it. **View all** opens the Decorators tab filtered to that type. While the architecture is open, the overlays and the Decorators tab refresh every 5 seconds.
+The legend at the bottom of the diagram lists each overlay that has decorators on screen, with how many elements show each status. Clear an overlay's checkbox to hide it. On a screen narrower than 1024 pixels, the legend starts closed: tap **Overlays** to open it. **View all** opens the Decorators tab filtered to that type. While the architecture is open, the overlays and the Decorators tab refresh every 5 seconds.
 
 ![CALM Hub Raw JSON Viewer](/img/hub-ui/json-view.png)
 
@@ -226,7 +226,7 @@ Selecting a control from a **Control Domain** (e.g. `security` or `ai-governance
 An operator can install extensions (see [Extensions](../calm-hub/index.md#extensions), and the
 [extension tutorial](../tutorials/advanced/hub-extension.md)). The UI groups what they add:
 
-* **Home page:** an **Extensions** section under **Namespaces**, with one card per extension. A card shows the extension name, its provider and up to three figures. Click a card to open the extension screen.
+* **Home page:** an **Extensions** section under **Namespaces**, with one card per extension. A card shows the extension name, its provider and up to three figures, or one line of text. If the extension has a screen, click the card to open it.
 * **Side menu:** an **Extensions** group with one entry per extension screen.
 * **Architecture and pattern pages:** one **Extensions** tab. Each extension has a collapsible section with its actions and its tab content. With more than five extensions, a filter shows above the sections.
 * **Node details:** one **Extensions** section, with a collapsible part for each extension.
