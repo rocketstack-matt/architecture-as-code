@@ -56,7 +56,7 @@ a query parameter.
 | `resourceType` | `architectures` or `patterns` | `designer-tab`, `detail-panel`, `action` |
 | `resourceId` | The resource id, for example `1` | `designer-tab`, `detail-panel`, `action` |
 | `version` | The version on screen, for example `1.0.0` | `designer-tab`, `detail-panel`, `action` |
-| `selectedElement` | The `unique-id` of the selected element | `detail-panel` for a node, and `designer-tab` and `action` for a node or a relationship |
+| `selectedElement` | The `unique-id` of the selected node | `detail-panel`, when you click a node. A link that names a node with `?node=<unique-id>` also sends it to `designer-tab` and `action`. A tab change clears a clicked selection |
 
 CALM Hub checks only the format of a `{namespace}` or `{domain}` path value. A user can send any value, so check that the user may see the
 data that you return (see [Extension access](extension-access.md#what-hub-checks)).
