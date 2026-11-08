@@ -6,6 +6,7 @@ import { BUILTIN_DECORATOR_VIEWS } from '../../../../test-support/decorator-view
 import type { ElementOverlay, OverlayDecoratorView, OverlayStatus, ViewOverlay } from '../../../contracts/contracts.js';
 import { fakeElement, fakeView, fakeViewOverlays } from '../../../../test-support/fake-overlays.js';
 import { BUILTIN_MARKER, extensionMarkerColour } from '../../../../extensions/extensionIdentity.js';
+import { mockViewport } from '../../../../test-support/layout-mocks.js';
 
 const [evaluationView, deploymentView] = BUILTIN_DECORATOR_VIEWS as OverlayDecoratorView[];
 const element = (status: OverlayStatus): ElementOverlay => ({ status, value: status, entries: [] });
@@ -119,5 +120,44 @@ describe('OverlayLegend with extensions', () => {
         const state = renderOverlays(overlays);
         fireEvent.click(screen.getByRole('checkbox', { name: 'All views of Extension ext-1' }));
         expect(state.setViewsShown).toHaveBeenCalledWith(['ext-1/risk', 'ext-1/cost'], false);
+    });
+});
+
+describe('OverlayLegend on a phone', () => {
+    function renderAt(isMobile: boolean, hiddenViews: ReadonlySet<string> = new Set()) {
+        const restore = mockViewport(isMobile);
+        const overlays: ViewOverlay[] = [
+            { view: evaluationView, elements: new Map([['a', element('error')]]) },
+            { view: deploymentView, elements: new Map([['a', element('warn')]]) },
+        ];
+        render(
+            <DecoratorOverlayContext.Provider value={{ overlays, hiddenViews, toggleView: vi.fn() }}>
+                <OverlayLegend />
+            </DecoratorOverlayContext.Provider>
+        );
+        return restore;
+    }
+
+    it('starts collapsed to one button that says how many views are on, and expands', () => {
+        const restore = renderAt(true, new Set(['deployment/deployment']));
+        const toggle = screen.getByRole('button', { name: 'Overlays (1 of 2 on)' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryAllByTestId('overlay-legend-row')).toHaveLength(0);
+
+        fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getAllByTestId('overlay-legend-row')).toHaveLength(2);
+
+        fireEvent.click(toggle);
+        expect(screen.queryAllByTestId('overlay-legend-row')).toHaveLength(0);
+        restore();
+    });
+
+    it('shows every row with no collapse button on a desktop', () => {
+        const restore = renderAt(false);
+        expect(screen.getAllByTestId('overlay-legend-row')).toHaveLength(2);
+        expect(screen.queryByRole('button', { name: /^Overlays/ })).not.toBeInTheDocument();
+        expect(screen.getByTestId('overlay-legend').style.maxWidth).toBe('calc(100vw - 120px)');
+        restore();
     });
 });
