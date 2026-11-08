@@ -829,7 +829,7 @@ calm hub ext <id> <command> [--input <file|->] [--arg key=value]... [options]
 | `-c, --calm-hub-url <url>` | all | CalmHub instance. |
 | `-f, --format <format>` | all | Output format: `json` (default) or `pretty`. For `ext`, it changes only the error format. |
 
-`ext` reads the command's route from CalmHub. Input properties that match a `{param}` in the route path fill the path. A value that fills the path cannot contain `/`: `ext` refuses it before the call. The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. CalmHub checks the route and the scope, but not the input: the extension checks it. An error is printed with its body as CalmHub sent it.
+`ext` reads the command's route from CalmHub. Input properties that match a `{param}` in the route path fill the path. A value that fills the path cannot contain `/`: `ext` refuses it before the call. The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. CalmHub checks the route, the path and the scope, but not the input: the extension checks it. An error is printed with its body as CalmHub sent it. If the extension replies with a 3xx, 401, 407 or 5xx status, or with a content type that CalmHub does not pass on, CalmHub sends a generic `502` in its place.
 
 ```shell
 calm hub extensions list -f pretty

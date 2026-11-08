@@ -9,8 +9,7 @@ sidebar_position: 4
 
 A `screen`, `designer-tab`, `landing-card` or `detail-panel` route returns **blocks**: JSON that the
 Hub UI draws. No extension code runs in the browser. For where each contribution shows and the
-context it gets, see the [extension point reference](extension-points.md) and
-[Hub extension blocks](../working-with-calm/hub-extension-blocks.md).
+context it gets, see the [extension point reference](extension-points.md).
 
 The JSON Schema of a reply is at `GET /api/calm/extensions/schema/0/blocks.schema.json`, for a
 signed-in user. CALM Hub does not check a reply against it: the UI checks only `hubApi` and

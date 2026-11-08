@@ -6,10 +6,10 @@
   "description": "A demo extension: STRIDE threats, their severity and mitigations for architectures.",
   "provider": "Demo security",
   "routes": [
-    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated" },
-    { "id": "tab", "method": "GET", "path": "/tab", "scope": "authenticated" },
-    { "id": "card", "method": "GET", "path": "/card", "scope": "authenticated" },
-    { "id": "element", "method": "GET", "path": "/element", "scope": "authenticated" },
+    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated", "readOnly": true },
+    { "id": "tab", "method": "GET", "path": "/tab", "scope": "authenticated", "readOnly": true },
+    { "id": "card", "method": "GET", "path": "/card", "scope": "authenticated", "readOnly": true },
+    { "id": "element", "method": "GET", "path": "/element", "scope": "authenticated", "readOnly": true },
     { "id": "start-assessment", "method": "POST", "path": "/assessments", "scope": "authenticated" },
     { "id": "threats", "method": "GET", "path": "/threats", "scope": "authenticated", "readOnly": true }
   ],

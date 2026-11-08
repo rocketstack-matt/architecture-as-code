@@ -197,7 +197,7 @@ extension", for example `ExtensionScreenPage` on a deep link.
 
 ### Extension UI layout
 
-Each contribution kind has one place (see `docs/docs/working-with-calm/hub-extension-blocks.md`). Do not add a
+Each contribution kind has one place (see `docs/docs/calm-hub/extension-points.md`). Do not add a
 per-extension toolbar button or tab: it does not scale to many extensions.
 
 - Home: `IntroBrowse` shows an `ExtensionCard` per extension with a `landing-card` or a `screen`.

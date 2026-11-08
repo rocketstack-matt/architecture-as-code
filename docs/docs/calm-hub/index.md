@@ -164,7 +164,7 @@ Put one folder for each extension in `calm.extensions.dir`, with an `extension.j
 
 | Setting | Default | Purpose |
 |:--------|:--------|:--------|
-| `calm.extensions.dir` | not set | The folder of manifests. When it is not set, CALM Hub has no extensions |
+| `calm.extensions.dir` | not set | The folder of manifests. When it is not set, CALM Hub loads only the built-in [decorator views](decorator-views.md) |
 | `calm.extensions."<id>".enabled` | `true` | Set `false` to turn off an extension |
 | `calm.extensions."<id>".order` | `0` | Lower values come first in the list. Equal values sort by id |
 | `calm.extensions."<id>".backend-url` | not set | The base URL of the extension service. Required for an enabled extension with routes |

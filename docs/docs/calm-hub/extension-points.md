@@ -56,7 +56,7 @@ a query parameter.
 | `resourceType` | `architectures` or `patterns` | `designer-tab`, `detail-panel`, `action` |
 | `resourceId` | The resource id, for example `1` | `designer-tab`, `detail-panel`, `action` |
 | `version` | The version on screen, for example `1.0.0` | `designer-tab`, `detail-panel`, `action` |
-| `selectedElement` | The `unique-id` of the selected element | `detail-panel` for a node, and `designer-tab` and `action` for a node or a relationship |
+| `selectedElement` | The `unique-id` of the selected node | `detail-panel`, when you click a node. A link that names a node with `?node=<unique-id>` also sends it to `designer-tab` and `action`. A tab change clears a clicked selection |
 
 CALM Hub checks only the format of a `{namespace}` or `{domain}` path value. A user can send any value, so check that the user may see the
 data that you return (see [Extension access](extension-access.md#what-hub-checks)).
@@ -98,7 +98,9 @@ A compact card in the **Extensions** section of the home page.
 
 - Hub calls only the first `landing-card` of an extension.
 - The card shows the extension `name` and `provider`, and a headline from the reply: the first
-  three items of the first `stats` block. With no `stats` items, it shows the text of the first
+  three valid items of the first `stats` block. A valid item has a string `label` and a string or number
+  `value`. Hub ignores other items. If a card cannot render, it shows an error and the other cards stay.
+  With no valid `stats` items, it shows the text of the first
   `alert` block, on one line. Hub does not show other blocks on the card.
 - A card gets no context. If the call fails, the card shows no headline.
 - An extension with a `screen` and no `landing-card` also gets a card, with no headline.
@@ -127,6 +129,7 @@ A button in the extension's section of the **Extensions** tab.
 - The route can use any method. For a method other than `GET` and `DELETE`, the context also goes
   in the JSON body.
 - Hub asks the user to confirm when the route is not `readOnly`.
+- Hub does not cancel a confirmed call when the user changes the selection or leaves the page.
 - The action shows only when the context gives a value for each placeholder in the route path.
 - An action does not accept user input, and Hub does not show its reply. A failed call shows
   "Extension request failed."
