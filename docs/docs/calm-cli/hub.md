@@ -457,7 +457,7 @@ echo '{"namespace":"finos","name":"payments"}' | calm hub ext example-services a
 
 Input properties that match a `{param}` in the route path fill the path. The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. A JSON reply is printed as JSON, and a text reply as text.
 
-CALM Hub checks the route, the path and the scope. It does not check the input against the input schema, as it does for an MCP tool: the extension checks it. If CALM Hub or the extension rejects the call, the CLI exits with code 1 and prints the error with the body as CALM Hub sent it:
+CALM Hub checks the route, the path and the scope. It does not check the input against the input schema, as it does for an MCP tool: the extension checks it. If CALM Hub or the extension rejects the call, the CLI exits with code 1 and prints the error with the body as CALM Hub sent it. If the extension replies with a 3xx, 401, 407 or 5xx status, or with a content type that CALM Hub does not pass on, CALM Hub sends a generic `502` with the error `The extension failed` in its place:
 
 ```json
 {"status":400,"error":"Input is not valid","request":"POST /api/calm/extensions/example-services/api/namespaces/finos/services","body":{"error":"Input is not valid"}}
