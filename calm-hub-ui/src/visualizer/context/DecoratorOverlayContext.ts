@@ -12,7 +12,7 @@ import { viewKey } from '../overlay/overlayEngine.js';
 /** The id of the built-in view whose decision callouts and hover details read control-evaluation fields. */
 export const CONTROL_EVALUATION_VIEW_ID = 'control-evaluation';
 
-/** An operator can use the same view id for other data, so the id alone does not identify the built-in view. */
+/** When the built-in extension is disabled, an operator view can take its id, so the id alone does not identify it. */
 export const isControlEvaluationView = (view: DecoratorView): boolean =>
     view.id === CONTROL_EVALUATION_VIEW_ID && view.source?.builtIn === true;
 

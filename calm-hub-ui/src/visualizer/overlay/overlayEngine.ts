@@ -20,7 +20,7 @@ const isOverlayStatus = (value: unknown): value is OverlayStatus =>
 
 export const hasOverlay = (view: DecoratorView): view is OverlayDecoratorView => !!view.overlay;
 
-/** Two extensions can use the same view id, so a view is keyed by its extension too. */
+/** A view keyed by its extension too: a disabled built-in frees its id for another extension. */
 export const viewKey = (view: DecoratorView): string => (view.source ? `${view.source.id}/${view.id}` : view.id);
 
 /** "Release risk · Release tracker"; a built-in view says "Built-in". */

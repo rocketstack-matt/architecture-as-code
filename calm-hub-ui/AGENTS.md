@@ -187,7 +187,7 @@ details drawer and `Drawer`. Do not add a second request. `Drawer` gives the ove
 `DecoratorOverlayContext`. Nodes and
 edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
 Evaluations panel read control-evaluation fields, so they use `isControlEvaluationView()`: the id and
-`source.builtIn`. An operator view can have the same id.
+`source.builtIn`: when the built-in extension is disabled, an operator view can take its id.
 
 `ExtensionService` uses its own axios instance, not `apiClient`, so a registry or extension call failure does not
 open the global auth or outage page. The exception is a registry `401`: the registry is a Hub call, so it opens
@@ -221,7 +221,9 @@ per-extension toolbar button or tab: it does not scale to many extensions.
   Give `ExtensionSections` and `ExtensionSlot` a `headingLevel` one below the heading of the place that holds
   them: `h3`/`h4` in the Extensions tab, `h5`/`h6` in the node details, `h2` on a screen page.
 - Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
-  `view.id` alone: two extensions can use the same view id. `extensionMarkerColour()` gives the marker colour.
+  `view.id` alone. Hub does not start when two enabled extensions declare the same view id, but a disabled
+  built-in frees its id for an operator view, and a stored legend choice must not move to it.
+  `extensionMarkerColour()` gives the marker colour.
   When there is no stored choice, `useOverlayVisibility` switches on the built-in views and the first 3 extension
   views in registry order. It takes the registered views, not the views drawn, so a default is the same on each diagram.
 
