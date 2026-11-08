@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -93,7 +94,11 @@ class TestExtensionAssertionRejectingMechanismShould {
         ChallengeData challenge = mechanism.getChallenge(mockRoutingContext).await().indefinitely();
 
         assertEquals(401, challenge.status);
-        assertTrue("WWW-Authenticate".equalsIgnoreCase(challenge.headerName.toString()));
-        assertEquals("Bearer error=\"invalid_token\"", challenge.headerContent);
+        String wwwAuthenticate = challenge.getHeaders().entrySet().stream()
+                .filter(header -> "WWW-Authenticate".equalsIgnoreCase(header.getKey().toString()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+        assertEquals("Bearer error=\"invalid_token\"", wwwAuthenticate);
     }
 }
