@@ -145,6 +145,28 @@ describe('useArchitectureDecorators', () => {
         expect(result.current).toEqual({ status: 'loaded', decorators: [] });
     });
 
+    it('shows the error state, not an empty list, when the slug lookup fails before anything loaded', async () => {
+        resolve.mockRejectedValueOnce(new Error('mappings 500'));
+        const { result } = renderFor(architecture);
+        await flush();
+        expect(result.current).toEqual({ status: 'error' });
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('does not keep a failed slug lookup, and looks it up again on the next refresh', async () => {
+        resolve.mockRejectedValueOnce(new Error('mappings 500'));
+        fetch.mockResolvedValue([decorator('d1')]);
+        const { result } = renderFor(architecture);
+        await flush();
+
+        await advance(5000);
+        expect(resolve).toHaveBeenCalledTimes(2);
+        expect(result.current).toEqual({ status: 'loaded', decorators: [decorator('d1')] });
+
+        await advance(5000);
+        expect(resolve).toHaveBeenCalledTimes(2);
+    });
+
     it('keeps the last list when a refresh fails', async () => {
         fetch.mockResolvedValueOnce([decorator('d1')]).mockRejectedValue(new Error('hub down'));
         const { result } = renderFor(architecture);

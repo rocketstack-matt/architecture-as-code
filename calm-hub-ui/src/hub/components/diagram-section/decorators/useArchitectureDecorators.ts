@@ -36,7 +36,7 @@ export function useArchitectureDecorators(service: CalmService, data: Data, isAr
         // Polls can overlap on a slow network; a response older than one already applied is dropped.
         let requested = 0;
         let applied = 0;
-        // A slug is resolved to the version's target once, not on every poll. An unresolved one is retried.
+        // A slug is resolved to the version's target once, not on every poll. A failed or unresolved lookup is retried.
         let target: Promise<string | undefined> | undefined;
         let failures = 0;
         let ticksToSkip = 0;
@@ -65,10 +65,16 @@ export function useArchitectureDecorators(service: CalmService, data: Data, isAr
             setLoaded((prev) => (prev?.source === data && prev.state.status === 'loaded' ? prev : { source: data, state: ERROR }));
         };
         const resolveTarget = async () => {
-            target ??= service.resolveArchitectureVersionTarget(name, id, version);
-            const resolved = await target;
+            const lookup = (target ??= service.resolveArchitectureVersionTarget(name, id, version));
+            const forget = () => {
+                if (target === lookup) target = undefined;
+            };
+            const resolved = await lookup.catch((error: unknown) => {
+                forget();
+                throw error;
+            });
             if (!resolved) {
-                target = undefined;
+                forget();
                 throw new Error(`Could not resolve architecture ${id}`);
             }
             return resolved;

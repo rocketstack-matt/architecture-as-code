@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { OverlayLegend } from './OverlayLegend.js';
 import { DecoratorOverlayContext, type DecoratorOverlayState } from '../../../context/DecoratorOverlayContext.js';
@@ -123,9 +123,12 @@ describe('OverlayLegend with extensions', () => {
     });
 });
 
-describe('OverlayLegend on a phone', () => {
+describe('OverlayLegend on a narrow screen', () => {
+    let restoreViewport = () => {};
+    afterEach(() => restoreViewport());
+
     function renderAt(isMobile: boolean, hiddenViews: ReadonlySet<string> = new Set()) {
-        const restore = mockViewport(isMobile);
+        restoreViewport = mockViewport(isMobile);
         const overlays: ViewOverlay[] = [
             { view: evaluationView, elements: new Map([['a', element('error')]]) },
             { view: deploymentView, elements: new Map([['a', element('warn')]]) },
@@ -135,11 +138,10 @@ describe('OverlayLegend on a phone', () => {
                 <OverlayLegend />
             </DecoratorOverlayContext.Provider>
         );
-        return restore;
     }
 
     it('starts collapsed to one button that says how many views are on, and expands', () => {
-        const restore = renderAt(true, new Set(['deployment/deployment']));
+        renderAt(true, new Set(['deployment/deployment']));
         const toggle = screen.getByRole('button', { name: 'Overlays (1 of 2 on)' });
         expect(toggle).toHaveAttribute('aria-expanded', 'false');
         expect(screen.queryAllByTestId('overlay-legend-row')).toHaveLength(0);
@@ -150,14 +152,12 @@ describe('OverlayLegend on a phone', () => {
 
         fireEvent.click(toggle);
         expect(screen.queryAllByTestId('overlay-legend-row')).toHaveLength(0);
-        restore();
     });
 
     it('shows every row with no collapse button on a desktop', () => {
-        const restore = renderAt(false);
+        renderAt(false);
         expect(screen.getAllByTestId('overlay-legend-row')).toHaveLength(2);
         expect(screen.queryByRole('button', { name: /^Overlays/ })).not.toBeInTheDocument();
         expect(screen.getByTestId('overlay-legend').style.maxWidth).toBe('calc(100vw - 120px)');
-        restore();
     });
 });
