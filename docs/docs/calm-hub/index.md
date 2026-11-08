@@ -304,8 +304,8 @@ views-only manifest. Hub draws the results; the service supplies no browser code
    credentials with the decorator API, not a user's token. If the decorator type is
    reserved, the operator must also allow this principal to write that type.
 2. Write decorators with a stable `type`, architecture version URLs in `target`,
-   element ids in `applies-to`, and results in `data`. A known `$schema` is validated on write. For reserved types, append a new
-   result and use Hub's `supersedes` field to replace an old result.
+   element ids in `applies-to`, and results in `data`. A known `$schema` is validated on write. For a reserved type, `PUT` the new
+   result to the old decorator id. Hub stores it as a new decorator and keeps the old one in the history.
 3. Put this manifest at `<calm.extensions.dir>/scanner/extension.json`, then restart Hub:
 
 ```json

@@ -134,4 +134,6 @@ To restrict a namespace: delete the `* read` record. The AND rule for child name
 
 ## Reserved decorator types
 
-`calm.decorators.reserved."<type>".writers` lists the principals that may create, update or delete a decorator of a reserved type. `DecoratorWriteService` checks it after the `WRITE` (or `GLOBAL_ADMIN` for delete) permission check, for REST and MCP. Any other caller gets 403, a namespace grant does not override it. No type is reserved by default.
+`calm.decorators.reserved."<type>".writers` lists the principals that may create or update a decorator of a reserved type. `DecoratorWriteService` checks it after the `WRITE` permission check, for REST and MCP. Any other caller gets 403, a namespace grant does not override it. No type is reserved by default.
+
+Delete needs `GLOBAL_ADMIN`, and a global admin does not have to be a writer of the reserved types in the history. The audit log records the delete as for other deletes. `DecoratorWriteService.deleteDecorator` keeps the writer check for a caller that is not a global admin.
