@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 abstract class ExtensionAssertionRejection {
 
     static final String PROTECTED_PATH = "/api/calm/extensions/schema/0/blocks.schema.json";
+    static final String TEST_SECURITY_PACKAGE = "io.quarkus.test.security";
 
     @Inject
     @Any
@@ -51,6 +52,8 @@ abstract class ExtensionAssertionRejection {
         int rejecting = mechanisms.select(ExtensionAssertionRejectingMechanism.class).get().getPriority();
         mechanisms.stream()
                 .filter(mechanism -> !(mechanism instanceof ExtensionAssertionRejectingMechanism))
+                // quarkus-test-security adds these on the test classpath only; a real Hub does not have them.
+                .filter(mechanism -> !TEST_SECURITY_PACKAGE.equals(mechanism.getClass().getPackageName()))
                 .forEach(mechanism -> assertTrue(mechanism.getPriority() < rejecting,
                         mechanism.getClass().getName() + " runs before the assertion check"));
     }
