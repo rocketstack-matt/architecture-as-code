@@ -694,6 +694,11 @@ describe('CalmService', () => {
             mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(200, { values: [] });
             expect(await calmService.resolveArchitectureVersionTarget(namespace, 'unknown-slug', '1.0.0')).toBeUndefined();
         });
+
+        it.each([500, 401])('rejects when the mappings request fails with %i', async (status) => {
+            mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(status);
+            await expect(calmService.resolveArchitectureVersionTarget(namespace, 'my-arch', '1.0.0')).rejects.toThrow();
+        });
     });
 
     describe('fetchDecoratorsForTarget', () => {

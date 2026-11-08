@@ -61,14 +61,16 @@ The home page card shows the extension `name` and `provider`, and a headline fro
 `landing-card` reply:
 
 - the first three items of the first `stats` block, or
-- when there is no `stats` block, the text of the first `alert` block, on one line.
+- when that block has no valid item, the text of the first `alert` block, on one line.
 
-Hub does not show the other blocks on the card. Put the detail on a `screen`: the card opens
+A valid item has a string `label` and a string or number `value`. Hub ignores other items. If a card
+cannot render, it shows an error and the other cards stay. Hub does not show the other blocks on the card. Put the detail on a `screen`: the card opens
 the first `screen` of the extension. A card without a `screen` is not a link.
 
 ## Actions
 
 An `action` contribution declares a button in the Extensions tab. Hub calls its route and asks for confirmation when
 `readOnly` is false. Context also goes in the JSON body for methods other than GET and DELETE.
+Hub does not cancel a confirmed call when the user changes the selection or leaves the page.
 Actions show only when their route placeholders have context values.
 Actions do not accept user input or render a reply in this version.

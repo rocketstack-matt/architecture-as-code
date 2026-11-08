@@ -71,6 +71,28 @@ describe('ExtensionCard', () => {
         expect(screen.getByText('2.1 days')).not.toHaveClass('truncate');
     });
 
+    it.each([
+        ['a null item', [null]],
+        ['an object value', [{ label: 'x', value: { n: 1 } }]],
+    ])('shows the card without figures for %s', async (_, items) => {
+        const call = vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [{ type: 'stats', items }] });
+        renderCard(fakeExtension(1));
+        await waitFor(() => expect(call).toHaveBeenCalled());
+        expect(screen.getByTestId('browse-extension')).toHaveTextContent('Extension 1');
+        expect(screen.queryByTestId('extension-card-figures')).not.toBeInTheDocument();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('shows only the valid figures of a stats block', async () => {
+        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({
+            hubApi: 0,
+            blocks: [{ type: 'stats', items: [null, { label: 'x', value: { n: 1 } }, { label: 'Reviews', value: 3 }] }],
+        });
+        renderCard(fakeExtension(1));
+        expect(await screen.findByText('Reviews')).toBeInTheDocument();
+        expect(screen.getByTestId('extension-card-figures').style.gridTemplateColumns).toBe('repeat(1, minmax(0, 1fr))');
+    });
+
     it('shows the card without figures when the request fails', async () => {
         const call = vi.spyOn(ExtensionService.prototype, 'call').mockRejectedValue(new Error('down'));
         renderCard(fakeExtension(1));
@@ -114,6 +136,21 @@ describe('IntroBrowse extensions', () => {
         expect(namespaces).toHaveClass('grid-cols-2', 'sm:grid-cols-3');
         expect(extensions).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
         expect(extensions).not.toHaveClass('grid-cols-2');
+    });
+
+    it('keeps the other cards when one card fails to render', () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+        const broken = { ...fakeExtension(1), name: { text: 'not a string' } } as unknown as ExtensionSummary;
+        render(
+            <MemoryRouter>
+                <ExtensionsContext.Provider value={[broken, fakeExtension(2)]}>
+                    <IntroBrowse namespaceCounts={[]} domainCounts={[]} />
+                </ExtensionsContext.Provider>
+            </MemoryRouter>
+        );
+        expect(screen.getByRole('alert')).toHaveTextContent('This extension sent content that CALM Hub cannot show.');
+        expect(screen.getByTestId('browse-extension')).toHaveTextContent('Extension 2');
     });
 
     it('shows extensions on an empty catalogue', () => {

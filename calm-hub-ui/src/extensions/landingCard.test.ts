@@ -26,6 +26,18 @@ describe('landing card headline', () => {
         expect(cardHeadline([{ type: 'stats', items: [] }, { type: 'markdown', text: '#' }])).toBeUndefined();
     });
 
+    it('keeps only items with a string label and a string or number value', () => {
+        const items = [null, 'text', { label: 'x', value: { n: 1 } }, { label: 2, value: 1 }, { value: 1 }, { label: 'ok', value: 'yes' }];
+        expect(cardHeadline([{ type: 'stats', items } as never])).toEqual({ kind: 'stats', items: [{ label: 'ok', value: 'yes' }] });
+    });
+
+    it('falls back to the alert when no stats item is valid', () => {
+        expect(cardHeadline([{ type: 'stats', items: [null] } as never, { type: 'alert', text: 'Rolling out' }])).toMatchObject({
+            kind: 'alert',
+        });
+        expect(cardHeadline([{ type: 'stats', items: [{ label: 'x', value: { n: 1 } }] } as never])).toBeUndefined();
+    });
+
     it('accepts only a blocks reply of the extension API version', () => {
         expect(isBlocksReply({ hubApi: 0, blocks: [] }, 0)).toBe(true);
         expect(isBlocksReply({ hubApi: 1, blocks: [] }, 0)).toBe(false);

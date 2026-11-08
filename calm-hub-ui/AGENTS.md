@@ -192,6 +192,8 @@ Evaluations panel read control-evaluation fields, so they use `isControlEvaluati
 `ExtensionService` uses its own axios instance, not `apiClient`, so a registry or extension call failure does not
 open the global auth or outage page. The shared `extensionService` loads the registry one time for
 `ExtensionsProvider` and `useDecoratorViews()`. After a failed load, the next call tries again.
+`useExtensionsStatus()` gives `loading`, `loaded` or `failed`. Use it where an empty list must not mean "no
+extension", for example `ExtensionScreenPage` on a deep link.
 
 ### Extension UI layout
 
@@ -203,6 +205,9 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 - Menu: `ExtensionMenuGroup` in the navbar drawer.
 - Architecture: one `extensions` tab in `DIAGRAM_TABS`, hidden (not unknown) until the registry loads, so a link
   to it keeps the tab. `resourceExtensions()` decides if it shows.
+- Actions: `ExtensionActionButton`. A route that is not `readOnly` asks in `ConfirmActionDialog`, not
+  `window.confirm`. Do not abort it: the backend can still finish it, so a retry can write twice. An action slot
+  key leaves out the context, so a change of selection does not remount it.
 - Node details: `ExtensionDetailPanels`.
 - Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
   closed section renders nothing, so it sends no request.
