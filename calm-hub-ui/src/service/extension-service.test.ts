@@ -105,15 +105,21 @@ describe('ExtensionService', () => {
     it('rejects missing route context', () => {
         expect(() => extensionRequest('test', route, {})).toThrow('Missing extension context');
     });
-    it('treats a path value with a slash as missing, and keeps it in the query', () => {
+    it.each(['', '.', '..', 'a..b', 'a/b', 'a\\b', '50%', 'alice@x', 'a\u0000b'])('rejects the invalid path value %j', (value) => {
+        expect(() => extensionRequest('test', route, { namespace: value })).toThrow(`Invalid extension context: namespace`);
+    });
+    it.each(['.a', 'v1.2', '~x_y-z'])('accepts the path value %j', (value) => {
+        expect(extensionRequest('test', route, { namespace: value }).url).toContain(`/${value}`);
+    });
+    it('treats a path value with a slash as invalid, and keeps it in the query', () => {
         const typed = { ...route, path: '/releases/{resourceType}/{resourceId}' };
         const context = { resource: 'architectures/1', resourceType: 'architectures', resourceId: '1' };
         expect(extensionRequest('test', typed, context)).toEqual({
             url: '/api/calm/extensions/test/api/releases/architectures/1',
             params: context,
         });
-        expect(() => extensionRequest('test', { ...route, path: '/releases/{resource}' }, context)).toThrow('Missing extension context: resource');
-        expect(() => extensionRequest('test', typed, { ...context, resourceId: 'a/b' })).toThrow('Missing extension context: resourceId');
+        expect(() => extensionRequest('test', { ...route, path: '/releases/{resource}' }, context)).toThrow('Invalid extension context: resource');
+        expect(() => extensionRequest('test', typed, { ...context, resourceId: 'a/b' })).toThrow('Invalid extension context: resourceId');
     });
     it('rejects traversal paths', () => {
         expect(() => extensionRequest('test', { ...route, path: '/../x' }, {})).toThrow('Invalid extension route');

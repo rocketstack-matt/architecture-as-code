@@ -85,6 +85,11 @@ public class ExtensionTools {
     static final int MAX_SCHEMA_DEPTH = 64;
     // The input check takes time in proportion to the argument size times the pattern size, so Hub limits both.
     static final int MAX_ARGUMENTS_BYTES = 1024 * 1024;
+    // The Vert.x limit on the request line of a REST call, which an MCP call must not get past.
+    static final int MAX_PATH_AND_QUERY_LENGTH = 4096;
+    static final int MAX_VALIDATION_ERRORS = 20;
+    // Hub refuses these parts of a path (ADR 0011). The same rule as @finos/calm-shared buildExtensionRequest.
+    private static final Pattern REFUSED_PATH_VALUE = Pattern.compile("\\.\\.|[/\\\\%@\\x00-\\x1f\\x7f]");
     private static final String META_SCHEMA_BASE = "https://json-schema.org/draft/2020-12/";
     private static final String META_SCHEMA = META_SCHEMA_BASE + "schema";
     // Bundled in vertx-json-schema under this classpath folder.
@@ -723,9 +728,12 @@ public class ExtensionTools {
         }
         List<OutputUnit> errors = result.getErrors() == null || result.getErrors().isEmpty() ? List.of(result) : result.getErrors();
         StringBuilder sb = new StringBuilder("Error: The input does not match the schema of this command:");
-        for (OutputUnit error : errors) {
+        for (OutputUnit error : errors.subList(0, Math.min(errors.size(), MAX_VALIDATION_ERRORS))) {
             String location = error.getInstanceLocation() == null ? "" : error.getInstanceLocation().replaceFirst("^#", "");
             sb.append("\n- ").append(location.isEmpty() ? "/" : location).append(": ").append(error.getError());
+        }
+        if (errors.size() > MAX_VALIDATION_ERRORS) {
+            sb.append("\n- and ").append(errors.size() - MAX_VALIDATION_ERRORS).append(" more");
         }
         return sb.toString();
     }
@@ -747,14 +755,9 @@ public class ExtensionTools {
                         + "because it fills the path " + route.path());
             }
             String text = String.valueOf(value);
-            if (text.equals(".") || text.equals("..")) {
-                throw new IllegalArgumentException("Input property '" + name + "' must not be . or .., because it fills "
-                        + "the path " + route.path());
-            }
-            if (text.contains("/")) {
-                // Encoded, it is %2F, which the proxy refuses (ADR 0011).
-                throw new IllegalArgumentException("Input property '" + name + "' must not contain /, because it fills "
-                        + "the path " + route.path());
+            if (text.isEmpty() || text.equals(".") || REFUSED_PATH_VALUE.matcher(text).find()) {
+                throw new IllegalArgumentException("Input property '" + name + "' must not be empty or ., or contain .., /, "
+                        + "\\, %, @ or a control character, because it fills the path " + route.path());
             }
             rest.remove(name);
             matcher.appendReplacement(path, Matcher.quoteReplacement(encode(text)));
@@ -762,11 +765,19 @@ public class ExtensionTools {
         matcher.appendTail(path);
 
         String method = route.method();
-        if ("GET".equals(method) || "DELETE".equals(method)) {
-            List<String> query = new ArrayList<>();
-            rest.forEach((name, value) -> queryValues(value).forEach(v -> query.add(encode(name) + "=" + encode(v))));
-            return new ExtensionProxyRequest(tool.extensionId(), method, path.toString(),
-                    query.isEmpty() ? null : String.join("&", query), null, null, null, null);
+        boolean queryMethod = "GET".equals(method) || "DELETE".equals(method);
+        String query = null;
+        if (queryMethod) {
+            List<String> parameters = new ArrayList<>();
+            rest.forEach((name, value) -> queryValues(value).forEach(v -> parameters.add(encode(name) + "=" + encode(v))));
+            query = parameters.isEmpty() ? null : String.join("&", parameters);
+        }
+        if (path.length() + (query == null ? 0 : query.length() + 1) > MAX_PATH_AND_QUERY_LENGTH) {
+            throw new IllegalArgumentException("The path and query are longer than " + MAX_PATH_AND_QUERY_LENGTH
+                    + " characters.");
+        }
+        if (queryMethod) {
+            return new ExtensionProxyRequest(tool.extensionId(), method, path.toString(), query, null, null, null, null);
         }
         byte[] body = new JsonObject(rest).encode().getBytes(StandardCharsets.UTF_8);
         return new ExtensionProxyRequest(tool.extensionId(), method, path.toString(), null, "application/json", null,
