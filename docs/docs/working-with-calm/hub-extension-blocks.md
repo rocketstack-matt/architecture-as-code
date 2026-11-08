@@ -61,9 +61,10 @@ The home page card shows the extension `name` and `provider`, and a headline fro
 `landing-card` reply:
 
 - the first three items of the first `stats` block, or
-- when there is no `stats` block, the text of the first `alert` block, on one line.
+- when that block has no valid item, the text of the first `alert` block, on one line.
 
-Hub does not show the other blocks on the card. Put the detail on a `screen`: the card opens
+A valid item has a string `label` and a string or number `value`. Hub ignores other items. If a card
+cannot render, it shows an error and the other cards stay. Hub does not show the other blocks on the card. Put the detail on a `screen`: the card opens
 the first `screen` of the extension. A card without a `screen` is not a link.
 
 ## Actions

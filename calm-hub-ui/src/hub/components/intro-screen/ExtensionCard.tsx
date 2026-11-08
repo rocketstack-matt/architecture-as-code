@@ -4,6 +4,7 @@ import { ExtensionSummary } from '../../../model/extensions.js';
 import { ExtensionService } from '../../../service/extension-service.js';
 import { colors } from '../../../theme/colors.js';
 import { ExtensionMarker } from '../../../extensions/ExtensionMarker.js';
+import { ScreenErrorBoundary } from '../../../extensions/ScreenErrorBoundary.js';
 import { screenPath } from '../../../extensions/contributions.js';
 import { CardHeadline, cardHeadline, isBlocksReply } from '../../../extensions/landingCard.js';
 
@@ -56,8 +57,7 @@ function Headline({ headline }: { headline: CardHeadline }) {
     );
 }
 
-/** A compact home page card: the extension's name, provider and landing card headline. Opens its first screen. */
-export function ExtensionCard({ extension }: { extension: ExtensionSummary }) {
+function ExtensionCardContent({ extension }: { extension: ExtensionSummary }) {
     const headline = useCardHeadline(extension);
     const screen = extension.contributes.screen?.[0];
     const style = { border: `1px solid ${colors.redesign.border}`, color: colors.redesign.bodyStrong };
@@ -92,5 +92,14 @@ export function ExtensionCard({ extension }: { extension: ExtensionSummary }) {
         >
             {body}
         </Link>
+    );
+}
+
+/** A compact home page card: the extension's name, provider and landing card headline. Opens its first screen. */
+export function ExtensionCard({ extension }: { extension: ExtensionSummary }) {
+    return (
+        <ScreenErrorBoundary>
+            <ExtensionCardContent extension={extension} />
+        </ScreenErrorBoundary>
     );
 }
