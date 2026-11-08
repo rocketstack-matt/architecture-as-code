@@ -27,7 +27,8 @@ export function OverlayBadge({ shown, presenting }: { shown: ShownOverlay; prese
     const button = useRef<HTMLButtonElement>(null);
     const close = useCallback((restoreFocus: boolean) => {
         setAnchor(null);
-        if (restoreFocus) button.current?.focus();
+        // The badge can be out of view after a pan; a scroll to it would move the diagram's pane.
+        if (restoreFocus) button.current?.focus({ preventScroll: true });
     }, []);
     const toggle = (event: MouseEvent<HTMLButtonElement>) => {
         // The node must not take the click as a selection.

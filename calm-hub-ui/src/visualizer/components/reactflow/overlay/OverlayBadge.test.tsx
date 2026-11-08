@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { ReactFlowProvider, useStoreApi } from 'reactflow';
+import type { ReactNode } from 'react';
 import { DecoratorOverlayContext } from '../../../context/DecoratorOverlayContext.js';
 import { fakeDecorator, fakeView } from '../../../../test-support/fake-overlays.js';
 import { extensionMarkerColour } from '../../../../extensions/extensionIdentity.js';
@@ -8,6 +10,23 @@ import { detailsPosition } from './detailsPosition.js';
 import { OVERLAY_STYLES, overlayOutline } from './overlayStyle.js';
 import { BUILTIN_DECORATOR_VIEWS } from '../../../../test-support/decorator-views.js';
 import type { OverlayDecoratorView, OverlayStatus } from '../../../contracts/contracts.js';
+
+type FlowStore = ReturnType<typeof useStoreApi>;
+
+/** The details read the diagram's viewport, so they need React Flow's store; `onStore` gives it to the test. */
+function Flow({ children, onStore }: { children: ReactNode; onStore?: (store: FlowStore) => void }) {
+    return (
+        <ReactFlowProvider>
+            <StoreProbe onStore={onStore} />
+            {children}
+        </ReactFlowProvider>
+    );
+}
+
+function StoreProbe({ onStore }: { onStore?: (store: FlowStore) => void }) {
+    onStore?.(useStoreApi());
+    return null;
+}
 
 const deploymentView = BUILTIN_DECORATOR_VIEWS.find((v) => v.id === 'deployment') as OverlayDecoratorView;
 const shown = (status: OverlayStatus, value: string) => ({ view: deploymentView, overlay: { status, value, entries: [] } });
@@ -65,14 +84,18 @@ describe('OverlayBadge details', () => {
     const riskShown = { view, overlay: { status: 'error' as const, value: 'high', entries: [entry('d1', 'high', 'error'), entry('d2', 'low', 'ok')] } };
 
     function renderBadge(onOpenView = vi.fn(), onNodeClick = vi.fn()) {
+        let store: FlowStore | undefined;
         render(
-            <DecoratorOverlayContext.Provider value={{ overlays: [], hiddenViews: new Set(), toggleView: vi.fn(), onOpenView }}>
-                <div onClick={onNodeClick}>
-                    <OverlayBadge shown={riskShown} presenting={false} />
-                </div>
-            </DecoratorOverlayContext.Provider>
+            <Flow onStore={(s) => { store = s; }}>
+                <DecoratorOverlayContext.Provider value={{ overlays: [], hiddenViews: new Set(), toggleView: vi.fn(), onOpenView }}>
+                    <div onClick={onNodeClick}>
+                        <OverlayBadge shown={riskShown} presenting={false} />
+                    </div>
+                </DecoratorOverlayContext.Provider>
+            </Flow>
         );
-        return { onOpenView, onNodeClick };
+        const moveViewport = (transform: [number, number, number]) => act(() => store!.setState({ transform }));
+        return { onOpenView, onNodeClick, moveViewport };
     }
 
     it('names the view and extension, and shows the extension marker', () => {
@@ -139,6 +162,38 @@ describe('OverlayBadge details', () => {
         expect(badge).not.toHaveFocus();
     });
 
+    it.each([
+        ['a pan', [40, 0, 1]],
+        ['a zoom', [0, 0, 1.5]],
+    ] as const)('closes on %s of the diagram, so the details never stay away from the badge', (_name, transform) => {
+        const { moveViewport } = renderBadge();
+        fireEvent.click(screen.getByTestId('overlay-badge'));
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        moveViewport([...transform]);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.getByTestId('overlay-badge')).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('stays open while the viewport does not move, and gives focus back to the badge when a move closes it', () => {
+        const { moveViewport } = renderBadge();
+        const badge = screen.getByTestId('overlay-badge');
+        fireEvent.click(badge);
+        moveViewport([0, 0, 1]);
+        expect(screen.getByRole('dialog')).toHaveFocus();
+        moveViewport([0, 10, 1]);
+        expect(badge).toHaveFocus();
+    });
+
+    it('does not take focus when a move closes the details and focus is elsewhere', () => {
+        const { moveViewport } = renderBadge();
+        const badge = screen.getByTestId('overlay-badge');
+        fireEvent.click(badge);
+        (document.activeElement as HTMLElement).blur();
+        moveViewport([5, 5, 1]);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(badge).not.toHaveFocus();
+    });
+
     it('opens above a badge near the bottom of a phone screen, inside the viewport', () => {
         Object.defineProperty(window, 'innerHeight', { configurable: true, value: 667 });
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 });
@@ -155,7 +210,7 @@ describe('OverlayBadge details', () => {
 
     it('marks a built-in view in the details', () => {
         const builtIn = { ...riskShown, view: fakeView('deployment', 'deployment', 'Deployments') };
-        render(<OverlayBadge shown={builtIn} presenting={false} />);
+        render(<Flow><OverlayBadge shown={builtIn} presenting={false} /></Flow>);
         fireEvent.click(screen.getByTestId('overlay-badge'));
         expect(screen.getByRole('dialog')).toHaveTextContent('Built-in (Deployments)');
     });
