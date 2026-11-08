@@ -164,7 +164,7 @@ class TestExtensionProxyServiceShould {
     }
 
     @Test
-    void accept_a_json_media_type_or_an_empty_body_of_any_type() {
+    void accept_a_json_media_type() {
         for (String type : new String[]{"application/json; charset=utf-8", "Application/JSON",
                 "application/merge-patch+json"}) {
             ExtensionProxyRequest json = new ExtensionProxyRequest("team-services", "POST", "/search", null, type,
@@ -172,9 +172,56 @@ class TestExtensionProxyServiceShould {
 
             assertThat(type, service.call(alice, json).status(), is(200));
         }
-        ExtensionProxyRequest empty = new ExtensionProxyRequest("team-services", "POST", "/search", null, "text/plain",
-                null, null, new ByteArrayInputStream(new byte[0]));
-        assertThat(service.call(alice, empty).status(), is(200));
+    }
+
+    @Test
+    void refuse_an_empty_post_that_is_not_json_before_signing() throws IOException {
+        for (String type : new String[]{"text/plain", "application/x-www-form-urlencoded", "multipart/form-data", null}) {
+            for (ByteArrayInputStream body : new ByteArrayInputStream[]{new ByteArrayInputStream(new byte[0]), null}) {
+                ExtensionProxyRequest empty = new ExtensionProxyRequest("team-services", "POST", "/search", null, type,
+                        null, null, body);
+
+                assertThat(String.valueOf(type), status(empty), is(415));
+            }
+        }
+        assertThat(backend.received(), nullValue());
+
+        ExtensionProxyRequest json = new ExtensionProxyRequest("team-services", "POST", "/search", null,
+                "application/json", null, null, new ByteArrayInputStream(new byte[0]));
+        assertThat(service.call(alice, json).status(), is(200));
+        assertThat(claims(backend.received().header("X-Calm-Hub-Identity")).has("bdh"), is(false));
+    }
+
+    @Test
+    void accept_an_empty_put_patch_or_delete_of_any_type_but_not_a_non_json_body() {
+        ExtensionManifest manifest = new ExtensionManifest("team-services", "1.0.0", 0, "Team services", null, null,
+                List.of(new Route("put", "PUT", "/item", "authenticated", false),
+                        new Route("patch", "PATCH", "/item", "authenticated", false),
+                        new Route("delete", "DELETE", "/item", "authenticated", false)), null, null);
+        when(registry.find("team-services")).thenReturn(Optional.of(new RegisteredExtension(manifest, 0,
+                Optional.of(backend.url("/base")), limits(1024, 1024, Duration.ofSeconds(5)))));
+
+        for (String method : new String[]{"PUT", "PATCH", "DELETE"}) {
+            assertThat(method, service.call(alice, new ExtensionProxyRequest("team-services", method, "/item", null,
+                    "text/plain", null, null, new ByteArrayInputStream(new byte[0]))).status(), is(200));
+            assertThat(method, status(new ExtensionProxyRequest("team-services", method, "/item", null, "text/plain",
+                    null, null, new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)))), is(415));
+        }
+    }
+
+    @Test
+    void audit_a_415_on_a_write_route_and_not_on_a_read_only_route() {
+        assertThat(status(new ExtensionProxyRequest("team-services", "POST", "/namespaces/finos/services", null,
+                "text/plain", null, null, null)), is(415));
+        assertThat(status(new ExtensionProxyRequest("team-services", "POST", "/search", null, "text/plain", null,
+                null, null)), is(415));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getOutcome(), is(AuditOutcome.FAILURE));
+        assertThat(captor.getValue().getRoute(), is("add-service"));
+        assertThat(captor.getValue().getNamespace(), is("finos"));
+        assertThat(captor.getValue().getJti(), nullValue());
     }
 
     @Test
@@ -192,7 +239,8 @@ class TestExtensionProxyServiceShould {
     @ParameterizedTest
     @CsvSource({"authenticated,false", "global_admin,false", "domain_read,false", "domain_write,false",
             "domain_admin,false", "read,true", "write,true", "admin,true"})
-    void send_ns_only_for_a_scope_that_checks_the_namespace(String scope, boolean sendsNs) throws IOException {
+    void send_and_audit_ns_only_for_a_scope_that_checks_the_namespace(String scope, boolean sendsNs)
+            throws IOException {
         ExtensionManifest manifest = new ExtensionManifest("team-services", "1.0.0", 0, "Team services", null, null,
                 List.of(new Route("route", "GET", "/domains/{domain}/namespaces/{namespace}", scope, false)), null, null);
         when(registry.find("team-services")).thenReturn(Optional.of(new RegisteredExtension(manifest, 0,
@@ -211,6 +259,28 @@ class TestExtensionProxyServiceShould {
             assertThat(claims.get("ns").asText(), is("finos"));
         }
         assertThat(claims.has("domain"), is(false));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getNamespace(), is(sendsNs ? "finos" : null));
+        assertThat(captor.getValue().getDomain(), is(scope.startsWith("domain_") ? "payments" : null));
+    }
+
+    @Test
+    void audit_a_denied_call_with_only_the_checked_namespace_and_domain() {
+        ExtensionManifest manifest = new ExtensionManifest("team-services", "1.0.0", 0, "Team services", null, null,
+                List.of(new Route("route", "GET", "/domains/{domain}/namespaces/{namespace}", "domain_read", false)),
+                null, null);
+        when(registry.find("team-services")).thenReturn(Optional.of(new RegisteredExtension(manifest, 0,
+                Optional.of(backend.url("/base")), limits(1024, 1024, Duration.ofSeconds(5)))));
+
+        assertThat(status(request("GET", "/domains/payments/namespaces/finos", null, null)), is(403));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getOutcome(), is(AuditOutcome.DENIED));
+        assertThat(captor.getValue().getNamespace(), nullValue());
+        assertThat(captor.getValue().getDomain(), is("payments"));
     }
 
     @Test

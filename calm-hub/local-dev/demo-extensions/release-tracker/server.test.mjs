@@ -14,3 +14,10 @@ test('answers 400 to a malformed JSON body, and keeps serving', async (t) => {
     assert.equal((await backend.request('POST', '/reviews', '{}')).status, 200);
     assert.equal((await backend.request('GET', '/screen')).status, 200);
 });
+
+test('accepts an empty JSON POST', async (t) => {
+    const backend = await startBackend(new URL('./server.mjs', import.meta.url), 'release-tracker');
+    t.after(backend.stop);
+
+    assert.equal((await backend.request('POST', '/reviews')).status, 200);
+});

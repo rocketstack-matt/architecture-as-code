@@ -33,8 +33,9 @@ MCP or any other client, with the same rules as for its own resources (see
   also gets `405`, not `400`.
 - CALM Hub refuses an encoded slash (`%2F`, also double-encoded) in a route path with `400`, and does
   not call the backend.
-- CALM Hub refuses a request body that is not `application/json` or another `+json` type with `415`.
-  Thus a cross-site form cannot call a route as the user.
+- CALM Hub gives `415` to a `POST` with no `application/json` or other `+json` `Content-Type`, also
+  when it has no body, and to a body of another type for the other methods. It does this before it
+  signs the assertion. Thus a cross-site form or fetch cannot call a route as the user.
 - `GET /api/calm/extensions` and the blocks schema also need a signed-in user.
   `GET /api/calm/auth/jwks` is public.
 

@@ -87,8 +87,11 @@ createServer(async (req, res) => {
     } catch (e) {
         return send(res, 413, { error: 'request body is too large' });
     }
-    if (body.length && !isJson(req.headers['content-type'])) {
-        return send(res, 415, { error: 'request body must be JSON' });
+    // A POST needs a JSON type also with no body: a cross-site form or a bodyless fetch can send one
+    // with none. The other methods need a preflight, so for them only a body must be JSON.
+    const needsJson = req.method === 'POST' || body.length > 0;
+    if (needsJson && !isJson(req.headers['content-type'])) {
+        return send(res, 415, { error: 'request must be JSON' });
     }
     let claims;
     try {

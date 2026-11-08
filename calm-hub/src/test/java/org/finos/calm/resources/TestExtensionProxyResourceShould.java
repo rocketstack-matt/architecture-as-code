@@ -232,9 +232,22 @@ class TestExtensionProxyResourceShould {
                 .when().post(BASE + "/search")
                 .then().statusCode(415)
                 .header("Content-Security-Policy", CSP)
-                .body("error", equalTo("The request body must be JSON"));
+                .header("Cache-Control", "private")
+                .body("error", equalTo("The request must be JSON"));
 
         assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void refuse_an_empty_post_that_is_not_json_and_forward_an_empty_json_post() {
+        for (String type : new String[]{"text/plain", "application/x-www-form-urlencoded"}) {
+            given().contentType(type).when().post(BASE + "/search").then().statusCode(415);
+        }
+        assertThat(backend.received(), nullValue());
+
+        given().contentType("application/json").when().post(BASE + "/search").then().statusCode(200);
+        assertThat(backend.received(), notNullValue());
     }
 
     @Test

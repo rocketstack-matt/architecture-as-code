@@ -203,15 +203,15 @@ CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route pa
 - refuses an encoded slash (`%2F`, in any case, or double-encoded) with `400`, and does not call the backend. A backend that decodes `%2F` before routing would see a path other than the one CALM Hub checked
 - decodes percent-encoded unreserved characters and uppercases other escapes before matching and forwarding. Percent-encoding in a matched literal segment gets `400`
 - on a read-only CALM Hub, gives `405`, not `400`, to a method other than `GET` with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`, `//` or `@` in the path. CALM Hub refuses such a path before it finds the route
-- refuses a request body that is not `application/json` or another `+json` type with `415`, before it signs the assertion. Thus a cross-site form cannot call a route as the user
+- gives `415`, before it signs the assertion, to a `POST` that has no `application/json` or other `+json` `Content-Type`, also when it has no body. A `PUT`, `PATCH` or `DELETE` gets `415` only for a body of another type. Thus a cross-site form or fetch cannot call a route as the user. Those three methods need a CORS preflight, which CALM Hub does not allow cross-site
 - matches the path against the declared routes only, and refuses `..`, `%2e`, `\`, `//`, `@` and their encoded forms
 - checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path
 - on a read-only CALM Hub, allows a method other than `GET` only on a `readOnly` route
 - sends only `Content-Type`, `Accept`, `Accept-Language` and its own `X-Calm-Hub-Identity` assertion. The caller's token and cookies never go to the extension
 - returns only `Content-Type` (`application/json`, `text/plain` or `text/event-stream`, and for a `4xx` reply also `application/problem+json` and other `+json` types), `Cache-Control` and `ETag`, and adds `Content-Security-Policy: sandbox; default-src 'none'`. It does not follow redirects
-- marks each reply `Cache-Control: private`, because the reply is for one user. It removes `public`, and keeps the other directives of the backend
+- marks each reply `Cache-Control: private`, because the reply is for one user. It removes `public`, and keeps the other directives of the backend. Its own error replies are also `private`
 - returns `502` or `504`, with a generic body, when the backend fails, is slow, replies with `5xx`, `3xx` or `401`, or sends another content type
-- audits every non-`readOnly` call, including `GET`, as entity type `EXTENSION` with the extension id, route id and assertion `jti`. Outcomes are `SUCCESS`, `DENIED`, `FAILURE` (other returned client errors), or `UNKNOWN` (an upstream failure or unusable reply; the backend may have completed the call)
+- audits every non-`readOnly` call, including `GET`, as entity type `EXTENSION` with the extension id, route id and assertion `jti`. The entry has the namespace only for a `read`, `write` or `admin` route, and the domain only for a `domain_*` route. Outcomes are `SUCCESS`, `DENIED`, `FAILURE` (a `415`, or another returned client error), or `UNKNOWN` (an upstream failure or unusable reply; the backend may have completed the call)
 
 Replies are buffered. Streaming is not supported yet.
 

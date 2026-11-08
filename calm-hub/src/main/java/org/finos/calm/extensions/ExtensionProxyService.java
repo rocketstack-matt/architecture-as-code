@@ -59,6 +59,7 @@ public class ExtensionProxyService {
     private static final List<String> REPLY_HEADERS = List.of("Content-Type", "ETag");
     /** The scopes for which Hub checks the namespace, so the only ones that get the {@code ns} claim. */
     private static final Set<String> NAMESPACE_SCOPES = Set.of("read", "write", "admin");
+    private static final Set<String> DOMAIN_SCOPES = Set.of("domain_read", "domain_write", "domain_admin");
     private static final Pattern NAMESPACE = Pattern.compile(ResourceValidationConstants.NAMESPACE_REGEX);
     private static final Pattern DOMAIN = Pattern.compile(ResourceValidationConstants.DOMAIN_REGEX);
 
@@ -116,15 +117,16 @@ public class ExtensionProxyService {
         URI target = ExtensionPaths.resolve(access.backend(), pathAndQuery);
         ExtensionLimits limits = extension.limits();
         byte[] body = readBody(request.body(), limits.maxRequestBytes());
-        // JSON only, so that a cross-site form cannot reach a route with the victim's identity.
-        if (body.length > 0 && !isJson(request.contentType())) {
-            throw new ExtensionProxyException(415, "The request body must be JSON");
+        if (!acceptsContentType(method, body, request.contentType())) {
+            if (audited) {
+                audit(identity, method, extension, route, namespace, domain, null, AuditOutcome.FAILURE);
+            }
+            throw new ExtensionProxyException(415, "The request must be JSON");
         }
 
         String jti = UUID.randomUUID().toString();
-        String checkedNamespace = NAMESPACE_SCOPES.contains(route.scope()) ? namespace : null;
         String assertion = signer.sign(new ExtensionAssertion(identity.getPrincipal().getName(), extension.id(), jti,
-                authMode, extension.manifest().hubApi(), route.id(), route.scope(), checkedNamespace, method,
+                authMode, extension.manifest().hubApi(), route.id(), route.scope(), namespace, method,
                 pathAndQuery), body);
         HttpRequest outbound = outboundRequest(request, method, target, body, limits, assertion);
         AuditOutcome outcome = AuditOutcome.UNKNOWN;
@@ -165,7 +167,11 @@ public class ExtensionProxyService {
             throw new ExtensionProxyException(400, "The namespace or domain in the path is not valid");
         }
         boolean audited = !route.readOnly();
-        if (!isAuthorised(identity, route.scope(), namespace, domain)) {
+        boolean authorised = isAuthorised(identity, route.scope(), namespace, domain);
+        // The backend and the audit log get only the values that Hub checked for the scope.
+        namespace = NAMESPACE_SCOPES.contains(route.scope()) ? namespace : null;
+        domain = DOMAIN_SCOPES.contains(route.scope()) ? domain : null;
+        if (!authorised) {
             if (audited) {
                 audit(identity, method, extension, route, namespace, domain, null, AuditOutcome.DENIED);
             }
@@ -355,6 +361,15 @@ public class ExtensionProxyService {
         } catch (IOException e) {
             throw new ExtensionProxyException(400, "The request body cannot be read");
         }
+    }
+
+    /**
+     * JSON only, so that a cross-site request cannot reach a route with the user's identity. A POST
+     * needs a JSON type also with no body: a cross-site form or a bodyless fetch needs no preflight.
+     * The other methods need a preflight, which Hub does not allow cross-site.
+     */
+    static boolean acceptsContentType(String method, byte[] body, String contentType) {
+        return "POST".equals(method) ? isJson(contentType) : body.length == 0 || isJson(contentType);
     }
 
     /** {@code application/json}, or an {@code application/*+json} type such as {@code application/problem+json}. */
