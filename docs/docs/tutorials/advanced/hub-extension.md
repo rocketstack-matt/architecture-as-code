@@ -52,8 +52,8 @@ at start-up. The folder name must equal the `id`.
   "name": "Release tracker",
   "provider": "Demo",
   "routes": [
-    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated" },
-    { "id": "card", "method": "GET", "path": "/card", "scope": "authenticated" },
+    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated", "readOnly": true },
+    { "id": "card", "method": "GET", "path": "/card", "scope": "authenticated", "readOnly": true },
     { "id": "releases", "method": "GET", "path": "/releases", "scope": "authenticated", "readOnly": true }
   ],
   "commands": {
@@ -156,7 +156,7 @@ secret.
 
 ## Step 4: Configure CALM Hub
 
-CALM Hub needs five settings for this extension:
+CALM Hub needs six settings for this extension:
 
 | Setting | Value |
 |---|---|
@@ -165,6 +165,7 @@ CALM Hub needs five settings for this extension:
 | `calm.extensions."release-tracker".backend-url` | The base URL of the backend |
 | `calm.extensions.identity.private-key-location` | The private key from step 3 |
 | `calm.extensions.identity.public-key-locations` | The public key from step 3 |
+| `calm.extensions.allow-without-auth` | `true`, for local development only. See below |
 
 CALM Hub does not start if an enabled extension has routes but no backend URL, so the commands below
 turn off `stride-threats`. To run both demos, see the
@@ -193,7 +194,7 @@ built-in decorator views.
 
 ### With environment variables
 
-Each setting is also an environment variable. In the name, the quotes and the dots become `_`:
+Each setting is also an environment variable. In the name, the quotes, the dots and each `-` become `_`, and the letters become capitals:
 
 ```bash
 export CALM_EXTENSIONS_DIR=local-dev/demo-extensions

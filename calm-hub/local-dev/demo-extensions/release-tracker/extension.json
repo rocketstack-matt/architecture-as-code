@@ -6,10 +6,10 @@
   "description": "A demo extension: release status, risk and reviews for architectures.",
   "provider": "Demo",
   "routes": [
-    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated" },
-    { "id": "tab", "method": "GET", "path": "/tab/{resourceType}/{resourceId}", "scope": "authenticated" },
-    { "id": "card", "method": "GET", "path": "/card", "scope": "authenticated" },
-    { "id": "element", "method": "GET", "path": "/element", "scope": "authenticated" },
+    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated", "readOnly": true },
+    { "id": "tab", "method": "GET", "path": "/tab/{resourceType}/{resourceId}", "scope": "authenticated", "readOnly": true },
+    { "id": "card", "method": "GET", "path": "/card", "scope": "authenticated", "readOnly": true },
+    { "id": "element", "method": "GET", "path": "/element", "scope": "authenticated", "readOnly": true },
     { "id": "request-review", "method": "POST", "path": "/reviews", "scope": "authenticated" },
     { "id": "releases", "method": "GET", "path": "/releases", "scope": "authenticated", "readOnly": true }
   ],
