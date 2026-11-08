@@ -277,6 +277,8 @@ export class CalmHubClient {
                 url: request.path,
                 params: request.query.length > 0 ? new URLSearchParams(request.query) : undefined,
                 data: request.body,
+                // Hub refuses a POST with no JSON Content-Type, also with no body (CSRF).
+                headers: request.method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
                 responseType: 'text',
                 transformResponse: (data: unknown) => data,
             });

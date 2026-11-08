@@ -293,6 +293,17 @@ describe('CalmHubClient', () => {
             expect(result.data).toEqual({ name: 'payments' });
         });
 
+        it('sends a JSON Content-Type for a POST with only path input', async () => {
+            mock.onPost('/api/calm/extensions/example/api/namespaces/finos/services').reply((config) => {
+                expect(config.headers?.['Content-Type']).toBe('application/json');
+                expect(JSON.parse(config.data)).toEqual({});
+                return [204, ''];
+            });
+
+            await expect(client.callExtension('example', postRoute, { namespace: 'finos' }))
+                .resolves.toMatchObject({ status: 204 });
+        });
+
         it('returns a text reply as text, even when it looks like JSON', async () => {
             mock.onGet().reply(200, '42', { 'content-type': 'text/plain' });
 
