@@ -22,11 +22,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -66,6 +71,54 @@ class TestDecoratorWriteServiceShould {
         lenient().when(mockConfig.reserved()).thenReturn(Map.of("control-evaluation", reserved));
         lenient().when(mockSchemaValidator.validate(any())).thenReturn(List.of());
         service = new DecoratorWriteService(mockDecoratorStore, mockConfig, mockSchemaValidator);
+    }
+
+    @Test
+    void log_each_reserved_type_with_its_writer_count_at_startup() {
+        DecoratorConfig.ReservedType twoWriters = () -> List.of("system", "auditor");
+        DecoratorConfig.ReservedType oneWriter = () -> List.of(WRITER);
+        when(mockConfig.reserved()).thenReturn(Map.of("validation", twoWriters, "control-evaluation", oneWriter));
+
+        assertThat(infoLogs(() -> service.logReservedTypes(null)),
+                contains("Reserved decorator types: control-evaluation (1 writers), validation (2 writers)"));
+    }
+
+    @Test
+    void log_that_no_type_is_reserved_at_startup() {
+        when(mockConfig.reserved()).thenReturn(Map.of());
+
+        assertThat(infoLogs(() -> service.logReservedTypes(null)), contains("No decorator type is reserved"));
+    }
+
+    private static List<String> infoLogs(Runnable action) {
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(DecoratorWriteService.class.getName());
+        List<String> messages = new ArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord logRecord) {
+                if (logRecord.getLevel().intValue() >= Level.INFO.intValue()) {
+                    messages.add(logRecord.getMessage());
+                }
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Level level = logger.getLevel();
+        logger.setLevel(Level.INFO);
+        logger.addHandler(handler);
+        try {
+            action.run();
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(level);
+        }
+        return messages;
     }
 
     @Test

@@ -1,10 +1,12 @@
 package org.finos.calm.services;
 
+import io.quarkus.runtime.StartupEvent;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.bson.json.JsonParseException;
 import org.finos.calm.config.DecoratorConfig;
@@ -18,9 +20,13 @@ import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.store.DecoratorStore;
 import org.finos.calm.store.util.DecoratorTimestamps;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /**
  * The write rules for decorators, shared by REST and MCP. A reserved type can only be written by
@@ -29,6 +35,8 @@ import java.util.Optional;
  */
 @ApplicationScoped
 public class DecoratorWriteService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DecoratorWriteService.class);
 
     private final DecoratorStore decoratorStore;
     private final DecoratorConfig config;
@@ -39,6 +47,18 @@ public class DecoratorWriteService {
         this.decoratorStore = decoratorStore;
         this.config = config;
         this.schemaValidator = schemaValidator;
+    }
+
+    // A mistyped reserved-type key leaves the type open, so say which types are reserved.
+    void logReservedTypes(@Observes StartupEvent event) {
+        if (config.reserved().isEmpty()) {
+            LOG.info("No decorator type is reserved");
+            return;
+        }
+        String types = new TreeMap<>(config.reserved()).entrySet().stream()
+                .map(entry -> entry.getKey() + " (" + entry.getValue().writers().size() + " writers)")
+                .collect(Collectors.joining(", "));
+        LOG.info("Reserved decorator types: " + types);
     }
 
     public static String principalName(SecurityIdentity identity) {
