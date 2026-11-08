@@ -127,7 +127,7 @@ A writer is a principal name, the same name that the audit log records for the c
 
 At startup, Hub logs each reserved type with its number of writers. Check this line after a change: a key with a typing error reserves a different type and leaves the intended type open.
 
-A reserved type is also append-only. An update of a reserved-type decorator does not change it. Hub stores a new decorator that supersedes the old one, returns `201` with the new `id` and a `Location` header, and keeps the old one. Hub stores the link in its own storage fields, not in the decorator `data`. Other types keep the in-place update (`200`).
+A reserved type is also append-only. An update of a reserved-type decorator does not change it. Hub stores a new decorator that supersedes the old one, returns `201` with the new `id` and a `Location` header, and keeps the old one. Hub stores the link in its own storage fields, not in the decorator `data`. The audit log records an `UPDATE` of the old id and a `CREATE` of the new id. Other types keep the in-place update (`200`).
 
 | Request | Effect |
 |:--------|:-------|

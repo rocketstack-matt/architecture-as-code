@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -35,6 +36,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -235,6 +237,10 @@ class TestReservedDecoratorResourceShould {
                 .body("id", equalTo(5));
 
         verify(mockDecoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+        ArgumentCaptor<AuditLogEntry> audit = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(mockAuditService, times(2)).record(audit.capture());
+        assertThat(audit.getAllValues().stream().map(entry -> entry.getAction() + " " + entry.getEntityId()).toList(),
+                contains("UPDATE 1", "CREATE 5"));
     }
 
     @Test
