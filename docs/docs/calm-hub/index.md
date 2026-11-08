@@ -154,7 +154,7 @@ The Hub UI shows the contributions of an extension, the CLI runs its commands (s
 | [Decorator views](decorator-views.md) | Draw decorators on the diagram, with no backend |
 | [Extension access](extension-access.md) | Learn the scopes, the identity assertion and the trust model |
 
-Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`. Hub skips hidden folders and warns about folders without a manifest. Settings for unknown extension ids also produce a warning.
+Put one folder for each extension in `calm.extensions.dir`, with an `extension.json` in it. The folder name must equal the manifest `id`. Hub skips hidden folders and warns about folders without a manifest. A per-id setting for an unknown extension id gives a warning at start up, as a property or as an environment variable.
 
 ```text
 /etc/calm-hub/extensions/
@@ -173,6 +173,7 @@ Put one folder for each extension in `calm.extensions.dir`, with an `extension.j
 | `calm.extensions."<id>".request-timeout-seconds` | `calm.extensions.http.request-timeout-seconds` (`10`) | The limit for the whole call. A slow backend gets `504` |
 | `calm.extensions."<id>".max-request-bytes` | `calm.extensions.http.max-request-bytes` (`1048576`) | A larger request body gets `413` |
 | `calm.extensions."<id>".max-response-bytes` | `calm.extensions.http.max-response-bytes` (`1048576`) | A larger reply gets `502` |
+| `calm.extensions."<id>".max-concurrent-calls` | `calm.extensions.http.max-concurrent-calls` (`32`) | The calls to the extension at the same time. One more call gets `503` with `Retry-After: 1`, so that a slow backend cannot hold every worker thread |
 | `calm.extensions.identity.private-key-location` | not set | The PKCS#8 PEM key that signs the identity assertion: RSA (2048 bits or more, RS256) or P-256 (ES256). Required when an enabled extension has routes. A shared secret (HS256) is refused |
 | `calm.extensions.identity.public-key-locations` | not set | Comma-separated PEM public keys for the JWKS. The first is the public key of the signing key |
 | `calm.extensions.identity.ttl-seconds` | `60` | The lifetime of an assertion, at most `300` |
@@ -206,12 +207,12 @@ CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route pa
 - gives `415`, before it signs the assertion, to a `POST` that has no `application/json` or other `+json` `Content-Type`, also when it has no body. A `PUT`, `PATCH` or `DELETE` gets `415` only for a body of another type. Thus a cross-site form or fetch cannot call a route as the user. Those three methods need a CORS preflight, which CALM Hub does not allow cross-site
 - matches the path against the declared routes only, and refuses `..`, `%2e`, `\`, `//`, `@` and their encoded forms
 - checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path
-- on a read-only CALM Hub, allows a method other than `GET` only on a `readOnly` route
-- sends only `Content-Type`, `Accept`, `Accept-Language` and its own `X-Calm-Hub-Identity` assertion. The caller's token and cookies never go to the extension
-- returns only `Content-Type` (`application/json`, `text/plain` or `text/event-stream`, and for a `4xx` reply also `application/problem+json` and other `+json` types), `Cache-Control` and `ETag`, and adds `Content-Security-Policy: sandbox; default-src 'none'`. It does not follow redirects
+- on a read-only CALM Hub, allows a method other than `GET` only on a `readOnly` route. Its `405`, and the `405` for a method that the route does not declare, has an `Allow` header
+- sends only `Content-Type`, `Accept`, `Accept-Language`, `If-Match`, `If-None-Match` and its own `X-Calm-Hub-Identity` assertion. A header value with a line break gets `400`. The caller's token and cookies never go to the extension
+- returns only `Content-Type` (`application/json`, `text/plain` or `text/event-stream`, and for a `4xx` reply also `application/problem+json` and other `+json` types), `Cache-Control`, `ETag`, `Retry-After` and `Vary`, and adds `Content-Security-Policy: sandbox; default-src 'none'`. It passes on a `304`. It does not follow redirects, and does not return `Location`, because that would name the private backend
 - marks each reply `Cache-Control: private`, because the reply is for one user. It removes `public`, and keeps the other directives of the backend. Its own error replies are also `private`
-- returns `502` or `504`, with a generic body, when the backend fails, is slow, replies with `5xx`, `3xx` or `401`, or sends another content type
-- audits every non-`readOnly` call, including `GET`, as entity type `EXTENSION` with the extension id, route id and assertion `jti`. The entry has the namespace only for a `read`, `write` or `admin` route, and the domain only for a `domain_*` route. Outcomes are `SUCCESS`, `DENIED`, `FAILURE` (a `415`, or another returned client error), or `UNKNOWN` (an upstream failure or unusable reply; the backend may have completed the call)
+- returns `502` or `504`, with a generic body, when the backend fails, is slow, replies with `5xx`, `401`, `407` or a `3xx` other than `304`, or sends another content type
+- audits every non-`readOnly` call, including `GET`, as entity type `EXTENSION` with the extension id, route id and assertion `jti`. The entry has the namespace only for a `read`, `write` or `admin` route, and the domain only for a `domain_*` route. Outcomes are `SUCCESS`, `DENIED`, `FAILURE` (a refusal after the scope check, such as `400`, `413`, `415` or `503`, or a returned client error), or `UNKNOWN` (an upstream failure or unusable reply; the backend may have completed the call). The entry has the `jti` only when CALM Hub sent the call, and the source IP when `calm.audit.capture-source-ip=true`
 
 Replies are buffered. Streaming is not supported yet.
 
@@ -219,7 +220,7 @@ CALM Hub does not start with an enabled extension that has routes when `calm.aut
 
 ### Identity keys
 
-CALM Hub signs a short-lived JWT for each call, and publishes the public keys at `GET /api/calm/auth/jwks`. This endpoint is public. Create a key pair:
+CALM Hub signs a short-lived JWT for each call, and publishes the public keys at `GET /api/calm/auth/jwks`. This endpoint is public. Set `calm.hub.base-url` to the URL that the backends expect in `iss`. When it is not set, `iss` is `http://localhost:8080`, and CALM Hub gives a warning at start up if an enabled extension has routes. Create a key pair:
 
 ```bash
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out hub-private.pem
