@@ -63,6 +63,10 @@ const stringAt = (data: unknown, pointer?: string) => {
 interface Counted {
     entry: OverlayEntry | null;
     decorator: Decorator;
+    /** Hub does not require a uniqueId, so a decorator without one is told apart by its place in the list. */
+    id: string;
+    uniqueId: string;
+    index: number;
     key?: string;
     time: number;
 }
@@ -72,9 +76,12 @@ const newerFirst = (a: Counted, b: Counted) => {
     const ta = Number.isNaN(a.time) ? -Infinity : a.time;
     const tb = Number.isNaN(b.time) ? -Infinity : b.time;
     if (ta !== tb) return tb - ta;
-    const [ia, ib] = [a.decorator.uniqueId, b.decorator.uniqueId];
-    return ia === ib ? 0 : ia < ib ? 1 : -1;
+    if (a.uniqueId !== b.uniqueId) return a.uniqueId < b.uniqueId ? 1 : -1;
+    return b.index - a.index;
 };
+
+const elementsOf = (decorator: Decorator): Set<string> =>
+    new Set(Array.isArray(decorator.appliesTo) ? decorator.appliesTo.filter((id): id is string => typeof id === 'string') : []);
 
 /**
  * The container each containment relationship (`deployed-in` or `composed-of`) is drawn as, by relationship unique-id.
@@ -109,7 +116,7 @@ export function overlayByElement(
 ): Map<string, ElementOverlay> {
     const { overlay } = view;
     const counted = new Map<string, Map<string, Counted>>();
-    for (const decorator of decorators) {
+    for (const [index, decorator] of decorators.entries()) {
         if (!matchesView(view, decorator)) continue;
         const status = overlayStatus(overlay, decorator);
         if (!status) continue;
@@ -117,8 +124,12 @@ export function overlayByElement(
         if (overlay.key !== undefined && !key) continue;
         const time = overlay.time === undefined ? NaN : Date.parse(stringAt(decorator.data, overlay.time) ?? '');
         if (overlay.time !== undefined && Number.isNaN(time)) continue;
+        const uniqueId = typeof decorator.uniqueId === 'string' ? decorator.uniqueId : '';
         const item: Counted = {
             decorator,
+            id: uniqueId ? `id:${uniqueId}` : `index:${index}`,
+            uniqueId,
+            index,
             key,
             time,
             entry: status.status === null
@@ -131,8 +142,8 @@ export function overlayByElement(
                     time: stringAt(decorator.data, overlay.time),
                 },
         };
-        const group = overlay.time === undefined ? `#${decorator.uniqueId}` : `=${key ?? ''}`;
-        for (const element of new Set(decorator.appliesTo ?? [])) {
+        const group = overlay.time === undefined ? `#${item.id}` : `=${key ?? ''}`;
+        for (const element of elementsOf(decorator)) {
             const byGroup = counted.get(element) ?? new Map<string, Counted>();
             counted.set(element, byGroup);
             const current = byGroup.get(group);
@@ -145,7 +156,7 @@ export function overlayByElement(
         const target = drawnAs.get(element) ?? element;
         const byId = drawn.get(target) ?? new Map<string, Counted>();
         drawn.set(target, byId);
-        for (const item of byGroup.values()) byId.set(item.decorator.uniqueId, item);
+        for (const item of byGroup.values()) byId.set(item.id, item);
     }
 
     const sortKey = (item: Counted) => item.key ?? item.entry?.label ?? '';

@@ -79,8 +79,8 @@ export function OverlayBadgeDetails({ shown, anchor, trigger, onClose }: Overlay
                 <dd style={{ margin: 0, fontWeight: 600 }}>{view.label}</dd>
             </dl>
             <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {overlay.entries.slice(0, DETAILS_MAX_ENTRIES).map((entry) => (
-                    <li key={entry.decorator.uniqueId} data-testid="overlay-badge-entry" style={{ borderTop: `1px solid ${THEME.colors.border}`, paddingTop: '6px' }}>
+                {overlay.entries.slice(0, DETAILS_MAX_ENTRIES).map((entry, index) => (
+                    <li key={`${entry.decorator.uniqueId}-${index}`} data-testid="overlay-badge-entry" style={{ borderTop: `1px solid ${THEME.colors.border}`, paddingTop: '6px' }}>
                         <div style={{ fontWeight: 600, color: OVERLAY_STYLES[entry.status].text }}>
                             {statusText(entry.value)} → {STATUS_NAMES[entry.status]}
                         </div>
