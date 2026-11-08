@@ -4,6 +4,7 @@ import manifest from '../../../../calm-hub/src/test/resources/extensions-test/op
 import { overlayByElement } from './overlayEngine.js';
 import type { OverlayDecoratorView } from '../contracts/contracts.js';
 import { useDecoratorViews } from './decoratorViews.js';
+import { BUILTIN_DECORATOR_VIEWS } from './builtinDecoratorViews.js';
 
 const fetchViews = vi.hoisted(() => vi.fn());
 vi.mock('../../service/extension-service.js', () => ({
@@ -22,8 +23,14 @@ it('loads a new decorator type without a UI mapping', async () => {
     expect(overlay.get('service')?.status).toBe('error');
 });
 
-it('leaves overlays off when the registry fails', async () => {
+it('falls back to the built-in views when the registry fails', async () => {
     fetchViews.mockRejectedValue(new Error('offline'));
+    const { result } = renderHook(useDecoratorViews);
+    await waitFor(() => expect(result.current).toBe(BUILTIN_DECORATOR_VIEWS));
+});
+
+it('shows only the registered views when the registry loads, even with no built-in views', async () => {
+    fetchViews.mockResolvedValue([]);
     const { result } = renderHook(useDecoratorViews);
     await act(async () => { await Promise.resolve(); });
     expect(result.current).toEqual([]);

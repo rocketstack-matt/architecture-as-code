@@ -60,7 +60,7 @@ A view without `overlay` is valid, but the UI draws nothing for it yet.
 - A container shows the results of its `deployed-in` and `composed-of` relationships.
 - Click a badge to see each result, its mapped status, its label and its time.
 - While the architecture is open, Hub reads the decorators again every 5 seconds.
-- If the browser cannot load the extension registry, Hub draws no overlays. The **Decorators** tab still shows the stored data.
+- If the browser cannot load the extension registry, Hub draws only the built-in views. The **Decorators** tab still shows the stored data.
 
 ## Built-in views
 
@@ -109,5 +109,5 @@ off, set `calm.extensions."deployment".enabled=false`, or the same for `control-
 The legend row reads `Security scan · Security scan` (the view label, then the extension name).
 Each extension gets a colour marker, derived from its id, on its badges and legend rows. The legend
 switches each view, and all the views of one extension, on or off. When the browser has no stored
-choice, only the first three views in registry order that draw on the diagram are on. The built-in views
-have `order` 0, so set `calm.extensions."scanner".order=-1` to move a view above them.
+choice, the built-in views and the first three extension views in registry order are on. The order
+does not depend on the diagram. Set `calm.extensions."scanner".order=-1` to move a view up the list.

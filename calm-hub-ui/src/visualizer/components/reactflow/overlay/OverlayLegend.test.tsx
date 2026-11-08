@@ -38,18 +38,18 @@ describe('OverlayLegend', () => {
         renderLegend({});
         const rows = screen.getAllByTestId('overlay-legend-row');
         expect(rows).toHaveLength(2);
-        expect(rows[0]).toHaveTextContent('Control evaluations1 Error2 OK');
-        expect(rows[1]).toHaveTextContent('Deployments1 Warning');
+        expect(rows[0]).toHaveTextContent('Control evaluations · Built-in1 Error2 OK');
+        expect(rows[1]).toHaveTextContent('Deployments · Built-in1 Warning');
     });
 
     it('toggles a view, and shows a hidden view unchecked', () => {
-        const state = renderLegend({ hiddenViews: new Set(['deployment']) });
-        expect(screen.getByRole('checkbox', { name: 'Control evaluations' })).toBeChecked();
-        const deployments = screen.getByRole('checkbox', { name: 'Deployments' });
+        const state = renderLegend({ hiddenViews: new Set(['deployment/deployment']) });
+        expect(screen.getByRole('checkbox', { name: 'Control evaluations · Built-in' })).toBeChecked();
+        const deployments = screen.getByRole('checkbox', { name: 'Deployments · Built-in' });
         expect(deployments).not.toBeChecked();
 
         fireEvent.click(deployments);
-        expect(state.toggleView).toHaveBeenCalledWith('deployment');
+        expect(state.toggleView).toHaveBeenCalledWith('deployment/deployment');
     });
 
     it('offers View all only where the decorators can be listed', () => {

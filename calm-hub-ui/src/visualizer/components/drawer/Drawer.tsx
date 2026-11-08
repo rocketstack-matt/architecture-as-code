@@ -9,7 +9,7 @@ import { CalmService } from '../../../service/calm-service.js';
 import { buildViewportKey } from '../../services/node-position-service.js';
 import { DropzoneEmptyState } from './DropzoneEmptyState.js';
 import { colors } from '../../../theme/colors.js';
-import { CONTROL_EVALUATION_VIEW_ID, DecoratorOverlayContext, type DecoratorOverlayState } from '../../context/DecoratorOverlayContext.js';
+import { DecoratorOverlayContext, isControlEvaluationView, type DecoratorOverlayState } from '../../context/DecoratorOverlayContext.js';
 import { containersOfContainment, hasOverlay, matchesView, overlayByElement } from '../../overlay/overlayEngine.js';
 import { useDecoratorViews } from '../../overlay/decoratorViews.js';
 import { useOverlayDecorators } from '../../overlay/useOverlayDecorators.js';
@@ -114,14 +114,14 @@ export function Drawer({
             .map((view) => ({ view, elements: overlayByElement(view, overlayDecorators, drawnAs) }))
             .filter(({ elements }) => elements.size > 0);
     }, [views, overlayDecorators, calmInstance]);
-    const { hiddenViews, toggleView, setViewsShown } = useOverlayVisibility(overlays, storage);
+    const { hiddenViews, toggleView, setViewsShown } = useOverlayVisibility(views, storage);
     const overlayState = useMemo(
         (): DecoratorOverlayState => ({ overlays, hiddenViews, toggleView, setViewsShown, onOpenView }),
         [overlays, hiddenViews, toggleView, setViewsShown, onOpenView],
     );
     // The evaluation history for the panel under the diagram, which lists every evaluation, not only the newest.
     const evaluations = useMemo(() => {
-        const view = views.find((v) => v.id === CONTROL_EVALUATION_VIEW_ID);
+        const view = views.find(isControlEvaluationView);
         return view ? overlayDecorators.filter((d) => matchesView(view, d)) as ControlEvaluationDecorator[] : [];
     }, [views, overlayDecorators]);
 

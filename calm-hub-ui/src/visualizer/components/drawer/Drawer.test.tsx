@@ -61,7 +61,7 @@ vi.mock('../reactflow/ReactFlowVisualizer.js', async () => {
                     {useElementOverlays('n1').map(({ view, overlay }) => `${view.id}:${overlay.status}`).join(' ') || '(none)'}
                 </div>
                 <div data-testid="overlay-views">{overlays.map(({ view }) => view.id).join(' ') || '(none)'}</div>
-                <button onClick={() => toggleView('deployment')}>toggle-deployment</button>
+                <button onClick={() => toggleView('deployment/deployment')}>toggle-deployment</button>
                 <button onClick={() => onOpenView?.(overlays[0].view)}>open-first-view</button>
             </>
         );
