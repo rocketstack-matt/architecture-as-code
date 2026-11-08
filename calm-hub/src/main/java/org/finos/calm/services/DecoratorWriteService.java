@@ -127,8 +127,10 @@ public class DecoratorWriteService {
 
     // Hub reads these fields itself, whether or not the decorator has a $schema.
     private static void requireFieldTypes(JsonObject decorator) {
-        if (decorator.containsKey("type") && !(decorator.getValue("type") instanceof String)) {
-            throw new JsonParseException("Decorator field 'type' must be a string");
+        for (String field : List.of("$schema", "unique-id", "type")) {
+            if (decorator.containsKey(field) && !(decorator.getValue(field) instanceof String)) {
+                throw new JsonParseException("Decorator field '" + field + "' must be a string");
+            }
         }
         for (String field : List.of("target", "target-type", "applies-to")) {
             if (decorator.containsKey(field)

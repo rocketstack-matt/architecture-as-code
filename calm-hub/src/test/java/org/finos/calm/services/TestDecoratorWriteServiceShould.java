@@ -87,7 +87,7 @@ class TestDecoratorWriteServiceShould {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {UNRESERVED_JSON, "{\"type\": 42}", "{}"})
+    @ValueSource(strings = {UNRESERVED_JSON, "{}"})
     void create_an_unreserved_decorator_for_any_principal(String json) throws Exception {
         service.createDecorator("alice", NAMESPACE, json);
 
@@ -294,6 +294,8 @@ class TestDecoratorWriteServiceShould {
     @ValueSource(strings = {
             "{\"type\": 5, \"data\": {}}",
             "{\"type\": null, \"data\": {}}",
+            "{\"unique-id\": 7, \"type\": \"threat-model\"}",
+            "{\"$schema\": {}, \"type\": \"threat-model\"}",
             "{\"type\": \"threat-model\", \"target\": \"t\"}",
             "{\"type\": \"threat-model\", \"target\": [\"t\", 1]}",
             "{\"type\": \"threat-model\", \"applies-to\": {}}",
@@ -307,7 +309,7 @@ class TestDecoratorWriteServiceShould {
 
     @Test
     void accept_hub_read_fields_of_the_right_type_or_left_out() throws Exception {
-        String json = "{\"type\": \"threat-model\", \"target\": [\"t\"], \"target-type\": [], \"applies-to\": [\"a\"]}";
+        String json = "{\"$schema\": \"s\", \"unique-id\": \"u\", \"type\": \"threat-model\", \"target\": [\"t\"], \"target-type\": [], \"applies-to\": [\"a\"]}";
         when(mockDecoratorStore.createDecorator(NAMESPACE, json)).thenReturn(1);
         when(mockDecoratorStore.createDecorator(NAMESPACE, "{\"data\": {}}")).thenReturn(2);
 

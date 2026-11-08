@@ -45,6 +45,13 @@ public class CalmResourceErrorResponses {
                 .build();
     }
 
+    public static Response decoratorDeleteConflictResponse(String namespace, int id) {
+        return Response.status(Response.Status.CONFLICT)
+                .entity("Decorator with ID " + id + " in namespace " + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(namespace)
+                        + " was superseded during the delete. Nothing was deleted. Retry the delete")
+                .build();
+    }
+
     public static Response hubOwnedDecoratorFieldResponse(String field) {
         return Response.status(Response.Status.BAD_REQUEST)
                 .entity("Decorator field is set by Hub and may not be sent: " + field)

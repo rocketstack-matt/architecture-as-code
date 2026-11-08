@@ -292,7 +292,7 @@ public class DecoratorResource {
             return CalmResourceErrorResponses.decoratorNotFoundResponse(namespace, id);
         } catch (DecoratorSupersededException e) {
             logger.warn("Decorator [{}] in namespace [{}] was superseded while deleting", id, namespace);
-            return CalmResourceErrorResponses.decoratorSupersededResponse(namespace, id);
+            return CalmResourceErrorResponses.decoratorDeleteConflictResponse(namespace, id);
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when deleting decorator [{}]", namespace, id, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);

@@ -779,6 +779,20 @@ public class TestDecoratorResourceShould {
     }
 
     @Test
+    void return_400_when_a_created_decorator_has_a_unique_id_that_is_not_a_string() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"unique-id\": 7, \"type\": \"x\"}")
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body(containsString("'unique-id' must be a string"));
+
+        verify(decoratorStore, never()).createDecorator(anyString(), anyString());
+    }
+
+    @Test
     void return_400_when_an_updated_decorator_has_a_target_that_is_not_an_array_of_strings() throws Exception {
         given()
                 .contentType(ContentType.JSON)

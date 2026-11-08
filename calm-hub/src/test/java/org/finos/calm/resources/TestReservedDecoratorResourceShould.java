@@ -198,7 +198,7 @@ class TestReservedDecoratorResourceShould {
                 .delete("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(409)
-                .body(containsString("superseded"));
+                .body(containsString("Retry the delete"));
     }
 
     @Test
@@ -250,7 +250,7 @@ class TestReservedDecoratorResourceShould {
                 .put("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(409)
-                .body(containsString("superseded"));
+                .body(containsString("Update the current decorator"));
     }
 
     private static Decorator decorator(String type) {
