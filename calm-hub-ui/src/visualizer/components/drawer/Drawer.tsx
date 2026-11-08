@@ -5,16 +5,16 @@ import { ReactFlowVisualizer } from '../reactflow/ReactFlowVisualizer.js';
 import { PatternVisualizer } from '../reactflow/PatternVisualizer.js';
 import { MetadataPanel } from '../reactflow/MetadataPanel.js';
 import { toSidebarNodeData, toSidebarEdgeData } from '../reactflow/utils/patternClickHandlers.js';
-import { CalmService } from '../../../service/calm-service.js';
 import { buildViewportKey } from '../../services/node-position-service.js';
 import { DropzoneEmptyState } from './DropzoneEmptyState.js';
 import { colors } from '../../../theme/colors.js';
-import { CONTROL_EVALUATION_VIEW_ID, DecoratorOverlayContext, type DecoratorOverlayState } from '../../context/DecoratorOverlayContext.js';
+import { DecoratorOverlayContext, isControlEvaluationView, type DecoratorOverlayState } from '../../context/DecoratorOverlayContext.js';
 import { containersOfContainment, hasOverlay, matchesView, overlayByElement } from '../../overlay/overlayEngine.js';
 import { useDecoratorViews } from '../../overlay/decoratorViews.js';
-import { useOverlayDecorators } from '../../overlay/useOverlayDecorators.js';
 import { useOverlayVisibility } from '../../overlay/useOverlayVisibility.js';
-import type { DrawerProps, Control, ControlEvaluationDecorator, ViewOverlay } from '../../contracts/contracts.js';
+import type { DrawerProps, Control, ControlEvaluationDecorator, Decorator, ViewOverlay } from '../../contracts/contracts.js';
+
+const NO_DECORATORS: Decorator[] = [];
 
 /**
  * A pattern declares its nodes under `properties.nodes`, as `prefixItems` or `items`.
@@ -40,10 +40,10 @@ export function Drawer({
     layoutEpoch,
     onPositionsChange,
     onDroppedFileChange,
+    decorators = NO_DECORATORS,
     onOpenView,
     storage,
 }: DrawerProps) {
-    const calmService = useMemo(() => new CalmService(), []);
     const [fileInstance, setFileInstance] = useState<Record<string, unknown> | undefined>(undefined);
     const [dropError, setDropError] = useState<string | undefined>(undefined);
     const [isMetadataCollapsed, setIsMetadataCollapsed] = useState(true);
@@ -106,7 +106,7 @@ export function Drawer({
     useEffect(() => () => onDroppedFileChange?.(false), [onDroppedFileChange]);
 
     const views = useDecoratorViews();
-    const overlayDecorators = useOverlayDecorators(calmService, architectureData, views);
+    const overlayDecorators = architectureData ? decorators : NO_DECORATORS;
     const overlays = useMemo((): ViewOverlay[] => {
         const drawnAs = containersOfContainment(calmInstance?.relationships);
         return views
@@ -114,14 +114,14 @@ export function Drawer({
             .map((view) => ({ view, elements: overlayByElement(view, overlayDecorators, drawnAs) }))
             .filter(({ elements }) => elements.size > 0);
     }, [views, overlayDecorators, calmInstance]);
-    const { hiddenViews, toggleView, setViewsShown } = useOverlayVisibility(overlays, storage);
+    const { hiddenViews, toggleView, setViewsShown } = useOverlayVisibility(views, storage);
     const overlayState = useMemo(
         (): DecoratorOverlayState => ({ overlays, hiddenViews, toggleView, setViewsShown, onOpenView }),
         [overlays, hiddenViews, toggleView, setViewsShown, onOpenView],
     );
     // The evaluation history for the panel under the diagram, which lists every evaluation, not only the newest.
     const evaluations = useMemo(() => {
-        const view = views.find((v) => v.id === CONTROL_EVALUATION_VIEW_ID);
+        const view = views.find(isControlEvaluationView);
         return view ? overlayDecorators.filter((d) => matchesView(view, d)) as ControlEvaluationDecorator[] : [];
     }, [views, overlayDecorators]);
 

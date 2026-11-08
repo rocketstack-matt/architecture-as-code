@@ -357,7 +357,7 @@ describe('control evaluations', () => {
     it('labels the badge for assistive technology, hides its icon, and has no native tooltip', () => {
         renderWithEvaluation(new Map([['node-1', evaluation('not-met')]]));
         const badge = screen.getByTestId('overlay-badge');
-        expect(badge.getAttribute('aria-label')).toBe('Control evaluations: Not met');
+        expect(badge.getAttribute('aria-label')).toBe('Control evaluations · Built-in: Not met');
         expect(badge.hasAttribute('title')).toBe(false);
         expect(badge.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
     });
@@ -531,5 +531,38 @@ describe('extension overlays', () => {
         expect(screen.getAllByTestId('overlay-badge')).toHaveLength(2);
         expect(error.mock.calls.flat().join(' ')).not.toMatch(/same key/);
         error.mockRestore();
+    });
+});
+
+describe('an operator view with the built-in control-evaluation id', () => {
+    const renderWith = (builtIn: boolean) => {
+        const view = { ...fakeView(builtIn ? 'control-evaluation' : 'ops', 'control-evaluation'), source: {
+            id: builtIn ? 'control-evaluation' : 'ops', name: 'Ops', builtIn,
+        } };
+        const decorator = builtIn
+            ? { uniqueId: 'd1', type: 'control-evaluation', target: [], appliesTo: ['node-1'],
+                data: { status: 'met', control: { 'control-id': 'ctl-1', 'unique-id': 'ctl-1' } } }
+            : { uniqueId: 'd1', type: 'control-evaluation', target: [], appliesTo: ['node-1'], data: { status: 'met' } };
+        const overlays = [{
+            view,
+            elements: new Map([['node-1', fakeElement('ok', [{ decorator, value: 'met', status: 'ok' }] as never)]]),
+        }];
+        render(
+            <DecoratorOverlayContext.Provider value={{ overlays, hiddenViews: new Set(), toggleView: vi.fn() }}>
+                <CustomNode {...makeNodeProps(undefined, { 'unique-id': 'node-1' })} />
+            </DecoratorOverlayContext.Provider>
+        );
+        fireEvent.mouseEnter(screen.getByTestId('custom-node'));
+    };
+
+    it('draws its badge but not the control-evaluation details, which read fields it may not have', () => {
+        renderWith(false);
+        expect(screen.getByTestId('overlay-badge')).toBeTruthy();
+        expect(screen.queryByText('Latest control evaluations:')).toBeNull();
+    });
+
+    it('shows the control-evaluation details for the built-in view', () => {
+        renderWith(true);
+        expect(screen.getByText('Latest control evaluations:')).toBeTruthy();
     });
 });

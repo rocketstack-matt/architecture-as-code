@@ -22,7 +22,7 @@ describe('OverlayBadge', () => {
         render(<OverlayBadge shown={shown(status, value)} presenting={false} />);
         const badge = screen.getByTestId('overlay-badge');
         expect(badge).toHaveTextContent(text);
-        expect(badge.getAttribute('aria-label')).toBe(`Deployments: ${text}`);
+        expect(badge.getAttribute('aria-label')).toBe(`Deployments · Built-in: ${text}`);
         expect(badge.dataset.view).toBe('deployment');
         expect(badge.dataset.status).toBe(status);
         expect(badge.style.color).toBe(OVERLAY_STYLES[status].text);

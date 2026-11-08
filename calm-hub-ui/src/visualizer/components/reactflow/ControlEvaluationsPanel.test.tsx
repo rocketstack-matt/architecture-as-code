@@ -3,9 +3,10 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ControlEvaluationsPanel } from './ControlEvaluationsPanel.js';
 import { THEME } from './theme.js';
-import type { ControlEvaluationDecorator } from '../../contracts/contracts.js';
+import type { ControlEvaluationDecorator, DecoratorView } from '../../contracts/contracts.js';
 
-vi.mock('../../overlay/decoratorViews.js', () => ({ useDecoratorViews: () => BUILTIN_DECORATOR_VIEWS }));
+const registered = vi.hoisted(() => ({ views: undefined as DecoratorView[] | undefined }));
+vi.mock('../../overlay/decoratorViews.js', () => ({ useDecoratorViews: () => registered.views ?? BUILTIN_DECORATOR_VIEWS }));
 
 const make = (id: string, status: 'met' | 'not-met' | 'not-applicable', at: string, extra = {}): ControlEvaluationDecorator => ({
     schema: 's', uniqueId: id, type: 'control-evaluation', target: ['t'], appliesTo: ['trade-api', 'trade-api-to-client-ledger'],
@@ -49,6 +50,21 @@ describe('ControlEvaluationsPanel', () => {
         const [notMet, met] = screen.getAllByTestId('control-evaluation-chip');
         expect(notMet.style.color).toBe(THEME.colors.errorText);
         expect(met.style.color).toBe(THEME.colors.successText);
+    });
+
+    it('takes chip colours from the built-in view, not from an operator view with the same id', () => {
+        const operator: DecoratorView = {
+            id: 'control-evaluation', label: 'Ops', match: { type: 'control-evaluation' },
+            overlay: { status: '/status', map: { met: 'error' } }, source: { id: 'ops', name: 'Ops', builtIn: false },
+        };
+        registered.views = [operator];
+        const { unmount } = render(<ControlEvaluationsPanel evaluations={[make('one', 'met', '2026-11-04T15:00:00Z')]} />);
+        expect(screen.getByTestId('control-evaluation-chip').style.color).toBe(THEME.colors.muted);
+        unmount();
+        registered.views = [operator, ...BUILTIN_DECORATOR_VIEWS];
+        render(<ControlEvaluationsPanel evaluations={[make('one', 'met', '2026-11-04T15:00:00Z')]} />);
+        expect(screen.getByTestId('control-evaluation-chip').style.color).toBe(THEME.colors.successText);
+        registered.views = undefined;
     });
 
     it('says when there are none', () => {

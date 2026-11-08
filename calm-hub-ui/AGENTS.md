@@ -180,10 +180,14 @@ field, so guard each read. A missing type shows as "(no type)".
 One engine (`visualizer/overlay/`) draws decorators on the diagram from `decorator-views` entries that have an
 `overlay` (types in `visualizer/contracts/decorator-view-contracts.ts`). Status values map to the fixed scale
 `ok`, `warn`, `error`, `info`. The built-in views for `control-evaluation` and `deployment` come from classpath manifests through
-`GET /api/calm/extensions`. `useDecoratorViews()` returns no views if the registry is unavailable. `Drawer` polls
-each view's decorator type every 5 s and gives the result to the diagram through `DecoratorOverlayContext`. Nodes and
+`GET /api/calm/extensions`. If the registry is unavailable, `useDecoratorViews()` returns the bundled copy in
+`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. `DiagramSection` polls all decorators of
+the version every 5 s (`useArchitectureDecorators`, one request) and gives the one list to the Decorators tab, the
+details drawer and `Drawer`. Do not add a second request. `Drawer` gives the overlays to the diagram through
+`DecoratorOverlayContext`. Nodes and
 edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
-Evaluations panel read control-evaluation fields, so they stay tied to that view id.
+Evaluations panel read control-evaluation fields, so they use `isControlEvaluationView()`: the id and
+`source.builtIn`. An operator view can have the same id.
 
 `ExtensionService` uses its own axios instance, not `apiClient`, so a registry or extension call failure does not
 open the global auth or outage page. The shared `extensionService` loads the registry one time for
@@ -209,7 +213,8 @@ per-extension toolbar button or tab: it does not scale to many extensions.
   closed section renders nothing, so it sends no request.
 - Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
   `view.id` alone: two extensions can use the same view id. `extensionMarkerColour()` gives the marker colour.
-  `useOverlayVisibility` switches on the first 3 views when there is no stored choice.
+  When there is no stored choice, `useOverlayVisibility` switches on the built-in views and the first 3 extension
+  views in registry order. It takes the registered views, not the views drawn, so a default is the same on each diagram.
 
 ### Operator UI config
 

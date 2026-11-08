@@ -12,6 +12,10 @@ import { viewKey } from '../overlay/overlayEngine.js';
 /** The id of the built-in view whose decision callouts and hover details read control-evaluation fields. */
 export const CONTROL_EVALUATION_VIEW_ID = 'control-evaluation';
 
+/** An operator can use the same view id for other data, so the id alone does not identify the built-in view. */
+export const isControlEvaluationView = (view: DecoratorView): boolean =>
+    view.id === CONTROL_EVALUATION_VIEW_ID && view.source?.builtIn === true;
+
 /** The decorator views drawn on the diagram. Empty unless an architecture from CALM Hub has matching decorators. */
 export interface DecoratorOverlayState {
     /** Each view with at least one element on the diagram, in view order. */
@@ -54,7 +58,7 @@ export function useElementOverlays(id?: string): ShownOverlay[] {
 
 /** One element's latest control evaluations, for the details only the control-evaluation view has. */
 export function useElementEvaluation(id?: string): ElementEvaluation | undefined {
-    const shown = useElementOverlays(id).find(({ view }) => view.id === CONTROL_EVALUATION_VIEW_ID);
+    const shown = useElementOverlays(id).find(({ view }) => isControlEvaluationView(view));
     return useMemo(() => shown && {
         status: shown.overlay.status === 'error' ? 'not-met' : 'met',
         latest: shown.overlay.entries.map((entry) => entry.decorator as ControlEvaluationDecorator),

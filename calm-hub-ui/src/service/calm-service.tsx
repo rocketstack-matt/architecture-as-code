@@ -456,45 +456,19 @@ export class CalmService {
     /**
      * Builds the exact-match decorator target for one architecture version.
      *
-     * Resolves a slug identifier to its numeric ID via the mapping API. Returns undefined when the slug cannot be
-     * resolved (including when the mappings cannot be fetched).
+     * Resolves a slug identifier to its numeric ID via the mapping API. Returns undefined when the slug has no
+     * mapping, and rejects when the mappings request fails, so the caller can tell a failure from no decorators.
      */
     public async resolveArchitectureVersionTarget(namespace: string, id: string, version: string): Promise<string | undefined> {
-        return this.architectureVersionTarget(namespace, id, version, () => this.fetchMappings(namespace, 'Architectures'));
-    }
-
-    private async architectureVersionTarget(
-        namespace: string,
-        id: string,
-        version: string,
-        loadMappings: () => Promise<ResourceMapping[]>
-    ): Promise<string | undefined> {
         const versionPath = version.replace(/\./g, '-');
         let numericId = id;
         if (isSlug(id)) {
-            const mappings = await loadMappings();
+            const mappings = await this.requestMappings(namespace, 'Architectures');
             const match = mappings.find((m) => m.customId === id);
             if (!match) return undefined;
             numericId = String(match.numericId);
         }
         return `/api/calm/namespaces/${namespace}/architectures/${numericId}/versions/${versionPath}`;
-    }
-
-    /**
-     * Fetches the decorators of every type recorded against one architecture version.
-     *
-     * Resolves a slug id to its numeric id first, and returns an empty array when the slug has no mapping. Unlike
-     * `fetchDecoratorValues` this rejects when the mappings or the decorators request fails, so the caller can tell a
-     * failure from no decorators.
-     */
-    public async fetchArchitectureDecorators(namespace: string, id: string, version: string): Promise<Decorator[]> {
-        return this.architectureVersionTarget(namespace, id, version, () => this.requestMappings(namespace, 'Architectures'))
-            .then((target) => (target ? this.requestDecoratorValues(namespace, target) : []))
-            .catch((error) => {
-                const errorMessage = `Error fetching decorators for namespace ${namespace}:`;
-                console.error('%s', errorMessage, error);
-                return Promise.reject(new Error(errorMessage));
-            });
     }
 
     /**

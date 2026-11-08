@@ -4,7 +4,7 @@ import { FindingText } from './FindingText.js';
 import { OVERLAY_STYLES } from './overlay/overlayStyle.js';
 import { overlayStatus, statusText } from '../../overlay/overlayEngine.js';
 import { useDecoratorViews } from '../../overlay/decoratorViews.js';
-import { CONTROL_EVALUATION_VIEW_ID } from '../../context/DecoratorOverlayContext.js';
+import { isControlEvaluationView } from '../../context/DecoratorOverlayContext.js';
 import type { ControlEvaluationDecorator, DecoratorOverlay } from '../../contracts/contracts.js';
 
 interface Chip {
@@ -102,7 +102,7 @@ function EvaluationRow({ evaluation, overlay }: { evaluation: ControlEvaluationD
 
 export function ControlEvaluationsPanel({ evaluations }: { evaluations: ControlEvaluationDecorator[] }) {
     const sorted = newestFirst(evaluations ?? []);
-    const overlay = useDecoratorViews().find((view) => view.id === CONTROL_EVALUATION_VIEW_ID)?.overlay;
+    const overlay = useDecoratorViews().find(isControlEvaluationView)?.overlay;
 
     if (sorted.length === 0) {
         return (

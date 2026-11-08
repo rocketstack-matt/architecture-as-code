@@ -10,6 +10,8 @@ import { mockOffsetSize } from '../../../test-support/layout-mocks.js';
 import { EvaluationOverlayProvider } from '../../../test-support/evaluation-overlay.js';
 import { DecisionOverlayContext, type CalloutSize } from '../../context/DecisionOverlayContext.js';
 import type { ElementEvaluation } from '../../contracts/contracts.js';
+import { DecoratorOverlayContext } from '../../context/DecoratorOverlayContext.js';
+import { fakeElement, fakeView } from '../../../test-support/fake-overlays.js';
 
 const { bezier, smoothStep, straight, edgeParams, storeNodes } = vi.hoisted(() => ({
     storeNodes: new Map<string, object>(),
@@ -454,5 +456,44 @@ describe('FloatingEdge clearing the decision callouts', () => {
         storeNodes.set('middle', { id: 'middle', type: 'custom', width: 50, height: 50, positionAbsolute: { x: 0, y: 4 } });
         render(edge({ calloutSizes: callout(25) }));
         expect(labelBox().style.transform).toBe('translate(-50%, -100%) translate(11px,-4px)');
+    });
+});
+
+describe('FloatingEdge with extension overlays', () => {
+    beforeEach(() => {
+        edgeParams.mockReturnValue(FLOATING);
+    });
+
+    it('draws one badge for each extension when two extensions use the same view id', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const overlays = ['ext-a', 'ext-b'].map((extension) => ({
+            view: fakeView(extension, 'risk'),
+            elements: new Map([['rel-1', fakeElement('error')]]),
+        }));
+        render(
+            <DecoratorOverlayContext.Provider value={{ overlays, hiddenViews: new Set(), toggleView: vi.fn() }}>
+                <svg>
+                    <FloatingEdge {...edgeProps({ data: { 'unique-id': 'rel-1', description: 'writes' } })} />
+                </svg>
+            </DecoratorOverlayContext.Provider>
+        );
+        expect(screen.getAllByTestId('edge-overlay-badge')).toHaveLength(2);
+        expect(error.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+        error.mockRestore();
+    });
+
+    it('hides only the extension whose view key the legend turned off', () => {
+        const overlays = ['ext-a', 'ext-b'].map((extension) => ({
+            view: fakeView(extension, 'risk'),
+            elements: new Map([['rel-1', fakeElement('error')]]),
+        }));
+        render(
+            <DecoratorOverlayContext.Provider value={{ overlays, hiddenViews: new Set(['ext-a/risk']), toggleView: vi.fn() }}>
+                <svg>
+                    <FloatingEdge {...edgeProps({ data: { 'unique-id': 'rel-1', description: 'writes' } })} />
+                </svg>
+            </DecoratorOverlayContext.Provider>
+        );
+        expect(screen.getAllByTestId('edge-overlay-badge')).toHaveLength(1);
     });
 });
