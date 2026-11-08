@@ -52,19 +52,22 @@ describe('buildExtensionRequest', () => {
     });
 
     it('encodes path parameter values', () => {
-        const request = buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: '..admin?x=1 é' });
+        const request = buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: '.admin?x=1 é' });
 
-        expect(request.path).toBe('/api/calm/extensions/ext/api/namespaces/..admin%3Fx%3D1%20%C3%A9');
+        expect(request.path).toBe('/api/calm/extensions/ext/api/namespaces/.admin%3Fx%3D1%20%C3%A9');
     });
 
-    it.each(['.', '..'])('fails when a path parameter is the dot segment %s', (value) => {
-        expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
-            .toThrow('Input property \'namespace\' must not be . or ..');
-    });
+    it.each(['', '.', '..', 'a..b', 'architectures/1', '/', '../admin', 'a\\b', '50%', 'alice@x', 'a\u0000b', 'a\u007fb'])(
+        'fails when a path parameter has a part that Hub refuses: %j', (value) => {
+            expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
+                .toThrow('Input property \'namespace\' must not be empty or ., or contain .., /, \\, %, @ or a control character, '
+                    + 'because it fills the path /namespaces/{namespace}');
+        });
 
-    it.each(['architectures/1', '/', '../admin'])('fails when a path parameter has a slash: %s', (value) => {
-        expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
-            .toThrow('Input property \'namespace\' must not contain /, because it fills the path /namespaces/{namespace}');
+    it.each(['.a', 'a.', 'v1.2', '~x_y-z', 1.5])('accepts the path parameter %j', (value) => {
+        const request = buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value });
+
+        expect(request.path).toBe(`/api/calm/extensions/ext/api/namespaces/${value}`);
     });
 
     it('fills a parameter that the path uses twice', () => {

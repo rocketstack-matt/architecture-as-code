@@ -6,12 +6,18 @@ import { isBuiltInExtension } from '../extensions/extensionIdentity.js';
 
 type RegistryEntry = ExtensionSummary & { contributes?: { 'decorator-views'?: DecoratorView[] } };
 
+// Hub refuses these parts of a path (ADR 0011). The same rule as @finos/calm-shared buildExtensionRequest.
+function isPathValue(value: string): boolean {
+    // eslint-disable-next-line no-control-regex
+    return value !== '' && value !== '.' && !/\.\.|[/\\%@\u0000-\u001f\u007f]/.test(value);
+}
+
 export function extensionRequest(id: string, route: ExtensionRoute, context: ExtensionContext) {
     const values: Record<string, string | undefined> = { ...context };
     const path = route.path.replace(/\{([^}]+)\}/g, (_, key: string) => {
         const value = values[key];
-        // Hub refuses %2F in a path (ADR 0011), so a value with a slash is not encoded but missing.
-        if (typeof value !== 'string' || !value || value.includes('/')) throw new Error(`Missing extension context: ${key}`);
+        if (typeof value !== 'string') throw new Error(`Missing extension context: ${key}`);
+        if (!isPathValue(value)) throw new Error(`Invalid extension context: ${key}`);
         return encodeURIComponent(value);
     });
     if (!path.startsWith('/') || path.split('/').some((part) => part === '.' || part === '..')) {

@@ -46,8 +46,9 @@ contribution, but the call fails.
 
 The UI sends the context as query parameters. A route path can also use these names as
 placeholders, for example `/namespaces/{namespace}/{resourceType}/{resourceId}`. A placeholder
-value cannot contain a slash, because CALM Hub refuses `%2F` in a path. Thus use `resource` only as
-a query parameter.
+value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@` or a control character, because
+CALM Hub refuses these in a path. The UI hides an action whose path gets such a value. Thus use
+`resource` only as a query parameter.
 
 | Parameter | Value | Sent to |
 |---|---|---|

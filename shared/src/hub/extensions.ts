@@ -47,7 +47,7 @@ export function extensionProxyPath(extensionId: string, routePath: string): stri
  * Maps a command input to a request on the route (ADR 0012). Input properties that match a
  * `{param}` fill the path. The rest go to the query for GET and DELETE, and to the JSON body otherwise.
  * The extension validates the input (the REST proxy does not), so this checks only what it needs to build the request.
- * @throws Error when a path parameter is missing, is not a string, number or boolean, is a dot segment or has a slash.
+ * @throws Error when a path parameter is missing, is not a string, number or boolean, or has a part that Hub refuses in a path.
  */
 export function buildExtensionRequest(extensionId: string, route: HubExtensionRoute, input: Record<string, unknown>): HubExtensionRequest {
     const rest: Record<string, unknown> = { ...input };
@@ -56,13 +56,8 @@ export function buildExtensionRequest(extensionId: string, route: HubExtensionRo
         if (!isScalar(value)) {
             throw new Error(`Input property '${name}' must be a string, number or boolean, because it fills the path ${route.path}`);
         }
-        // A URL client collapses dot segments, which would move the call out of the route.
-        if (value === '.' || value === '..') {
-            throw new Error(`Input property '${name}' must not be . or .., because it fills the path ${route.path}`);
-        }
-        // Hub refuses %2F in a path (ADR 0011).
-        if (String(value).includes('/')) {
-            throw new Error(`Input property '${name}' must not contain /, because it fills the path ${route.path}`);
+        if (!isPathValue(String(value))) {
+            throw new Error(`Input property '${name}' ${PATH_VALUE_RULE}, because it fills the path ${route.path}`);
         }
         delete rest[name];
         return encodeURIComponent(String(value));
@@ -75,6 +70,14 @@ export function buildExtensionRequest(extensionId: string, route: HubExtensionRo
         request.body = rest;
     }
     return request;
+}
+
+const PATH_VALUE_RULE = 'must not be empty or ., or contain .., /, \\, %, @ or a control character';
+
+// Hub refuses these parts of a path (ADR 0011), so a value with one would get a generic 400.
+function isPathValue(value: string): boolean {
+    // eslint-disable-next-line no-control-regex
+    return value !== '' && value !== '.' && !/\.\.|[/\\%@\u0000-\u001f\u007f]/.test(value);
 }
 
 function isScalar(value: unknown): value is string | number | boolean {

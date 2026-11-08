@@ -1325,7 +1325,8 @@ function parseExtensionArgs(args: string[], request: string, format: OutputForma
 
 /**
  * Converts an `--arg` value to the type that the input schema declares for the property, so that
- * `--arg limit=5` sends a number. A value that does not convert stays a string, and Hub rejects it.
+ * `--arg limit=5` sends a number. A value that does not convert stays a string. The REST proxy does
+ * not check the input, so the extension must reject it.
  */
 function coerceArg(value: string, properties: unknown, key: string): unknown {
     const schema = properties && typeof properties === 'object' && Object.prototype.hasOwnProperty.call(properties, key)

@@ -2440,7 +2440,7 @@ describe('hub-commands', () => {
                 });
             });
 
-            it('keeps an --arg value as a string when it does not convert, so that Hub rejects it', async () => {
+            it('keeps an --arg value as a string when it does not convert, for the extension to reject', async () => {
                 const { mockClient } = await getSharedMocks();
 
                 await runExtensionCommand({

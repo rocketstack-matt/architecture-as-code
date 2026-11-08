@@ -531,7 +531,7 @@ class TestExtensionToolsShould {
 
     @Test
     void match_a_long_argument_that_overflows_the_stack_of_java_util_regex() {
-        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "POST", "/r", "authenticated", false);
         Map<String, Object> input = Map.of("type", "object",
                 "properties", Map.of("text", Map.of("type", "string", "pattern", "^(a|b)*$")));
         ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
@@ -595,7 +595,7 @@ class TestExtensionToolsShould {
     }
 
     private static ExtensionTools.ExtensionTool textCommand(String pattern) {
-        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "GET", "/r", "authenticated", false);
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "POST", "/r", "authenticated", false);
         Map<String, Object> input = Map.of("type", "object",
                 "properties", Map.of("text", Map.of("type", "string", "pattern", pattern)));
         ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
@@ -933,25 +933,53 @@ class TestExtensionToolsShould {
     @Test
     void encode_a_path_value_so_it_cannot_add_a_segment() {
         ExtensionProxyRequest request = ExtensionTools.request(tool("remove-service"),
-                new JsonObject("{\"namespace\":\"finos\",\"name\":\"..a?c#d é\\\\\"}"));
+                new JsonObject("{\"namespace\":\"finos\",\"name\":\".a?c#d é~\"}"));
 
-        assertThat(request.path(), is("/namespaces/finos/services/..a%3Fc%23d%20%C3%A9%5C"));
+        assertThat(request.path(), is("/namespaces/finos/services/.a%3Fc%23d%20%C3%A9~"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", ".", "..", "a..b", "architectures/1", "a\\b", "50%", "alice@x", "a\0b", "a\177b"})
+    void refuse_a_path_value_that_the_proxy_refuses(String value) {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
+                tool("remove-service"), new JsonObject().put("namespace", "finos").put("name", value)));
+
+        assertThat(e.getMessage(), is("Input property 'name' must not be empty or ., or contain .., /, \\, %, @ or a "
+                + "control character, because it fills the path " + tool("remove-service").route().path()));
     }
 
     @Test
-    void refuse_a_slash_in_the_path() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
-                tool("remove-service"), new JsonObject("{\"namespace\":\"finos\",\"name\":\"architectures/1\"}")));
+    void accept_a_path_and_query_of_the_rest_limit() {
+        String query = "x=" + "a".repeat(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH - "/namespaces/finos/services?x=".length());
 
-        assertThat(e.getMessage(), containsString("must not contain /"));
+        ExtensionProxyRequest request = ExtensionTools.request(tool("list-services"),
+                new JsonObject().put("namespace", "finos").put("x", query.substring(2)));
+
+        assertThat(request.path().length() + 1 + request.rawQuery().length(), is(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH));
     }
 
     @Test
-    void refuse_a_dot_segment_in_the_path() {
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
-                tool("remove-service"), new JsonObject("{\"namespace\":\"finos\",\"name\":\"..\"}")));
+    void refuse_a_path_and_query_longer_than_the_rest_limit() {
+        String value = "a".repeat(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH - "/namespaces/finos/services?x=".length() + 1);
 
-        assertThat(e.getMessage(), containsString("must not be . or .."));
+        IllegalArgumentException query = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
+                tool("list-services"), new JsonObject().put("namespace", "finos").put("x", value)));
+        IllegalArgumentException path = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
+                tool("add-service"), new JsonObject().put("namespace", "a".repeat(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH))));
+
+        assertThat(query.getMessage(), is("The path and query are longer than 4096 characters."));
+        assertThat(path.getMessage(), is("The path and query are longer than 4096 characters."));
+    }
+
+    @Test
+    void return_a_long_query_as_a_tool_error_without_calling_the_extension() {
+        ToolResponse response = extensionTools.call(tool("list-services"),
+                Map.of("namespace", "finos", "tag", List.of("a".repeat(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH))));
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), is("Error: The path and query are longer than 4096 characters."));
+        verify(proxyService, never()).checkAccess(any(), any());
+        verify(proxyService, never()).call(any(), any());
     }
 
     @Test
@@ -1066,6 +1094,28 @@ class TestExtensionToolsShould {
         assertThat(response.isError(), is(true));
         assertThat(text(response), startsWith("Error: The input does not match the schema of this command:"));
         assertThat(text(response), containsString("/limit"));
+        assertThat(text(response).contains(" more"), is(false));
+        verify(proxyService, never()).call(any(), any());
+    }
+
+    @Test
+    void list_at_most_twenty_input_errors() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        for (int i = 0; i < 30; i++) {
+            properties.put("p" + i, Map.of("type", "integer"));
+            arguments.put("p" + i, "x");
+        }
+        ExtensionManifest.Route route = new ExtensionManifest.Route("r", "POST", "/r", "authenticated", false);
+        ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", List.of(route),
+                Map.of("c", new ExtensionManifest.Command("r", "C", Map.of("type", "object", "properties", properties),
+                        null, null, null)), null);
+
+        ToolResponse response = extensionTools.call(ExtensionTools.tools(List.of(manifest)).getFirst(), arguments);
+
+        String[] lines = text(response).split("\n");
+        assertThat(lines.length, is(1 + ExtensionTools.MAX_VALIDATION_ERRORS + 1));
+        assertThat(lines[lines.length - 1].matches("- and \\d+ more"), is(true));
         verify(proxyService, never()).call(any(), any());
     }
 
@@ -1090,7 +1140,7 @@ class TestExtensionToolsShould {
     void return_a_mapping_error_without_calling_the_extension() {
         ToolResponse response = extensionTools.call(tool("remove-service"), Map.of("namespace", "finos", "name", "."));
 
-        assertThat(text(response), containsString("must not be . or .."));
+        assertThat(text(response), containsString("Input property 'name' must not be empty or ."));
         verify(proxyService, never()).call(any(), any());
     }
 
