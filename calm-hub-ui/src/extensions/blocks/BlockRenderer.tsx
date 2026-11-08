@@ -1,39 +1,18 @@
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { ScreenBlock } from '../../model/extensions.js';
-import '../../hub/components/adr-renderer/AdrMarkdown.css';
-import { safeHref } from '../ScreenLink.js';
+import type { HeadingLevel } from '../Heading.js';
 import { alertClass } from '../tone.js';
 import { CardsBlock } from './CardsBlock.js';
 import { KeyValueBlock } from './KeyValueBlock.js';
 import { LinksBlock } from './LinksBlock.js';
+import { MarkdownBlock } from './MarkdownBlock.js';
 import { StatsBlock } from './StatsBlock.js';
 import { TableBlock } from './TableBlock.js';
 
-export function BlockRenderer({ block }: { block: ScreenBlock }) {
+/** `headingLevel` is the level of the slot title: headings in the block go below it. */
+export function BlockRenderer({ block, headingLevel = 2 }: { block: ScreenBlock; headingLevel?: HeadingLevel }) {
     switch (block.type) {
         case 'markdown':
-            return (
-                <div className="adr-markdown">
-                    <Markdown
-                        remarkPlugins={[remarkGfm]}
-                        skipHtml
-                        components={{
-                            a: ({ href, children }) =>
-                                safeHref(href) ? (
-                                    <a href={safeHref(href)} target="_blank" rel="noopener noreferrer">
-                                        {children}
-                                    </a>
-                                ) : (
-                                    <span>{children}</span>
-                                ),
-                            img: ({ alt }) => <span>{alt}</span>,
-                        }}
-                    >
-                        {block.text}
-                    </Markdown>
-                </div>
-            );
+            return <MarkdownBlock text={block.text} headingLevel={headingLevel} />;
         case 'keyValue':
             return <KeyValueBlock items={block.items} />;
         case 'stats':

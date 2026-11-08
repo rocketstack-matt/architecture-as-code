@@ -236,3 +236,9 @@ describe('ExtensionSlot actions', () => {
         }
     });
 });
+
+it('makes the slot a size container, so its blocks follow the slot width', async () => {
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+    render(<ExtensionSlot extension={extension} contribution={contribution} />);
+    expect(await screen.findByRole('region', { name: 'Summary' })).toHaveClass('@container');
+});

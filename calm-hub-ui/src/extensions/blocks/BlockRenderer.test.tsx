@@ -100,3 +100,43 @@ it('draws key-value lines between rows and columns, not a divide that puts a lin
         expect(item.className.split(' ')).toEqual(expect.arrayContaining(['-mt-px', '-ml-px', 'border-t', 'border-l']));
     }
 });
+
+describe('Markdown in a slot', () => {
+    it('puts its headings below the slot title, and styles them', () => {
+        render(
+            <MemoryRouter>
+                <BlockRenderer block={{ type: 'markdown', text: '# Top\n\n## Next\n\n#### Deep\n\n- item' }} headingLevel={4} />
+            </MemoryRouter>
+        );
+        expect(screen.getByRole('heading', { name: 'Top', level: 5 })).toHaveClass('text-lg', 'font-bold');
+        expect(screen.getByRole('heading', { name: 'Next', level: 6 })).toHaveClass('text-base', 'font-bold');
+        expect(screen.getByRole('heading', { name: 'Deep', level: 6 })).toHaveClass('text-sm', 'font-semibold');
+        expect(screen.getByRole('list')).toHaveClass('list-disc');
+    });
+
+    it('starts below h2 when the slot gives no level', () => {
+        draw({ type: 'markdown', text: '# Top' });
+        expect(screen.getByRole('heading', { name: 'Top', level: 3 })).toBeInTheDocument();
+    });
+});
+
+describe('blocks in a narrow slot', () => {
+    // A details panel can be 304px wide on a wide screen, so the column count follows the slot, not the viewport.
+    it.each([
+        { type: 'keyValue', items: [{ label: 'k', value: 1 }] },
+        { type: 'stats', items: [{ label: 'k', value: 1 }] },
+        { type: 'cards', items: [{ title: 'k' }] },
+    ] as ScreenBlock[])('sets the $type columns from the slot width', (block) => {
+        const { container } = draw(block);
+        const grid = container.firstElementChild!;
+        expect(grid.className).toMatch(/@(md|sm):grid-cols-3/);
+        expect(grid.className).not.toMatch(/(^|\s)sm:grid-cols/);
+    });
+
+    it('wraps a very long card title and subtitle in the card', () => {
+        const long = 'x'.repeat(200);
+        draw({ type: 'cards', items: [{ title: long, subtitle: long }] });
+        for (const text of screen.getAllByText(long)) expect(text).toHaveClass('wrap-anywhere');
+        expect(screen.getAllByText(long)[0].parentElement).toHaveClass('min-w-0');
+    });
+});

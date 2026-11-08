@@ -40,7 +40,8 @@ signed-in user. CALM Hub does not check a reply against it: the UI checks only `
 ```
 
 GitHub-flavoured Markdown. Hub ignores raw HTML, shows an image as its alt text, and shows a link
-that is not `http` or `https` as plain text. Links open in a new tab.
+that is not `http` or `https` as plain text. Links open in a new tab. A Markdown heading goes
+one level below the slot heading, so `#` in a node details panel is not a page title.
 
 ### keyValue
 
@@ -125,6 +126,11 @@ A row of link buttons, with the same rules as a table link.
 | `warning` | Amber |
 | `info` | Blue |
 | `neutral` | Grey. A `neutral` alert has no colour |
+
+An unknown `tone` shows as the default of its block.
+
+The `keyValue`, `stats` and `cards` blocks set their columns from the width of the slot, not of
+the screen. In a narrow node details panel they show in one or two columns.
 
 ## Errors and unknown blocks
 

@@ -47,6 +47,18 @@ describe('ExtensionCard', () => {
         expect(await screen.findByText('Rolling out')).toHaveClass('truncate');
     });
 
+    it('wraps a very long name and provider to two lines, with the full text as a title', () => {
+        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+        const name = 'N'.repeat(120);
+        const provider = 'P'.repeat(120);
+        renderCard({ ...fakeExtension(1), name, provider });
+        for (const text of [screen.getByText(name), screen.getByText(provider)]) {
+            expect(text).toHaveClass('line-clamp-2', 'wrap-anywhere');
+            expect(text).not.toHaveClass('truncate');
+        }
+        expect(screen.getByText(name)).toHaveAttribute('title', name);
+    });
+
     it('is not a link without a screen, and needs no landing card', () => {
         const call = vi.spyOn(ExtensionService.prototype, 'call');
         renderCard(fakeExtension(1, ['landing-card']));

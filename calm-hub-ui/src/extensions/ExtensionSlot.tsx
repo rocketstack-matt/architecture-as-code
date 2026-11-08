@@ -43,12 +43,12 @@ function SlotContent({ extension, contribution, context = {}, action, headingLev
     if (route.method !== 'GET') return <p role="alert">Block routes must use GET.</p>;
     if (!result) return <p role="status">Loading extension…</p>;
     return (
-        <section className="flex flex-col gap-4 min-w-0 overflow-auto" aria-label={contribution.title}>
+        <section className="@container flex flex-col gap-4 min-w-0 overflow-auto" aria-label={contribution.title}>
             <Heading level={headingLevel} className="text-lg font-bold">
                 {result.title ?? contribution.title}
             </Heading>
             {result.blocks.map((block, index) => (
-                <BlockRenderer key={index} block={block} />
+                <BlockRenderer key={index} block={block} headingLevel={headingLevel} />
             ))}
         </section>
     );

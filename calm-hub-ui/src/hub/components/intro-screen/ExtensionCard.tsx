@@ -66,10 +66,12 @@ function ExtensionCardContent({ extension }: { extension: ExtensionSummary }) {
         <>
             <span className="flex items-center gap-2 min-w-0">
                 <ExtensionMarker extensionId={extension.id} />
-                <span className="min-w-0 truncate font-medium text-[14px]">{extension.name}</span>
+                <span className="min-w-0 line-clamp-2 wrap-anywhere font-medium text-[14px]" title={extension.name}>
+                    {extension.name}
+                </span>
             </span>
             {extension.provider && (
-                <span className="text-[12px] truncate" style={{ color: colors.redesign.muted }}>
+                <span className="text-[12px] line-clamp-2 wrap-anywhere" style={{ color: colors.redesign.muted }} title={extension.provider}>
                     {extension.provider}
                 </span>
             )}
