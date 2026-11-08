@@ -202,7 +202,7 @@ CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route pa
 
 - refuses an encoded slash (`%2F`, in any case, or double-encoded) with `400`, and does not call the backend. A backend that decodes `%2F` before routing would see a path other than the one CALM Hub checked
 - decodes percent-encoded unreserved characters and uppercases other escapes before matching and forwarding. Percent-encoding in a matched literal segment gets `400`
-- on a read-only CALM Hub, gives `405`, not `400`, to a method other than `GET` with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`, `//` or `@` in the path. CALM Hub refuses such a path before it finds the route
+- on a read-only CALM Hub, gives `405`, not `400`, to a `POST`, `PUT`, `PATCH` or `DELETE` with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`, `//` or `@` in the path. CALM Hub refuses such a path before it finds the route
 - gives `415`, before it signs the assertion, to a `POST` that has no `application/json` or other `+json` `Content-Type`, also when it has no body. A `PUT`, `PATCH` or `DELETE` gets `415` only for a body of another type. Thus a cross-site form or fetch cannot call a route as the user. Those three methods need a CORS preflight, which CALM Hub does not allow cross-site
 - matches the path against the declared routes only, and refuses `..`, `%2e`, `\`, `//`, `@` and their encoded forms
 - checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path
