@@ -89,6 +89,11 @@ vi.mock('../../../visualizer/components/drawer/Drawer.js', () => ({
             <button onClick={() => onOpenView?.({ id: 'scan', label: 'Scans', match: { schema: 'https://example.org/scan.json' } })}>
                 simulate-open-schema-view
             </button>
+            <button
+                onClick={() => onOpenView?.({ id: 'scan', label: 'Scans', match: { type: 'observability', schema: 'https://example.org/scan.json' } })}
+            >
+                simulate-open-type-and-schema-view
+            </button>
         </div>
     ),
 }));
@@ -414,6 +419,14 @@ describe('DiagramSection', () => {
             appliesTo: ['api', 'db'],
             data: { dashboard: 'https://grafana.example.com/d/abc' },
         };
+        const scan = {
+            uniqueId: 'scan-1',
+            type: 'observability',
+            schema: 'https://example.org/scan.json',
+            target: ['/api/calm/namespaces/arch-namespace/architectures/42/versions/1-0-0'],
+            appliesTo: ['api'],
+            data: { result: 'clean' },
+        };
 
         function LocationProbe() {
             const location = useLocation();
@@ -526,12 +539,43 @@ describe('DiagramSection', () => {
             expect(await screen.findByText(/dep-1/)).toBeInTheDocument();
         });
 
-        it('opens the unfiltered Decorators tab for a view that matches on $schema', async () => {
+        it('opens the Decorators tab filtered to the $schema of a view that matches on $schema', async () => {
+            calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, observability, scan]);
             const user = userEvent.setup();
             renderArchitecture();
 
             await user.click(screen.getByText('simulate-open-schema-view'));
-            expect(screen.getByTestId('location')).toHaveTextContent(/^\?tab=decorators$/);
+            expect(new URLSearchParams(screen.getByTestId('location').textContent ?? '').get('schema')).toBe('https://example.org/scan.json');
+            expect(await screen.findByRole('article', { name: 'observability decorator scan-1' })).toBeInTheDocument();
+            expect(screen.queryByRole('article', { name: 'observability decorator obs-1' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('article', { name: 'deployment decorator dep-1' })).not.toBeInTheDocument();
+        });
+
+        it('filters on both the type and the $schema of a view that matches on both', async () => {
+            calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, observability, scan]);
+            const user = userEvent.setup();
+            renderArchitecture();
+
+            await user.click(screen.getByText('simulate-open-type-and-schema-view'));
+            const query = new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+            expect([query.get('type'), query.get('schema')]).toEqual(['observability', 'https://example.org/scan.json']);
+            expect(await screen.findByRole('article', { name: 'observability decorator scan-1' })).toBeInTheDocument();
+            expect(screen.queryByRole('article', { name: 'observability decorator obs-1' })).not.toBeInTheDocument();
+        });
+
+        it('keeps the $schema filter when the type changes, and drops it on "Show all schemas"', async () => {
+            calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, observability, scan]);
+            const user = userEvent.setup();
+            renderArchitecture('/?tab=decorators&schema=https%3A%2F%2Fexample.org%2Fscan.json');
+
+            await user.selectOptions(await screen.findByRole('combobox'), 'observability');
+            let query = new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+            expect([query.get('type'), query.get('schema')]).toEqual(['observability', 'https://example.org/scan.json']);
+
+            await user.click(screen.getByRole('button', { name: 'Show all schemas' }));
+            query = new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+            expect([query.get('type'), query.get('schema')]).toEqual(['observability', null]);
+            expect(await screen.findByRole('article', { name: 'observability decorator obs-1' })).toBeInTheDocument();
         });
 
         it('offers the tab in the mobile view menu, selected when active', async () => {

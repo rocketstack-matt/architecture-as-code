@@ -35,7 +35,7 @@ import { IoSaveOutline, IoRefreshOutline } from 'react-icons/io5';
 import { PatternImplementationService } from '../../../service/pattern-implementation-service.js';
 import { usePatternImplementations } from './used-by/usePatternImplementations.js';
 import { useArchitectureDecorators } from './decorators/useArchitectureDecorators.js';
-import { DECORATOR_TYPE_PARAM, DIAGRAM_TAB_REDIRECTS, DIAGRAM_TABS, extensionContext } from './tabs/diagramTabs.js';
+import { decoratorFilterParams, DIAGRAM_TAB_REDIRECTS, DIAGRAM_TABS, extensionContext } from './tabs/diagramTabs.js';
 import {
     carriedDiagramTab,
     DEFAULT_DIAGRAM_TAB_ID,
@@ -235,9 +235,8 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
         if (redirectTo !== undefined) setSearchParams(new URLSearchParams(redirectTo), { replace: true, state: location.state });
     }, [redirectTo, setSearchParams, location.state]);
     const openDecoratorView = useCallback((view: DecoratorView) => {
-        const type = view.match.type;
         setSearchParams(
-            { tab: 'decorators', ...(type ? { [DECORATOR_TYPE_PARAM]: type } : {}) },
+            { tab: 'decorators', ...decoratorFilterParams(view.match.type, view.match.schema) },
             { replace: true, state: location.state }
         );
     }, [setSearchParams, location.state]);

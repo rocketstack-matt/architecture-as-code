@@ -8,8 +8,15 @@ import { DEFAULT_DIAGRAM_TAB_ID, type DiagramTab } from './diagramTabRegistry.js
 import type { Data } from '../../../../model/calm.js';
 import type { ExtensionContext } from '../../../../model/extensions.js';
 
-/** The `?tab=decorators` query parameter that filters by decorator type. */
+/** The `?tab=decorators` query parameters that filter by decorator type and by `$schema`. */
 export const DECORATOR_TYPE_PARAM = 'type';
+export const DECORATOR_SCHEMA_PARAM = 'schema';
+
+/** The query that keeps only the given filters. */
+export const decoratorFilterParams = (type: string | null | undefined, schema: string | null | undefined): Record<string, string> => ({
+    ...(type ? { [DECORATOR_TYPE_PARAM]: type } : {}),
+    ...(schema ? { [DECORATOR_SCHEMA_PARAM]: schema } : {}),
+});
 
 /** Old `?tab=` values, and the query that replaces each. Deployments became a decorator view. */
 export const DIAGRAM_TAB_REDIRECTS: Readonly<Record<string, Record<string, string>>> = {
@@ -53,14 +60,20 @@ export const DIAGRAM_TABS: readonly DiagramTab[] = [
         label: 'Decorators',
         icon: IoPricetagsOutline,
         isVisible: ({ isArchitecture }) => isArchitecture,
-        searchParams: [DECORATOR_TYPE_PARAM],
-        render: ({ decorators, searchParams, setTabParams }) => (
-            <DecoratorsPanel
-                state={decorators}
-                typeFilter={searchParams.get(DECORATOR_TYPE_PARAM) || null}
-                onTypeFilterChange={(type) => setTabParams(type ? { [DECORATOR_TYPE_PARAM]: type } : {})}
-            />
-        ),
+        searchParams: [DECORATOR_TYPE_PARAM, DECORATOR_SCHEMA_PARAM],
+        render: ({ decorators, searchParams, setTabParams }) => {
+            const typeFilter = searchParams.get(DECORATOR_TYPE_PARAM) || null;
+            const schemaFilter = searchParams.get(DECORATOR_SCHEMA_PARAM) || null;
+            return (
+                <DecoratorsPanel
+                    state={decorators}
+                    typeFilter={typeFilter}
+                    schemaFilter={schemaFilter}
+                    onTypeFilterChange={(type) => setTabParams(decoratorFilterParams(type, schemaFilter))}
+                    onSchemaFilterChange={(schema) => setTabParams(decoratorFilterParams(typeFilter, schema))}
+                />
+            );
+        },
     },
     {
         id: 'used-by',
