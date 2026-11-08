@@ -287,6 +287,15 @@ class NitriteDecoratorStoreTest {
     }
 
     @Test
+    void testParseJsonToNitriteDocument_KeepsNumberIntAndMaxKeyAsPlainData() {
+        Document data = decoratorStore.parseJsonToNitriteDocument(
+                "{\"data\":{\"n\":{\"$numberInt\":\"1\"},\"k\":{\"$maxKey\":1}}}").get("data", Document.class);
+
+        assertEquals("1", data.get("n", Document.class).get("$numberInt", String.class));
+        assertEquals(1, data.get("k", Document.class).get("$maxKey", Integer.class));
+    }
+
+    @Test
     void testDocumentToDecorator_MapsAllFields() {
         Document doc = Document.createDocument("$schema", "https://calm.finos.org/schemas/decorator.json")
                 .put("unique-id", "test-decorator")

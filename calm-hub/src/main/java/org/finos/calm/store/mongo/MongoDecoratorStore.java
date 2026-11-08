@@ -15,12 +15,16 @@ import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
 import org.finos.calm.store.util.DecoratorHistoryChain;
+import org.finos.calm.store.util.DecoratorJson;
 import org.finos.calm.store.util.DecoratorTimestamps;
 import org.finos.calm.store.util.MongoUpsertPush;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -123,7 +127,7 @@ public class MongoDecoratorStore implements DecoratorStore {
     public int createDecorator(String namespace, String decoratorJson) throws NamespaceNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
-        Document parsedDecorator = Document.parse(decoratorJson);
+        Document parsedDecorator = toBsonDocument(DecoratorJson.parseObject(decoratorJson));
         int id = counterStore.getNextDecoratorSequenceValue();
         String now = DecoratorTimestamps.now();
         Document decoratorDocument = new Document("decoratorId", id)
@@ -143,7 +147,7 @@ public class MongoDecoratorStore implements DecoratorStore {
     public void updateDecorator(String namespace, int id, String decoratorJson) throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
-        Document parsedDecorator = Document.parse(decoratorJson);
+        Document parsedDecorator = toBsonDocument(DecoratorJson.parseObject(decoratorJson));
 
         long modified = decoratorCollection.updateOne(
                 Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
@@ -165,7 +169,7 @@ public class MongoDecoratorStore implements DecoratorStore {
             throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
         namespaceStore.requireNamespace(namespace);
 
-        Document parsedDecorator = Document.parse(decoratorJson);
+        Document parsedDecorator = toBsonDocument(DecoratorJson.parseObject(decoratorJson));
         int newId = counterStore.getNextDecoratorSequenceValue();
         String now = DecoratorTimestamps.now();
 
@@ -292,6 +296,27 @@ public class MongoDecoratorStore implements DecoratorStore {
                         doc.getString(SUPERSEDED_DATE_TIME_FIELD),
                         toDecorator(doc)))
                 .toList();
+    }
+
+    // Not Document.parse, which decodes extended JSON: {"$numberInt": "1"} must stay the object that was validated.
+    static Document toBsonDocument(Map<?, ?> map) {
+        Document document = new Document();
+        map.forEach((key, value) -> document.append(key.toString(), toBsonValue(value)));
+        return document;
+    }
+
+    private static Object toBsonValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return toBsonDocument(map);
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(MongoDecoratorStore::toBsonValue).collect(Collectors.toCollection(ArrayList::new));
+        }
+        // BSON has no arbitrary-precision integer.
+        if (value instanceof BigInteger big) {
+            return big.doubleValue();
+        }
+        return value;
     }
 
     private static Decorator toDecorator(Document entry) {

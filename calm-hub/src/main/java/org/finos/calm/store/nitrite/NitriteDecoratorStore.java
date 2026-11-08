@@ -1,11 +1,8 @@
 package org.finos.calm.store.nitrite;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
 import jakarta.inject.Inject;
-import org.bson.json.JsonParseException;
 import org.dizitart.no2.Nitrite;
 import org.dizitart.no2.collection.Document;
 import org.dizitart.no2.collection.NitriteCollection;
@@ -18,6 +15,7 @@ import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
 import org.finos.calm.store.util.DecoratorHistoryChain;
+import org.finos.calm.store.util.DecoratorJson;
 import org.finos.calm.store.util.DecoratorTimestamps;
 import org.finos.calm.store.util.TypeSafeNitriteDocument;
 import org.slf4j.Logger;
@@ -61,7 +59,6 @@ public class NitriteDecoratorStore implements DecoratorStore {
     private final NitriteNamespaceStore namespaceStore;
     private final NitriteCounterStore counterStore;
     private final Lock lock = new ReentrantLock();
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Inject
     public NitriteDecoratorStore(@StandaloneQualifier Nitrite db, NitriteNamespaceStore namespaceStore, NitriteCounterStore counterStore) {
@@ -415,18 +412,8 @@ public class NitriteDecoratorStore implements DecoratorStore {
     }
 
     // Nitrite only deserializes its own and JDK types, so no org.bson value may reach the store.
-    // Jackson gives only JDK types and keeps extended-JSON keys such as $numberDecimal as plain data.
     Document parseJsonToNitriteDocument(String json) {
-        Map<?, ?> map;
-        try {
-            map = objectMapper.readValue(json, Map.class);
-        } catch (JsonProcessingException e) {
-            throw new JsonParseException(e.getOriginalMessage());
-        }
-        if (map == null) {
-            throw new JsonParseException("Decorator JSON must be an object");
-        }
-        return toNitriteDocument(map);
+        return toNitriteDocument(DecoratorJson.parseObject(json));
     }
 
     private static Document toNitriteDocument(Map<?, ?> map) {

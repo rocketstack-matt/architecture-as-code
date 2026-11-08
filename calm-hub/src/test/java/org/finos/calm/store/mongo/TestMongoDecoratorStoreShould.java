@@ -11,6 +11,7 @@ import com.mongodb.client.result.UpdateResult;
 import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.json.JsonParseException;
 import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
@@ -980,6 +981,74 @@ class TestMongoDecoratorStoreShould {
         when(findIterable.first()).thenReturn(null);
 
         assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.getDecoratorHistory("finos", 1));
+    }
+
+    @Test
+    void should_store_extended_json_keys_as_plain_data_on_create() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(counterStore.getNextDecoratorSequenceValue()).thenReturn(1);
+        ArgumentCaptor<Bson> update = ArgumentCaptor.forClass(Bson.class);
+
+        decoratorStore.createDecorator("finos", EXTENDED_JSON_DECORATOR);
+
+        verify(decoratorCollection).updateOne(any(Bson.class), update.capture(), any(UpdateOptions.class));
+        assertStoredAsPlainData(update.getValue().toBsonDocument()
+                .getDocument("$push").getDocument("decorators").getDocument("decorator"));
+    }
+
+    @Test
+    void should_store_extended_json_keys_as_plain_data_on_update() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(1L);
+        ArgumentCaptor<Bson> update = ArgumentCaptor.forClass(Bson.class);
+        when(decoratorCollection.updateOne(any(Bson.class), update.capture())).thenReturn(updateResult);
+
+        decoratorStore.updateDecorator("finos", 1, EXTENDED_JSON_DECORATOR);
+
+        assertStoredAsPlainData(update.getValue().toBsonDocument()
+                .getDocument("$set").getDocument("decorators.$.decorator"));
+    }
+
+    @Test
+    void should_store_extended_json_keys_as_plain_data_on_supersede() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(counterStore.getNextDecoratorSequenceValue()).thenReturn(5);
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(1L);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
+
+        decoratorStore.supersedeDecorator("finos", 1, EXTENDED_JSON_DECORATOR);
+
+        verify(decoratorCollection).updateOne(any(Bson.class), argThat((List<? extends Bson> pipeline) -> {
+            BsonDocument successor = pipeline.getFirst().toBsonDocument().getDocument("$set").getDocument("decorators")
+                    .getArray("$concatArrays").get(1).asDocument().getArray("$literal").getFirst().asDocument();
+            assertStoredAsPlainData(successor.getDocument("decorator"));
+            return true;
+        }));
+    }
+
+    @Test
+    void should_refuse_decorator_json_that_is_not_an_object() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+
+        assertThrows(JsonParseException.class, () -> decoratorStore.createDecorator("finos", "[1]"));
+        assertThrows(JsonParseException.class, () -> decoratorStore.createDecorator("finos", "null"));
+        verify(decoratorCollection, never()).updateOne(any(Bson.class), any(Bson.class), any(UpdateOptions.class));
+    }
+
+    private static final String EXTENDED_JSON_DECORATOR = """
+            {"type": "deployment", "data": {"n": {"$numberInt": "1"}, "k": {"$maxKey": 1},
+             "list": [{"$numberLong": "2"}], "big": 123456789012345678901234567890, "small": 3}}
+            """;
+
+    private static void assertStoredAsPlainData(BsonDocument decorator) {
+        BsonDocument data = decorator.getDocument("data");
+        assertEquals("1", data.getDocument("n").getString("$numberInt").getValue());
+        assertEquals(1, data.getDocument("k").getInt32("$maxKey").getValue());
+        assertEquals("2", data.getArray("list").getFirst().asDocument().getString("$numberLong").getValue());
+        assertEquals(1.2345678901234568E29, data.getDouble("big").getValue());
+        assertEquals(3, data.getInt32("small").getValue());
     }
 
     private void mockNamespaceDocument(String namespace, Document... decorators) {
