@@ -26,12 +26,13 @@ import { DiagramSection } from './components/diagram-section/DiagramSection.js';
 import { Sidebar } from '../visualizer/components/sidebar/Sidebar.js';
 import { NodeSheet } from '../visualizer/components/sidebar/NodeSheet.js';
 import { DiagramActionsContext } from '../visualizer/context/DiagramActionsContext.js';
-import { DecoratorsContext } from '../visualizer/context/DecoratorsContext.js';
+import { DecoratorsContext, type DecoratorsState } from '../visualizer/context/DecoratorsContext.js';
+import { containersOfContainment } from '../visualizer/overlay/overlayEngine.js';
 import { ResourceNotFound } from './components/resource-not-found/ResourceNotFound.js';
 import { extensionContext } from './components/diagram-section/tabs/diagramTabs.js';
 import { parseCALMHubPath } from '../visualizer/components/reactflow/utils/calmHelpers.js';
 import type { Decorator, SelectedItem } from '../visualizer/contracts/contracts.js';
-import type { CalmNodeSchema } from '@finos/calm-models/types';
+import type { CalmNodeSchema, CalmRelationshipSchema } from '@finos/calm-models/types';
 import { authStore } from '../service/utils/auth-store.js';
 import './Hub.css';
 
@@ -322,6 +323,14 @@ export default function Hub() {
     // has no place in the node list, so the neighbours resolve to undefined).
     // Steppers only feed the mobile NodeSheet; desktop renders <Sidebar> and never
     // consumes onPrev/onNext, so skip the derivation entirely off mobile.
+    const decoratorsState = useMemo((): DecoratorsState => {
+        const relationships = (data?.data as { relationships?: unknown } | undefined)?.relationships;
+        return {
+            decorators,
+            drawnAs: containersOfContainment(Array.isArray(relationships) ? (relationships as CalmRelationshipSchema[]) : []),
+        };
+    }, [data, decorators]);
+
     const diagramNodes = useMemo<CalmNodeSchema[]>(() => {
         if (!isMobile) return [];
         const nodes = (data?.data as { nodes?: unknown } | undefined)?.nodes;
@@ -462,7 +471,7 @@ export default function Hub() {
     return (
         <DiagramActionsContext.Provider value={diagramActions}>
         <ExtensionResourceContext.Provider value={isDiagramView && !showsDroppedFile ? extensionContext(data) : null}>
-        <DecoratorsContext.Provider value={decorators}>
+        <DecoratorsContext.Provider value={decoratorsState}>
         <div className="flex flex-col h-screen overflow-hidden">
             <Navbar />
             {isMobile && !isMobileNavOpen && (
