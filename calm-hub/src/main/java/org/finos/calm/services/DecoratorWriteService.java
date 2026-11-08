@@ -2,6 +2,7 @@ package org.finos.calm.services;
 
 import io.quarkus.security.identity.SecurityIdentity;
 import io.vertx.core.json.DecodeException;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -53,6 +54,7 @@ public class DecoratorWriteService {
             HubOwnedDecoratorFieldException {
         JsonObject decorator = parse(decoratorJson);
         rejectHubOwnedFields(decorator);
+        requireFieldTypes(decorator);
         requireWriter(principal, typeOf(decorator));
         requireValid(decorator);
         return decoratorStore.createDecorator(namespace, decoratorJson);
@@ -69,6 +71,7 @@ public class DecoratorWriteService {
             ReservedDecoratorTypeException, DecoratorSchemaValidationException, HubOwnedDecoratorFieldException {
         JsonObject decorator = parse(decoratorJson);
         rejectHubOwnedFields(decorator);
+        requireFieldTypes(decorator);
         Optional<Decorator> existing = decoratorStore.getDecoratorById(namespace, id);
         if (existing.isPresent()) {
             requireWriter(principal, existing.get().getType());
@@ -88,14 +91,25 @@ public class DecoratorWriteService {
         return id;
     }
 
-    public void deleteDecorator(String principal, String namespace, int id)
-            throws NamespaceNotFoundException, DecoratorNotFoundException, ReservedDecoratorTypeException {
+    /**
+     * Deletes a decorator with its whole history. A global admin may delete any history; any other caller
+     * must be a writer of each reserved type in it.
+     */
+    public void deleteDecorator(String principal, boolean globalAdmin, String namespace, int id)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException,
+            ReservedDecoratorTypeException {
         Optional<Decorator> existing = decoratorStore.getDecoratorById(namespace, id);
         if (existing.isPresent()) {
-            requireWriter(principal, existing.get().getType());
+            if (!globalAdmin) {
+                requireWriter(principal, existing.get().getType());
+            }
             var history = decoratorStore.getDecoratorHistory(namespace, id);
-            for (var entry : history) {
-                requireWriter(principal, entry.getDecorator().getType());
+            if (!globalAdmin) {
+                for (var entry : history) {
+                    if (entry.getDecorator() != null) {
+                        requireWriter(principal, entry.getDecorator().getType());
+                    }
+                }
             }
             decoratorStore.deleteCurrentDecoratorHistory(namespace, history.getFirst().getId());
             return;
@@ -107,6 +121,21 @@ public class DecoratorWriteService {
         for (String field : List.of(DecoratorTimestamps.CREATION_DATE_TIME_FIELD, DecoratorTimestamps.UPDATE_DATE_TIME_FIELD)) {
             if (decorator.containsKey(field)) {
                 throw new HubOwnedDecoratorFieldException(field);
+            }
+        }
+    }
+
+    // Hub reads these fields itself, whether or not the decorator has a $schema.
+    private static void requireFieldTypes(JsonObject decorator) {
+        for (String field : List.of("$schema", "unique-id", "type")) {
+            if (decorator.containsKey(field) && !(decorator.getValue(field) instanceof String)) {
+                throw new JsonParseException("Decorator field '" + field + "' must be a string");
+            }
+        }
+        for (String field : List.of("target", "target-type", "applies-to")) {
+            if (decorator.containsKey(field)
+                    && !(decorator.getValue(field) instanceof JsonArray array && array.stream().allMatch(String.class::isInstance))) {
+                throw new JsonParseException("Decorator field '" + field + "' must be an array of strings");
             }
         }
     }

@@ -7,6 +7,7 @@ import io.quarkus.security.PermissionsAllowed;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.bson.json.JsonParseException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
@@ -121,7 +122,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards). Hub sets creationDateTime and updateDateTime; a decorator that sends either is refused.")
+    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards). Hub sets creationDateTime and updateDateTime; a decorator that sends either is refused.")
     public ToolResponse createDecorator(
             @ToolArg(description = "The namespace to create the decorator in") String namespace,
             @ToolArg(description = "The decorator JSON payload (must include $schema, unique-id, type, target, target-type, applies-to, and data fields)") String decoratorJson) {
@@ -140,6 +141,8 @@ public class DecoratorTools {
         } catch (NamespaceNotFoundException e) {
             logger.warn("Namespace not found [{}]", namespace, e);
             return ToolResponse.error("Error: Namespace '" + namespace + "' not found.");
+        } catch (JsonParseException e) {
+            return ToolResponse.error("Error: " + e.getMessage() + ".");
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {
@@ -150,7 +153,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows, or sends the Hub-owned creationDateTime or updateDateTime. A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
+    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows, or sends the Hub-owned creationDateTime or updateDateTime. A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
     public ToolResponse updateDecorator(
             @ToolArg(description = "The namespace containing the decorator") String namespace,
             @ToolArg(description = "The decorator numeric ID to update (positive integer)") int decoratorId,
@@ -191,6 +194,8 @@ public class DecoratorTools {
         } catch (DecoratorSupersededException e) {
             logger.warn("Decorator [{}] in namespace [{}] has been superseded", decoratorId, namespace);
             return ToolResponse.error("Error: Decorator " + decoratorId + " has been superseded. Use getDecoratorHistory to find the current decorator.");
+        } catch (JsonParseException e) {
+            return ToolResponse.error("Error: " + e.getMessage() + ".");
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {

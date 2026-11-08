@@ -124,7 +124,7 @@ class TestNitriteDecoratorHistoryShould {
         store.createDecorator(NAMESPACE, decorator("first"));
         store.supersedeDecorator(NAMESPACE, 1, decorator("second"));
 
-        assertThrows(DecoratorNotFoundException.class, () -> store.deleteCurrentDecoratorHistory(NAMESPACE, 1));
+        assertThrows(DecoratorSupersededException.class, () -> store.deleteCurrentDecoratorHistory(NAMESPACE, 1));
 
         assertThat(store.getDecoratorsForNamespace(NAMESPACE, null, null), contains(2));
         store.deleteCurrentDecoratorHistory(NAMESPACE, 2);
@@ -142,6 +142,36 @@ class TestNitriteDecoratorHistoryShould {
         assertThat(store.getDecoratorsForNamespace(NAMESPACE, null, null), contains(3));
         assertThat(store.getDecoratorById(NAMESPACE, 1).isPresent(), is(false));
         assertThat(store.getDecoratorValuesForNamespace(NAMESPACE, null, "missing"), is(empty()));
+    }
+
+    @Test
+    void throw_decorator_not_found_when_deleting_a_missing_current_decorator() throws Exception {
+        store.createDecorator(NAMESPACE, decorator("first"));
+
+        assertThrows(DecoratorNotFoundException.class, () -> store.deleteCurrentDecoratorHistory(NAMESPACE, 9));
+    }
+
+    @Test
+    void read_update_and_delete_a_decorator_stored_with_wrong_field_types() throws Exception {
+        store.createDecorator(NAMESPACE, """
+                {"unique-id": 7, "type": 5, "target": "t", "applies-to": ["a", 2], "target-type": ["architecture"]}
+                """);
+
+        Decorator stored = store.getDecoratorById(NAMESPACE, 1).orElseThrow();
+        assertThat(stored.getType(), is(nullValue()));
+        assertThat(stored.getTarget(), is(nullValue()));
+        assertThat(stored.getAppliesTo(), is(nullValue()));
+        assertThat(stored.getUniqueId(), is(nullValue()));
+        assertThat(stored.getTargetType(), contains("architecture"));
+        assertThat(store.getDecoratorsForNamespace(NAMESPACE, "t", "control-evaluation"), is(empty()));
+
+        store.updateDecorator(NAMESPACE, 1, """
+                {"unique-id": 7, "type": 5, "target": "t"}
+                """);
+        assertThat(store.getDecoratorHistory(NAMESPACE, 1).getFirst().getDecorator().getType(), is(nullValue()));
+
+        store.deleteCurrentDecoratorHistory(NAMESPACE, 1);
+        assertThat(store.getDecoratorById(NAMESPACE, 1).isPresent(), is(false));
     }
 
     private static String decorator(String uniqueId) {

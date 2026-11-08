@@ -285,10 +285,14 @@ public class DecoratorResource {
             @PathParam("id") @Min(value = 1, message = "ID must be a positive integer") int id
     ) {
         try {
-            decoratorWriteService.deleteDecorator(DecoratorWriteService.principalName(identity), namespace, id);
+            // The endpoint requires GLOBAL_ADMIN, so the caller need not be a writer of the reserved types.
+            decoratorWriteService.deleteDecorator(DecoratorWriteService.principalName(identity), true, namespace, id);
         } catch (DecoratorNotFoundException e) {
             logger.error("Decorator [{}] not found in namespace [{}] when deleting", id, namespace, e);
             return CalmResourceErrorResponses.decoratorNotFoundResponse(namespace, id);
+        } catch (DecoratorSupersededException e) {
+            logger.warn("Decorator [{}] in namespace [{}] was superseded while deleting", id, namespace);
+            return CalmResourceErrorResponses.decoratorDeleteConflictResponse(namespace, id);
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when deleting decorator [{}]", namespace, id, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);

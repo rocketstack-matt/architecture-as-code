@@ -97,9 +97,11 @@ public interface DecoratorStore {
     /**
      * Delete a history only if the authorized current entry is still current.
      * A concurrent supersession must not delete a successor that was not authorized.
+     *
+     * @throws DecoratorSupersededException if the entry is present but is no longer current
      */
     void deleteCurrentDecoratorHistory(String namespace, int currentId)
-            throws NamespaceNotFoundException, DecoratorNotFoundException;
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException;
 
     /**
      * Delete an existing decorator in the given namespace, with its whole history.

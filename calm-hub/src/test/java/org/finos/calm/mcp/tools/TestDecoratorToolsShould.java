@@ -402,6 +402,24 @@ class TestDecoratorToolsShould {
     // --- write rules ---
 
     @Test
+    void return_error_when_creating_a_decorator_with_a_type_that_is_not_a_string() {
+        ToolResponse response = decoratorTools.createDecorator("workshop", "{\"type\":5}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("'type' must be a string"));
+        verifyNoInteractions(decoratorStore);
+    }
+
+    @Test
+    void return_error_when_updating_a_decorator_with_a_target_that_is_not_an_array_of_strings() {
+        ToolResponse response = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"threat-model\",\"target\":\"t\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("'target' must be an array of strings"));
+        verifyNoInteractions(decoratorStore);
+    }
+
+    @Test
     void return_error_when_creating_a_reserved_type_as_another_principal() {
         ToolResponse response = decoratorTools.createDecorator("workshop", "{\"type\":\"control-evaluation\"}");
 

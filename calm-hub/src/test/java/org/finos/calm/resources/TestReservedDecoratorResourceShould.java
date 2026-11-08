@@ -11,6 +11,15 @@ import org.finos.calm.domain.DecoratorHistoryEntry;
 import java.util.List;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.store.DecoratorStore;
+import org.finos.calm.domain.UserAccess;
+import org.finos.calm.domain.audit.AuditAction;
+import org.finos.calm.domain.audit.AuditEntityType;
+import org.finos.calm.domain.audit.AuditLogEntry;
+import org.finos.calm.domain.audit.AuditOutcome;
+import org.finos.calm.security.AuditService;
+import org.finos.calm.security.CalmHubPermissionChecker;
+import org.finos.calm.store.UserAccessStore;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -22,6 +31,9 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,6 +64,12 @@ class TestReservedDecoratorResourceShould {
 
     @InjectMock
     DecoratorStore mockDecoratorStore;
+
+    @InjectMock
+    UserAccessStore mockUserAccessStore;
+
+    @InjectMock
+    AuditService mockAuditService;
 
     @Test
     @TestSecurity(user = "policy-engine", authorizationEnabled = false)
@@ -129,17 +147,58 @@ class TestReservedDecoratorResourceShould {
     }
 
     @Test
-    @TestSecurity(user = "alice", authorizationEnabled = false)
-    void return_403_when_another_principal_deletes_a_reserved_decorator() throws Exception {
-        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("control-evaluation")));
+    @TestSecurity(user = "admin")
+    void delete_a_reserved_history_for_a_global_admin_who_is_not_a_writer() throws Exception {
+        when(mockUserAccessStore.getGrantsForUser("admin")).thenReturn(List.of(
+                new UserAccess("admin", UserAccess.Permission.admin, CalmHubPermissionChecker.GLOBAL_ACCESS)));
+        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("threat-model")));
+        when(mockDecoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(2, 1, null, decorator("control-evaluation")),
+                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
 
+        given()
+                .when()
+                .delete("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(204);
+
+        verify(mockDecoratorStore).deleteCurrentDecoratorHistory("finos", 2);
+        ArgumentCaptor<AuditLogEntry> audit = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(mockAuditService).record(audit.capture());
+        assertThat(audit.getValue().getAction(), is(AuditAction.DELETE));
+        assertThat(audit.getValue().getEntityType(), is(AuditEntityType.DECORATOR));
+        assertThat(audit.getValue().getEntityId(), is("1"));
+        assertThat(audit.getValue().getActor(), is("admin"));
+        assertThat(audit.getValue().getOutcome(), is(AuditOutcome.SUCCESS));
+    }
+
+    @Test
+    @TestSecurity(user = "policy-engine")
+    void return_403_when_a_writer_who_is_not_a_global_admin_deletes_a_reserved_decorator() throws Exception {
         given()
                 .when()
                 .delete("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(403);
 
+        verify(mockDecoratorStore, never()).deleteCurrentDecoratorHistory(anyString(), anyInt());
         verify(mockDecoratorStore, never()).deleteDecorator(anyString(), anyInt());
+    }
+
+    @Test
+    @TestSecurity(user = "alice", authorizationEnabled = false)
+    void return_409_when_a_delete_loses_to_a_supersede() throws Exception {
+        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("control-evaluation")));
+        when(mockDecoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(1, null, null, decorator("control-evaluation"))));
+        doThrow(new DecoratorSupersededException()).when(mockDecoratorStore).deleteCurrentDecoratorHistory("finos", 1);
+
+        given()
+                .when()
+                .delete("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(409)
+                .body(containsString("Retry the delete"));
     }
 
     @Test
@@ -191,7 +250,7 @@ class TestReservedDecoratorResourceShould {
                 .put("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(409)
-                .body(containsString("superseded"));
+                .body(containsString("Update the current decorator"));
     }
 
     private static Decorator decorator(String type) {

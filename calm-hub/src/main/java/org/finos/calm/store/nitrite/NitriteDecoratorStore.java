@@ -264,54 +264,70 @@ public class NitriteDecoratorStore implements DecoratorStore {
 
     @Override
     public void deleteCurrentDecoratorHistory(String namespace, int currentId)
-            throws NamespaceNotFoundException, DecoratorNotFoundException {
-        deleteDecorator(namespace, currentId, true);
-    }
-
-    @Override
-    public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
-        deleteDecorator(namespace, id, false);
-    }
-
-    private void deleteDecorator(String namespace, int id, boolean requireCurrent)
-            throws NamespaceNotFoundException, DecoratorNotFoundException {
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
         namespaceStore.requireNamespace(namespace);
 
         lock.lock();
         try {
-            Document namespaceDoc = fetchNamespaceDocument(namespace);
-            if (namespaceDoc == null) {
-                throw new DecoratorNotFoundException();
+            Document entry = decoratorEntries(requireNamespaceDocument(namespace)).stream()
+                    .filter(candidate -> Integer.valueOf(currentId).equals(candidate.get(DECORATOR_ID_FIELD, Integer.class)))
+                    .findFirst()
+                    .orElseThrow(DecoratorNotFoundException::new);
+            if (entry.get(SUPERSEDED_BY_FIELD) != null) {
+                throw new DecoratorSupersededException();
             }
-
-            TypeSafeNitriteDocument<Document> typeSafeDoc = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class);
-            List<Document> decorators = typeSafeDoc.getList(DECORATORS_FIELD);
-            if (decorators == null) {
-                throw new DecoratorNotFoundException();
-            }
-
-            if (requireCurrent && decorators.stream().noneMatch(entry ->
-                    Integer.valueOf(id).equals(entry.get(DECORATOR_ID_FIELD, Integer.class))
-                            && entry.get(SUPERSEDED_BY_FIELD) == null)) {
-                throw new DecoratorNotFoundException();
-            }
-
-            Set<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespaceDoc, namespace), id).stream()
-                    .map(DecoratorHistoryEntry::getId)
-                    .collect(Collectors.toSet());
-            List<Document> mutableDecorators = new ArrayList<>(decorators);
-            boolean removed = mutableDecorators.removeIf(
-                    decoratorEntry -> ids.contains(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)));
-            if (!removed) {
-                throw new DecoratorNotFoundException();
-            }
-
-            namespaceDoc.put(DECORATORS_FIELD, mutableDecorators);
-            decoratorCollection.update(namespaceDoc);
-            LOG.debug("Deleted decorator with ID {} in namespace '{}'", id, namespace);
+            deleteHistory(namespace, currentId);
         } finally {
             lock.unlock();
         }
+    }
+
+    @Override
+    public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
+        namespaceStore.requireNamespace(namespace);
+
+        lock.lock();
+        try {
+            deleteHistory(namespace, id);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // The caller holds the lock.
+    private void deleteHistory(String namespace, int id) throws DecoratorNotFoundException {
+        Document namespaceDoc = requireNamespaceDocument(namespace);
+        List<Document> decorators = decoratorEntries(namespaceDoc);
+
+        Set<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespaceDoc, namespace), id).stream()
+                .map(DecoratorHistoryEntry::getId)
+                .collect(Collectors.toSet());
+        List<Document> mutableDecorators = new ArrayList<>(decorators);
+        boolean removed = mutableDecorators.removeIf(
+                decoratorEntry -> ids.contains(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)));
+        if (!removed) {
+            throw new DecoratorNotFoundException();
+        }
+
+        namespaceDoc.put(DECORATORS_FIELD, mutableDecorators);
+        decoratorCollection.update(namespaceDoc);
+        LOG.debug("Deleted decorator with ID {} in namespace '{}'", id, namespace);
+    }
+
+    private Document requireNamespaceDocument(String namespace) throws DecoratorNotFoundException {
+        Document namespaceDoc = fetchNamespaceDocument(namespace);
+        if (namespaceDoc == null) {
+            throw new DecoratorNotFoundException();
+        }
+        return namespaceDoc;
+    }
+
+    private static List<Document> decoratorEntries(Document namespaceDoc) throws DecoratorNotFoundException {
+        List<Document> decorators = new TypeSafeNitriteDocument<>(namespaceDoc, Document.class).getList(DECORATORS_FIELD);
+        if (decorators == null) {
+            throw new DecoratorNotFoundException();
+        }
+        return decorators;
     }
 
     /**
@@ -395,8 +411,7 @@ public class NitriteDecoratorStore implements DecoratorStore {
             return true;
         }
         
-        String decoratorType = decorator.get("type", String.class);
-        return decoratorType != null && decoratorType.equals(type);
+        return type.equals(decorator.get("type"));
     }
 
     // Nitrite only deserializes its own and JDK types, so no org.bson value may reach the store.
@@ -434,12 +449,12 @@ public class NitriteDecoratorStore implements DecoratorStore {
 
     Decorator documentToDecorator(Document doc) {
         return new Decorator.DecoratorBuilder()
-                .setSchema(doc.get("$schema", String.class))
-                .setUniqueId(doc.get("unique-id", String.class))
-                .setType(doc.get("type", String.class))
-                .setTarget((List<String>) doc.get("target"))
-                .setTargetType((List<String>) doc.get("target-type"))
-                .setAppliesTo((List<String>) doc.get("applies-to"))
+                .setSchema(Decorator.stringOrNull(doc.get("$schema")))
+                .setUniqueId(Decorator.stringOrNull(doc.get("unique-id")))
+                .setType(Decorator.stringOrNull(doc.get("type")))
+                .setTarget(Decorator.stringListOrNull(doc.get("target")))
+                .setTargetType(Decorator.stringListOrNull(doc.get("target-type")))
+                .setAppliesTo(Decorator.stringListOrNull(doc.get("applies-to")))
                 .setData(doc.get("data"))
                 .build();
     }
