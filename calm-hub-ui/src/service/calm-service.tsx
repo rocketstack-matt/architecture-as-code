@@ -460,10 +460,19 @@ export class CalmService {
      * resolved (including when the mappings cannot be fetched).
      */
     public async resolveArchitectureVersionTarget(namespace: string, id: string, version: string): Promise<string | undefined> {
+        return this.architectureVersionTarget(namespace, id, version, () => this.fetchMappings(namespace, 'Architectures'));
+    }
+
+    private async architectureVersionTarget(
+        namespace: string,
+        id: string,
+        version: string,
+        loadMappings: () => Promise<ResourceMapping[]>
+    ): Promise<string | undefined> {
         const versionPath = version.replace(/\./g, '-');
         let numericId = id;
         if (isSlug(id)) {
-            const mappings = await this.fetchMappings(namespace, 'Architectures');
+            const mappings = await loadMappings();
             const match = mappings.find((m) => m.customId === id);
             if (!match) return undefined;
             numericId = String(match.numericId);
@@ -474,17 +483,18 @@ export class CalmService {
     /**
      * Fetches the decorators of every type recorded against one architecture version.
      *
-     * Resolves a slug id to its numeric id first, and returns an empty array when the slug cannot be resolved. Unlike
-     * `fetchDecoratorValues` this rejects when the request fails, so the caller can tell a failure from no decorators.
+     * Resolves a slug id to its numeric id first, and returns an empty array when the slug has no mapping. Unlike
+     * `fetchDecoratorValues` this rejects when the mappings or the decorators request fails, so the caller can tell a
+     * failure from no decorators.
      */
     public async fetchArchitectureDecorators(namespace: string, id: string, version: string): Promise<Decorator[]> {
-        const target = await this.resolveArchitectureVersionTarget(namespace, id, version);
-        if (!target) return [];
-        return this.requestDecoratorValues(namespace, target).catch((error) => {
-            const errorMessage = `Error fetching decorators for namespace ${namespace}:`;
-            console.error('%s', errorMessage, error);
-            return Promise.reject(new Error(errorMessage));
-        });
+        return this.architectureVersionTarget(namespace, id, version, () => this.requestMappings(namespace, 'Architectures'))
+            .then((target) => (target ? this.requestDecoratorValues(namespace, target) : []))
+            .catch((error) => {
+                const errorMessage = `Error fetching decorators for namespace ${namespace}:`;
+                console.error('%s', errorMessage, error);
+                return Promise.reject(new Error(errorMessage));
+            });
     }
 
     /**
@@ -518,21 +528,23 @@ export class CalmService {
 
     /** Fetches all named resources of a given type from the name-based namespace API. */
     public async fetchMappings(namespace: string, type?: string): Promise<ResourceMapping[]> {
-        const headers = await getAuthHeaders();
         if (!type) {
+            await getAuthHeaders();
             return [];
         }
-        const pluralType = this.calmTypeToPath(type);
+        return this.requestMappings(namespace, type).catch((error) => {
+            const errorMessage = `Error fetching mappings for namespace ${namespace}:`;
+            console.error('%s', errorMessage, error);
+            return [];
+        });
+    }
+
+    /** Like `fetchMappings`, but rejects when the request fails. */
+    private async requestMappings(namespace: string, type: string): Promise<ResourceMapping[]> {
+        const headers = await getAuthHeaders();
         return this.ax
-            .get(`/calm/namespaces/${encodeURIComponent(namespace)}/${pluralType}`, { headers })
-            .then((res) => {
-                return Array.isArray(res.data?.values) ? res.data.values : [];
-            })
-            .catch((error) => {
-                const errorMessage = `Error fetching mappings for namespace ${namespace}:`;
-                console.error('%s', errorMessage, error);
-                return [];
-            });
+            .get(`/calm/namespaces/${encodeURIComponent(namespace)}/${this.calmTypeToPath(type)}`, { headers })
+            .then((res) => (Array.isArray(res.data?.values) ? res.data.values : []));
     }
 
     /** Fetches the list of versions for a named (slug) resource. */
