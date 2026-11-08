@@ -346,6 +346,67 @@ describe('CalmHubClient', () => {
                 .rejects.toMatchObject({ status: 404, error: 'Request failed with status code 404', body: { missing: true } });
         });
 
+        it('shows the title and detail of a problem+json error body', async () => {
+            const body = { type: 'about:blank', title: 'Conflict', detail: 'The service exists', status: 409 };
+            mock.onPost().reply(409, JSON.stringify(body), { 'content-type': 'application/problem+json' });
+
+            await expect(client.callExtension('example', postRoute, { namespace: 'finos' }))
+                .rejects.toMatchObject({ status: 409, error: 'Conflict: The service exists', body });
+        });
+
+        it('shows the title of a problem+json error body that has no detail', async () => {
+            mock.onPost().reply(400, '{"title":"Bad input"}', { 'content-type': 'application/problem+json' });
+
+            await expect(client.callExtension('example', postRoute, { namespace: 'finos' }))
+                .rejects.toMatchObject({ status: 400, error: 'Bad input' });
+        });
+
+        it.each([
+            [401, 'Authentication is required, or the credentials are not valid'],
+            [403, 'Access is denied'],
+            [404, 'Request failed with status code 404'],
+        ])('gives an empty %d reply a message and no body', async (status, message) => {
+            mock.onGet().reply(status, '');
+
+            const error = await client.callExtension('example', getRoute, { namespace: 'finos' }).catch((e) => e);
+
+            expect(error).toBeInstanceOf(HubClientError);
+            expect(error).toMatchObject({ status, error: message });
+            expect(error.body).toBeUndefined();
+        });
+
+        it('sets no client timeout by default, because Hub ends the call at the extension timeout', async () => {
+            mock.onGet().reply((config) => {
+                expect(config.timeout).toBe(0);
+                return [204, ''];
+            });
+
+            await client.callExtension('example', getRoute, { namespace: 'finos' });
+        });
+
+        it('uses the timeout that the caller gives', async () => {
+            mock.onGet().reply((config) => {
+                expect(config.timeout).toBe(90000);
+                return [204, ''];
+            });
+
+            await client.callExtension('example', getRoute, { namespace: 'finos' }, { timeoutMs: 90000 });
+        });
+
+        it('says that a write can still complete after a client timeout', async () => {
+            mock.onPost().timeout();
+
+            await expect(client.callExtension('example', postRoute, { namespace: 'finos' }, { timeoutMs: 5 }))
+                .rejects.toMatchObject({ status: 0, error: expect.stringContaining('check whether the write happened before you send it again') });
+        });
+
+        it('gives only the timeout for a read', async () => {
+            mock.onGet().timeout();
+
+            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }, { timeoutMs: 5 }))
+                .rejects.toMatchObject({ status: 0, error: 'timeout of 5ms exceeded' });
+        });
+
         it('throws HubClientError with status 0 on a network error', async () => {
             mock.onGet().networkError();
 
@@ -354,7 +415,13 @@ describe('CalmHubClient', () => {
         });
 
         it('throws before any call when a path parameter is missing', async () => {
-            await expect(client.callExtension('example', getRoute, {})).rejects.toThrow('Input property \'namespace\'');
+            await expect(client.callExtension('example', getRoute, {})).rejects.toThrow('Input property \'namespace\' is required');
+            expect(mock.history.get).toHaveLength(0);
+        });
+
+        it('throws before any call when a query value has a control character', async () => {
+            await expect(client.callExtension('example', getRoute, { namespace: 'finos', q: 'a\nb' }))
+                .rejects.toMatchObject({ status: 0, error: expect.stringContaining('Input property \'q\' must not contain a control character') });
             expect(mock.history.get).toHaveLength(0);
         });
 

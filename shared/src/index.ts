@@ -97,8 +97,10 @@ export {
     type HubExtensionRoute,
     type HubExtensionRequest,
     type HubExtensionResponse,
+    type HubExtensionCallOptions,
     buildExtensionRequest,
     extensionProxyPath,
+    numberText,
     type ResourceType,
     type ResourceChangeType,
     isValidResourceType
