@@ -717,6 +717,25 @@ describe('CalmService', () => {
             expect(mock.history.get.filter((r) => r.url?.includes('/decorators'))).toHaveLength(0);
         });
 
+        it('resolves a slug through the mappings', async () => {
+            const decorator = { uniqueId: 'dec-1', target: [target], appliesTo: ['node-a'], data: {} };
+            mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(200, { values: [{ customId: 'my-arch', numericId: 1 }] });
+            mock.onGet(url).reply(200, { values: [decorator] });
+
+            expect(await calmService.fetchArchitectureDecorators(namespace, 'my-arch', '1.0.0')).toEqual([decorator]);
+        });
+
+        it.each([500, 401])('rejects without a decorator request when the mappings request fails with %i', async (status) => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+            mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(status);
+
+            await expect(calmService.fetchArchitectureDecorators(namespace, 'my-arch', '1.0.0')).rejects.toThrow(
+                `Error fetching decorators for namespace ${namespace}:`
+            );
+            expect(mock.history.get.filter((r) => r.url?.includes('/decorators'))).toHaveLength(0);
+            consoleError.mockRestore();
+        });
+
         it('rejects when the request fails', async () => {
             const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
             mock.onGet(url).reply(500);
@@ -744,6 +763,13 @@ describe('CalmService', () => {
         it('returns undefined when the slug cannot be resolved', async () => {
             mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(200, { values: [] });
             expect(await calmService.resolveArchitectureVersionTarget(namespace, 'unknown-slug', '1.0.0')).toBeUndefined();
+        });
+
+        it('returns undefined when the mappings request fails', async () => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+            mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(500);
+            expect(await calmService.resolveArchitectureVersionTarget(namespace, 'my-arch', '1.0.0')).toBeUndefined();
+            consoleError.mockRestore();
         });
     });
 
