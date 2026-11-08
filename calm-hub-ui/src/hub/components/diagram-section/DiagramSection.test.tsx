@@ -18,8 +18,11 @@ const releaseTracker: ExtensionSummary = {
     contributes: { 'designer-tab': [{ id: 'releases', title: 'Releases', route: 'tab' }] },
 };
 
+const DECORATOR_TARGET = '/api/calm/namespaces/arch-namespace/architectures/42/versions/1-0-0';
+
 const calmServiceMock = {
-    fetchArchitectureDecorators: vi.fn().mockResolvedValue([]),
+    resolveArchitectureVersionTarget: vi.fn().mockResolvedValue(DECORATOR_TARGET),
+    fetchDecoratorsForTarget: vi.fn().mockResolvedValue([]),
     fetchVersionsByCustomId: vi.fn().mockResolvedValue(['1.0.0', '2.0.0']),
     fetchArchitectureTimeline: vi.fn().mockRejectedValue(new Error('no timeline')),
     fetchArchitectureSummaries: vi
@@ -60,17 +63,20 @@ vi.mock('../../../visualizer/components/drawer/Drawer.js', () => ({
     // simulate a drag without pulling in the full ReactFlow tree.
     Drawer: ({
         data,
+        decorators,
         onPositionsChange,
         onDroppedFileChange,
         onOpenView,
     }: {
         data: Data;
+        decorators?: { uniqueId: string }[];
         onPositionsChange?: (positions: { id: string; position: { x: number; y: number } }[]) => void;
         onDroppedFileChange?: (dropped: boolean) => void;
         onOpenView?: (view: { id: string; label: string; match: { type?: string; schema?: string } }) => void;
     }) => (
         <div data-testid="drawer">
             Drawer for {data.id}
+            <span data-testid="drawer-decorators">{decorators?.map((d) => d.uniqueId).join(' ') || '(none)'}</span>
             <button
                 onClick={() => onPositionsChange?.([{ id: 'node-1', position: { x: 1, y: 2 } }])}
             >
@@ -118,7 +124,8 @@ vi.mock('./timeline/TimelineBar.js', () => ({
 
 vi.mock('../../../service/calm-service.js', () => ({
     CalmService: vi.fn().mockImplementation(function () { return {
-        fetchArchitectureDecorators: calmServiceMock.fetchArchitectureDecorators,
+        resolveArchitectureVersionTarget: calmServiceMock.resolveArchitectureVersionTarget,
+        fetchDecoratorsForTarget: calmServiceMock.fetchDecoratorsForTarget,
         fetchVersionsByCustomId: calmServiceMock.fetchVersionsByCustomId,
         fetchArchitectureTimeline: calmServiceMock.fetchArchitectureTimeline,
         fetchArchitectureSummaries: calmServiceMock.fetchArchitectureSummaries,
@@ -164,7 +171,8 @@ const patternData: Data & { calmType: 'Patterns' } = {
 describe('DiagramSection', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        calmServiceMock.fetchArchitectureDecorators.mockResolvedValue([]);
+        calmServiceMock.resolveArchitectureVersionTarget.mockResolvedValue(DECORATOR_TARGET);
+        calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([]);
         calmServiceMock.fetchVersionsByCustomId.mockResolvedValue(['1.0.0', '2.0.0']);
         calmServiceMock.fetchArchitectureTimeline.mockRejectedValue(new Error('no timeline'));
         implementationServiceMock.fetchImplementations.mockResolvedValue([]);
@@ -422,7 +430,7 @@ describe('DiagramSection', () => {
         }
 
         beforeEach(() => {
-            calmServiceMock.fetchArchitectureDecorators.mockResolvedValue([deployment, observability]);
+            calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, observability]);
         });
 
         it('shows the tab for an architecture, not for a pattern', () => {
@@ -494,7 +502,7 @@ describe('DiagramSection', () => {
         });
 
         it('says so when the decorators cannot be loaded', async () => {
-            calmServiceMock.fetchArchitectureDecorators.mockRejectedValue(new Error('boom'));
+            calmServiceMock.fetchDecoratorsForTarget.mockRejectedValue(new Error('boom'));
             renderArchitecture('/?tab=decorators');
 
             expect(await screen.findByText('Could not load decorators.')).toBeInTheDocument();
@@ -557,6 +565,46 @@ describe('DiagramSection', () => {
             expect(onDecoratorsChange).toHaveBeenLastCalledWith([]);
         });
 
+        it('gives the diagram, the tab and the details drawer one polled list, with one request per refresh', async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            try {
+                const onDecoratorsChange = vi.fn();
+                renderArchitecture('/', { onDecoratorsChange });
+                await waitFor(() => expect(screen.getByTestId('drawer-decorators')).toHaveTextContent('dep-1 obs-1'));
+                expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, observability]);
+                expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(1);
+
+                const newer = { ...deployment, uniqueId: 'dep-2' };
+                calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, newer]);
+                await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+                expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(2);
+                expect(screen.getByTestId('drawer-decorators')).toHaveTextContent('dep-1 dep-2');
+                expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, newer]);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('keeps the list when a refresh fails', async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+            try {
+                renderArchitecture('/?tab=decorators');
+                expect(await screen.findByRole('article', { name: 'deployment decorator dep-1' })).toBeInTheDocument();
+
+                calmServiceMock.fetchDecoratorsForTarget.mockRejectedValue(new Error('boom'));
+                await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+                expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(2);
+                expect(screen.getByRole('article', { name: 'deployment decorator dep-1' })).toBeInTheDocument();
+                expect(screen.queryByText('Could not load decorators.')).not.toBeInTheDocument();
+            } finally {
+                error.mockRestore();
+                vi.useRealTimers();
+            }
+        });
+
         it('reports an empty list for a pattern', async () => {
             const onDecoratorsChange = vi.fn();
             render(
@@ -566,7 +614,7 @@ describe('DiagramSection', () => {
             );
 
             await waitFor(() => expect(onDecoratorsChange).toHaveBeenCalledWith([]));
-            expect(calmServiceMock.fetchArchitectureDecorators).not.toHaveBeenCalled();
+            expect(calmServiceMock.fetchDecoratorsForTarget).not.toHaveBeenCalled();
         });
     });
 
@@ -730,11 +778,8 @@ describe('DiagramSection', () => {
 
             await screen.findByTestId('drawer');
 
-            expect(calmServiceMock.fetchArchitectureDecorators).toHaveBeenCalledWith(
-                'arch-namespace',
-                'test-arch',
-                '1.0.0'
-            );
+            await waitFor(() => expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledWith('arch-namespace', DECORATOR_TARGET));
+            expect(calmServiceMock.resolveArchitectureVersionTarget).toHaveBeenCalledWith('arch-namespace', 'test-arch', '1.0.0');
         });
 
     });

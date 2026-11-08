@@ -59,7 +59,7 @@ A view without `overlay` is valid, but the UI draws nothing for it yet.
   `warn` amber.
 - A container shows the results of its `deployed-in` and `composed-of` relationships.
 - Click a badge to see each result, its mapped status, its label and its time.
-- While the architecture is open, Hub reads the decorators again every 5 seconds.
+- While the architecture is open, Hub reads the decorators again every 5 seconds. The overlays, the **Decorators** tab and the details drawer show the same list.
 - If the browser cannot load the extension registry, Hub draws only the built-in views. The **Decorators** tab still shows the stored data.
 
 ## Built-in views

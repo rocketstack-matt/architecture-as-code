@@ -4,7 +4,7 @@ import {
     CalmRelationshipSchema,
 } from '@finos/calm-models/types';
 import type { Control } from './control-contracts.js';
-import type { ControlEvaluationDecorator } from './decorator-contracts.js';
+import type { ControlEvaluationDecorator, Decorator } from './decorator-contracts.js';
 import type { DecoratorView } from './decorator-view-contracts.js';
 import { Data } from '../../model/calm.js';
 import type { StoredNodePosition } from '../services/node-position-service.js';
@@ -33,6 +33,11 @@ export type PositionsChangeHandler = (positions: StoredNodePosition[]) => void;
 export interface DrawerProps {
     data?: Data;
     onItemSelect?: (item: SelectedItem) => void;
+    /**
+     * Every decorator of the architecture version in `data`, kept current by its owner. The overlays draw from it; they
+     * are not drawn for a pattern or a dropped file.
+     */
+    decorators?: Decorator[];
     /** Opens the full list of a decorator view's decorators, from the overlay legend. */
     onOpenView?: (view: DecoratorView) => void;
     /** Keeps the overlay legend choices. Injected for tests; see the storage note in calm-hub-ui/AGENTS.md. */

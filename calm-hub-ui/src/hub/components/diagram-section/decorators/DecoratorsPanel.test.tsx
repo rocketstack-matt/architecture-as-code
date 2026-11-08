@@ -117,7 +117,7 @@ describe('DecoratorsPanel', () => {
                 decorator('legacy-1', 'deployment'),
             ],
         });
-        const reply = await new CalmService(ax).fetchArchitectureDecorators('finos', '1', '1.0.0');
+        const reply = await new CalmService(ax).fetchDecoratorsForTarget('finos', target);
 
         render(<DecoratorsPanel state={{ status: 'loaded', decorators: reply }} typeFilter={null} onTypeFilterChange={vi.fn()} />);
 

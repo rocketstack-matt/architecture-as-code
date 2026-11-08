@@ -677,57 +677,6 @@ describe('CalmService', () => {
         });
     });
 
-    describe('fetchArchitectureDecorators', () => {
-        const target = `/api/calm/namespaces/${namespace}/architectures/1/versions/1-0-0`;
-        const url = `/api/calm/namespaces/${namespace}/decorators/values?target=${encodeURIComponent(target)}`;
-
-        it('fetches the decorators of every type for the version', async () => {
-            const decorators = [
-                { uniqueId: 'dec-1', type: 'deployment', target: [target], appliesTo: ['node-a'], data: {} },
-                { uniqueId: 'dec-2', type: 'observability', target: [target], appliesTo: ['node-b'], data: {} },
-            ];
-            mock.onGet(url).reply(200, { values: decorators });
-
-            expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual(decorators);
-        });
-
-        it('returns an empty array when the response has no values', async () => {
-            mock.onGet(url).reply(200, {});
-
-            expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual([]);
-        });
-
-        it('drops entries that are not objects', async () => {
-            const decorator = { uniqueId: 'dec-1', target: [target], appliesTo: ['node-a'], data: {} };
-            mock.onGet(url).reply(200, { values: [decorator, null, 'text', 3] });
-
-            expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual([decorator]);
-        });
-
-        it('returns an empty array when values is not an array', async () => {
-            mock.onGet(url).reply(200, { values: { uniqueId: 'dec-1' } });
-
-            expect(await calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).toEqual([]);
-        });
-
-        it('returns an empty array without a decorator request when the slug cannot be resolved', async () => {
-            mock.onGet(`/calm/namespaces/${namespace}/architectures`).reply(200, { values: [] });
-
-            expect(await calmService.fetchArchitectureDecorators(namespace, 'unknown-slug', '1.0.0')).toEqual([]);
-            expect(mock.history.get.filter((r) => r.url?.includes('/decorators'))).toHaveLength(0);
-        });
-
-        it('rejects when the request fails', async () => {
-            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-            mock.onGet(url).reply(500);
-
-            await expect(calmService.fetchArchitectureDecorators(namespace, '1', '1.0.0')).rejects.toThrow(
-                `Error fetching decorators for namespace ${namespace}:`
-            );
-            consoleError.mockRestore();
-        });
-    });
-
     describe('resolveArchitectureVersionTarget', () => {
         it('builds the exact version target from a numeric id without calling mappings', async () => {
             expect(await calmService.resolveArchitectureVersionTarget(namespace, '7', '1.1.0'))
@@ -749,6 +698,27 @@ describe('CalmService', () => {
 
     describe('fetchDecoratorsForTarget', () => {
         const target = `/api/calm/namespaces/${namespace}/architectures/7/versions/1-1-0`;
+        const url = `/api/calm/namespaces/${namespace}/decorators/values?target=${encodeURIComponent(target)}`;
+
+        it('drops entries that are not objects', async () => {
+            const decorator = { uniqueId: 'dec-1', target: [target], appliesTo: ['node-a'], data: {} };
+            mock.onGet(url).reply(200, { values: [decorator, null, 'text', 3] });
+
+            expect(await calmService.fetchDecoratorsForTarget(namespace, target)).toEqual([decorator]);
+        });
+
+        it('returns an empty array when values is not an array', async () => {
+            mock.onGet(url).reply(200, { values: { uniqueId: 'dec-1' } });
+
+            expect(await calmService.fetchDecoratorsForTarget(namespace, target)).toEqual([]);
+        });
+
+        it('returns an empty array when the response has no values', async () => {
+            mock.onGet(url).reply(200, {});
+
+            expect(await calmService.fetchDecoratorsForTarget(namespace, target)).toEqual([]);
+        });
+
 
         it('fetches the decorators of one type for an exact version target', async () => {
             const values = [{ uniqueId: 'eval-1', type: 'control-evaluation', target: [target], appliesTo: ['trade-api'], data: { status: 'not-met' } }];

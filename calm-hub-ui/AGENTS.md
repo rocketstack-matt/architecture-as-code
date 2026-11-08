@@ -181,8 +181,10 @@ One engine (`visualizer/overlay/`) draws decorators on the diagram from `decorat
 `overlay` (types in `visualizer/contracts/decorator-view-contracts.ts`). Status values map to the fixed scale
 `ok`, `warn`, `error`, `info`. The built-in views for `control-evaluation` and `deployment` come from classpath manifests through
 `GET /api/calm/extensions`. If the registry is unavailable, `useDecoratorViews()` returns the bundled copy in
-`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. `Drawer` polls
-each view's decorator type every 5 s and gives the result to the diagram through `DecoratorOverlayContext`. Nodes and
+`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. `DiagramSection` polls all decorators of
+the version every 5 s (`useArchitectureDecorators`, one request) and gives the one list to the Decorators tab, the
+details drawer and `Drawer`. Do not add a second request. `Drawer` gives the overlays to the diagram through
+`DecoratorOverlayContext`. Nodes and
 edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
 Evaluations panel read control-evaluation fields, so they use `isControlEvaluationView()`: the id and
 `source.builtIn`. An operator view can have the same id.

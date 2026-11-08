@@ -492,6 +492,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
                 layoutEpoch={defaultLayoutState.layoutEpoch}
                 onPositionsChange={handlePositionsChange}
                 onDroppedFileChange={setShowsDroppedFile}
+                decorators={allDecorators}
                 onOpenView={openDecoratorView}
             />
         ),
