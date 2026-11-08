@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ExtensionContext, ExtensionContribution, ExtensionScreen, ExtensionSummary } from '../model/extensions.js';
-import { ExtensionService } from '../service/extension-service.js';
 import { ExtensionActionButton } from './ExtensionActionButton.js';
 import { ScreenErrorBoundary } from './ScreenErrorBoundary.js';
 import { BlockRenderer } from './blocks/BlockRenderer.js';
-import { isBlocksReply } from './landingCard.js';
+import { isBlocksReply } from './blocks/reply.js';
+import { useExtensionService } from './ExtensionsContext.js';
 
 export interface ExtensionSlotProps {
     extension: ExtensionSummary;
@@ -14,7 +14,7 @@ export interface ExtensionSlotProps {
 }
 
 function SlotContent({ extension, contribution, context = {}, action }: ExtensionSlotProps) {
-    const service = useMemo(() => new ExtensionService(), []);
+    const service = useExtensionService();
     const route = extension.routes.find((entry) => entry.id === contribution.route);
     const [result, setResult] = useState<ExtensionScreen>();
     const [error, setError] = useState(false);

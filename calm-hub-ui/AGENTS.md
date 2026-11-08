@@ -190,10 +190,14 @@ Evaluations panel read control-evaluation fields, so they use `isControlEvaluati
 `source.builtIn`. An operator view can have the same id.
 
 `ExtensionService` uses its own axios instance, not `apiClient`, so a registry or extension call failure does not
-open the global auth or outage page. The shared `extensionService` loads the registry one time for
-`ExtensionsProvider` and `useDecoratorViews()`. After a failed load, the next call tries again.
-`useExtensionsStatus()` gives `loading`, `loaded` or `failed`. Use it where an empty list must not mean "no
-extension", for example `ExtensionScreenPage` on a deep link.
+open the global auth or outage page. The exception is a registry `401`: the registry is a Hub call, so it opens
+the sign-in prompt. `ExtensionsProvider` (`extensions/ExtensionsContext.tsx`) owns the one `ExtensionService`.
+Get it with `useExtensionService()`, not `new ExtensionService()` or a module singleton: the registry, the
+decorator views and the slots then share one registry request, and a test can inject a service. The service
+drops registry entries whose `hubApi` the UI does not support, for both paths. After a failed load the provider
+tries again with a backoff (5 s, doubled, up to 60 s), but not after a `401`. `useExtensionsStatus()` gives
+`loading`, `loaded`, `failed` or `signed-out`. Use it where an empty list must not mean "no extension", for
+example `ExtensionScreenPage` on a deep link.
 
 ### Extension UI layout
 

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ExtensionsContext, ExtensionsProvider } from './ExtensionsContext.js';
-import { ExtensionService } from '../service/extension-service.js';
+import { ExtensionRegistryError, ExtensionService } from '../service/extension-service.js';
 import { ExtensionScreenPage } from './ExtensionScreenPage.js';
 import { fakeExtension } from '../test-support/fake-extensions.js';
 
@@ -63,4 +63,9 @@ it('says so when the registry fails to load', async () => {
     renderWithRegistry(Promise.reject(new Error('down')));
     expect(await screen.findByRole('alert')).toHaveTextContent('Extensions could not be loaded.');
     expect(screen.queryByText('Extension screen unavailable.')).not.toBeInTheDocument();
+});
+
+it('asks the user to sign in when the registry gives 401', async () => {
+    renderWithRegistry(Promise.reject(new ExtensionRegistryError('Error fetching extensions', true)));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign in to see extensions.');
 });

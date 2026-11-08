@@ -1,9 +1,4 @@
-import { ExtensionScreen, ScreenBlock, Tone } from '../model/extensions.js';
-
-export function isBlocksReply(reply: unknown, hubApi: number): reply is ExtensionScreen {
-    const value = reply as ExtensionScreen | null;
-    return !!value && value.hubApi === hubApi && Array.isArray(value.blocks);
-}
+import { ScreenBlock, Tone } from '../model/extensions.js';
 
 export const LANDING_CARD_MAX_STATS = 3;
 

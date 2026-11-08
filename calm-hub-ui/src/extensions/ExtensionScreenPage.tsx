@@ -9,6 +9,7 @@ function ScreenBody() {
     const extension = useExtensions().find((entry) => entry.id === extensionId);
     const contribution = extension?.contributes.screen?.find((entry) => entry.id === contributionId);
     if (status === 'loading') return <p role="status">Loading extension…</p>;
+    if (status === 'signed-out') return <p role="alert">Sign in to see extensions.</p>;
     if (status === 'failed') return <p role="alert">Extensions could not be loaded.</p>;
     if (!extension || !contribution) return <p>Extension screen unavailable.</p>;
     return <ExtensionSlot extension={extension} contribution={contribution} />;
