@@ -3,7 +3,7 @@ import remarkGfm from 'remark-gfm';
 import { ScreenBlock } from '../../model/extensions.js';
 import '../../hub/components/adr-renderer/AdrMarkdown.css';
 import { safeHref } from '../ScreenLink.js';
-import { ALERT_CLASS } from '../tone.js';
+import { alertClass } from '../tone.js';
 import { CardsBlock } from './CardsBlock.js';
 import { KeyValueBlock } from './KeyValueBlock.js';
 import { LinksBlock } from './LinksBlock.js';
@@ -44,7 +44,7 @@ export function BlockRenderer({ block }: { block: ScreenBlock }) {
             return <CardsBlock items={block.items} />;
         case 'alert':
             return (
-                <div role="alert" className={`alert ${ALERT_CLASS[block.tone ?? 'info']}`}>
+                <div role="alert" className={`alert ${alertClass(block.tone)}`}>
                     <span>{block.text}</span>
                 </div>
             );

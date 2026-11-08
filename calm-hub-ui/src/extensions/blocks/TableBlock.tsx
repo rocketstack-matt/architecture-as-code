@@ -1,13 +1,13 @@
 import { CellValue } from '../../model/extensions.js';
 import { ScreenLink } from '../ScreenLink.js';
-import { BADGE_CLASS } from '../tone.js';
+import { badgeClass } from '../tone.js';
 
 function Cell({ value }: { value: CellValue }) {
     if (typeof value === 'string' || typeof value === 'number') {
         return <>{value}</>;
     }
     if ('badge' in value) {
-        return <span className={`badge badge-sm badge-soft ${BADGE_CLASS[value.tone ?? 'neutral']}`}>{value.badge}</span>;
+        return <span className={`badge badge-sm badge-soft ${badgeClass(value.tone)}`}>{value.badge}</span>;
     }
     return <ScreenLink link={value} className="link link-primary font-semibold no-underline" />;
 }
