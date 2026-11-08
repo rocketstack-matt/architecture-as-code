@@ -49,7 +49,8 @@ function isJson(contentType = '') {
 }
 
 // Hub checked the route's scope for the namespace in the path, and says so in ns. Hub sends ns only for
-// a read, write or admin route. Each reply uses only sub and ns, so that it holds nothing that the user cannot read.
+// a read, write or admin route, and dom only for a domain_* route. Each reply uses only sub and ns, so that it
+// holds nothing that the user cannot read.
 function handle(req, claims, url, body) {
     const json = () => (body.length ? JSON.parse(body.toString('utf8')) : {});
     const match = url.pathname.match(/^\/namespaces\/([^/]+)\/services$/);

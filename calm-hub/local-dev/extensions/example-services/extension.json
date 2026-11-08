@@ -6,7 +6,7 @@
   "description": "A fixture extension for local development. It lists the services that each namespace owns.",
   "provider": "CALM Hub local development",
   "routes": [
-    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated" },
+    { "id": "screen", "method": "GET", "path": "/screen", "scope": "authenticated", "readOnly": true },
     { "id": "namespace-services", "method": "GET", "path": "/namespaces/{namespace}/services", "scope": "read" },
     { "id": "search", "method": "POST", "path": "/search", "scope": "authenticated", "readOnly": true },
     { "id": "add-service", "method": "POST", "path": "/namespaces/{namespace}/services", "scope": "write" }

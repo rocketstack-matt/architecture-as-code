@@ -24,8 +24,9 @@ curl http://localhost:8080/api/calm/extensions/example-services/api/namespaces/f
 ```
 
 The standalone profile has auth off, so `allow-without-auth` is needed and every caller is the
-`no-auth` principal. Set `PORT`, `CALM_HUB_URL` or `CALM_HUB_ISSUER` to change the defaults.
+`no-auth` principal. Hub warns that `calm.hub.base-url` is not set: its default, `http://localhost:8080`, is the
+issuer that `server.mjs` expects. Set `PORT`, `CALM_HUB_URL` or `CALM_HUB_ISSUER` to change the defaults.
 
 The [release-tracker and stride-threats demos](../../demo-extensions/README.md) are in their own folder, `local-dev/demo-extensions`.
 
-Test the verifier with `node --test local-dev/extensions/example-services/identity.test.mjs`.
+Test the verifier and the backend with `node --test local-dev/extensions/example-services/*.test.mjs`.

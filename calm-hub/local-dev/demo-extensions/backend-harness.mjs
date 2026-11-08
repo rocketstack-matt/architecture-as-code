@@ -47,9 +47,12 @@ export async function startBackend(serverUrl, audience) {
     }
 
     return {
-        request: (method, path, body) => fetch(`http://127.0.0.1:${port}${path}`, {
+        // A header set to undefined is not sent. A Buffer body gets no Content-Type from fetch.
+        request: (method, path, body, headers = {}) => fetch(`http://127.0.0.1:${port}${path}`, {
             method,
-            headers: { 'X-Calm-Hub-Identity': assertion(method, path, body), 'Content-Type': 'application/json' },
+            headers: Object.fromEntries(Object.entries({
+                'X-Calm-Hub-Identity': assertion(method, path, body), 'Content-Type': 'application/json', ...headers,
+            }).filter(([, value]) => value !== undefined)),
             body,
         }),
         stop: () => {

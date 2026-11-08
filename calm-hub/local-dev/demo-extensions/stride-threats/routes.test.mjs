@@ -100,3 +100,10 @@ test('the seed decorators match the overlay of the decorator view', () => {
     assert.equal(new Set(decorators.map((d) => d['unique-id'])).size, 3);
     assert.deepEqual(decorators.map((d) => d['applies-to'][0]), ['api-gateway', 'api-gateway', 'new-node']);
 });
+
+test('every GET route that a UI contribution names is readOnly', () => {
+    const routes = new Map(manifest.routes.map((r) => [r.id, r]));
+    const gets = Object.values(manifest.contributes).flat().map((c) => routes.get(c.route)).filter((r) => r?.method === 'GET');
+    assert.ok(gets.length >= 4);
+    for (const route of gets) assert.equal(route.readOnly, true, route.id);
+});
