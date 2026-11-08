@@ -627,7 +627,8 @@ describe('DiagramSection', () => {
                 const onDecoratorsChange = vi.fn();
                 renderArchitecture('/', { onDecoratorsChange });
                 await waitFor(() => expect(screen.getByTestId('drawer-decorators')).toHaveTextContent('dep-1 obs-1'));
-                expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, observability]);
+                // The report is a passive effect, which can run after the commit that waitFor saw.
+                await waitFor(() => expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, observability]));
                 expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(1);
 
                 const newer = { ...deployment, uniqueId: 'dep-2' };
@@ -636,7 +637,7 @@ describe('DiagramSection', () => {
 
                 expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(2);
                 expect(screen.getByTestId('drawer-decorators')).toHaveTextContent('dep-1 dep-2');
-                expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, newer]);
+                await waitFor(() => expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, newer]));
             } finally {
                 vi.useRealTimers();
             }
