@@ -9,7 +9,7 @@ The data is made up.
 | [release-tracker](release-tracker/README.md) | Release tracker | 8092 | `release-risk` |
 | [stride-threats](stride-threats/README.md) | STRIDE threat model | 8093 | `threat-model` |
 
-Hub loads every manifest in this folder, and does not start if one has no backend URL. Run both from
+Hub loads every manifest in this folder, and does not start if an enabled one has no backend URL. Run both from
 `calm-hub/`, with the keys from the [example-services README](../extensions/example-services/README.md):
 
 ```bash
@@ -33,5 +33,5 @@ start again, delete the data directory (`~/.calm-hub/data` by default).
 
 To run one demo only, add `-Dcalm.extensions.<id>.enabled=false` for the other.
 
-Both backends accept only the issuer `http://localhost:8080`, which is the default of
+Each backend accepts one issuer. By default it is `http://localhost:8080`, which is also the default of
 `calm.hub.base-url`. If you set `calm.hub.base-url`, set `CALM_HUB_ISSUER` to the same value.
