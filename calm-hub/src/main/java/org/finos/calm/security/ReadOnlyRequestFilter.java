@@ -28,6 +28,9 @@ import java.util.regex.Pattern;
  * surface no longer requires a matching filter update (as was the case when
  * {@code /api/calm} was introduced alongside the original {@code /calm} prefix).
  *
+ * <p>MCP ({@code /mcp}) is served by Vert.x routes, not JAX-RS, so this filter never sees it. The MCP tools refuse
+ * writes themselves ({@code ReadOnlyHubGuard}).
+ *
  * <p>The one exception is the extension proxy, {@code /api/calm/extensions/<id>/api/...}. It
  * enforces read-only mode itself, because a {@code readOnly} extension route (a search or a chat)
  * changes nothing and must work on a read-only Hub (ADR 0011).

@@ -405,6 +405,9 @@ All four workflows:
 - **Gated by `calm.mcp.enabled`** (default `false`): when disabled, every `@Tool`
   method returns a disabled error, though the `/mcp` HTTP endpoint stays reachable
 - Enable with `-Dcalm.mcp.enabled=true` or `CALM_MCP_ENABLED=true`
+- **Read-only mode:** `/mcp` is a Vert.x route, so `ReadOnlyRequestFilter` never sees it. Put
+  `@ReadOnlyHubGuard` on each `*Tools` class: on a read-only Hub it refuses each `@Tool` that needs more
+  than a read scope. `TestMcpToolsReadOnlyShould` fails for a write tool in a class without it
 
 ### UI Customization
 - `config/UiConfig` (`@ConfigMapping(prefix = "calm.ui")`) holds the operator values that
