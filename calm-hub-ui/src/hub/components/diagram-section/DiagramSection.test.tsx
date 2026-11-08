@@ -642,6 +642,33 @@ describe('DiagramSection', () => {
             }
         });
 
+        it.each([
+            ['the JSON tab', '/?tab=json', false, 0],
+            ['the JSON tab with the details drawer open', '/?tab=json', true, 2],
+            ['the Decorators tab', '/?tab=decorators', false, 2],
+            ['the diagram', '/', false, 2],
+        ])('polls the decorators on %s only if something there shows them', async (_name, entry, hasDetailsPanel, calls) => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            try {
+                renderArchitecture(entry, { hasDetailsPanel });
+                await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+                await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+                expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(calls);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('loads the decorators at once when the diagram opens from another tab', async () => {
+            const user = userEvent.setup();
+            renderArchitecture('/?tab=json');
+            expect(calmServiceMock.fetchDecoratorsForTarget).not.toHaveBeenCalled();
+
+            await user.click(screen.getByRole('tab', { name: 'Diagram' }));
+            await waitFor(() => expect(screen.getByTestId('drawer-decorators')).toHaveTextContent('dep-1 obs-1'));
+            expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(1);
+        });
+
         it('keeps the list when a refresh fails', async () => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             const error = vi.spyOn(console, 'error').mockImplementation(() => {});

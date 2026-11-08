@@ -35,7 +35,7 @@ import { IoSaveOutline, IoRefreshOutline } from 'react-icons/io5';
 import { PatternImplementationService } from '../../../service/pattern-implementation-service.js';
 import { usePatternImplementations } from './used-by/usePatternImplementations.js';
 import { useArchitectureDecorators } from './decorators/useArchitectureDecorators.js';
-import { decoratorFilterParams, DIAGRAM_TAB_REDIRECTS, DIAGRAM_TABS, extensionContext } from './tabs/diagramTabs.js';
+import { DECORATORS_TAB_ID, decoratorFilterParams, DIAGRAM_TAB_REDIRECTS, DIAGRAM_TABS, extensionContext } from './tabs/diagramTabs.js';
 import {
     carriedDiagramTab,
     DEFAULT_DIAGRAM_TAB_ID,
@@ -75,6 +75,7 @@ const iconMap = {
 } as const;
 
 const NO_DECORATORS: Decorator[] = [];
+const DECORATOR_TAB_IDS: ReadonlySet<string> = new Set([DEFAULT_DIAGRAM_TAB_ID, DECORATORS_TAB_ID]);
 const NO_MOMENTS: TimelineMoment[] = [];
 
 const subscribeToNothing = () => () => {};
@@ -153,8 +154,6 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     );
     const isArchitecture = data.calmType === 'Architectures';
     const resourceKey = `${data.calmType}|${data.name}|${data.id}`;
-    const decoratorsState = useArchitectureDecorators(calmService, data, isArchitecture);
-    const allDecorators = decoratorsState.status === 'loaded' ? decoratorsState.decorators : NO_DECORATORS;
     // A dropped file is not the loaded architecture, so the details drawer must not show its decorators.
     const [showsDroppedFile, setShowsDroppedFile] = useState(false);
     useEffect(() => { onDroppedFileChange?.(showsDroppedFile); }, [onDroppedFileChange, showsDroppedFile]);
@@ -223,6 +222,10 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     const tabQuery = diagramTabQuery(carriedDiagramTab(DIAGRAM_TABS, searchParams.get('tab'), activeTab), searchParams);
     const usedByOpen = activeTab.id === 'used-by' && !comparing;
     const usedBy = usePatternImplementations(implementationService, data.name, patternName, data.version, usedByOpen);
+    // Polled only while the diagram, the Decorators tab or the details drawer shows them.
+    const showsDecorators = (!comparing && DECORATOR_TAB_IDS.has(activeTab.id)) || !!hasDetailsPanel;
+    const decoratorsState = useArchitectureDecorators(calmService, data, isArchitecture, showsDecorators);
+    const allDecorators = decoratorsState.status === 'loaded' ? decoratorsState.decorators : NO_DECORATORS;
 
     // "View all" opens the Decorators tab and unmounts itself, so the tab takes focus.
     const [focusPanel, setFocusPanel] = useState(false);
@@ -240,7 +243,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     const openDecoratorView = useCallback((view: DecoratorView) => {
         setFocusPanel(true);
         setSearchParams(
-            { tab: 'decorators', ...decoratorFilterParams(view.match.type, view.match.schema) },
+            { tab: DECORATORS_TAB_ID, ...decoratorFilterParams(view.match.type, view.match.schema) },
             { replace: true, state: location.state }
         );
     }, [setSearchParams, location.state]);

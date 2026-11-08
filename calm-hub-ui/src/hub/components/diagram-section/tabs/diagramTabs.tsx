@@ -8,6 +8,8 @@ import { DEFAULT_DIAGRAM_TAB_ID, type DiagramTab } from './diagramTabRegistry.js
 import type { Data } from '../../../../model/calm.js';
 import type { ExtensionContext } from '../../../../model/extensions.js';
 
+export const DECORATORS_TAB_ID = 'decorators';
+
 /** The `?tab=decorators` query parameters that filter by decorator type and by `$schema`. */
 export const DECORATOR_TYPE_PARAM = 'type';
 export const DECORATOR_SCHEMA_PARAM = 'schema';
@@ -20,7 +22,7 @@ export const decoratorFilterParams = (type: string | null | undefined, schema: s
 
 /** Old `?tab=` values, and the query that replaces each. Deployments became a decorator view. */
 export const DIAGRAM_TAB_REDIRECTS: Readonly<Record<string, Record<string, string>>> = {
-    deployments: { tab: 'decorators', [DECORATOR_TYPE_PARAM]: 'deployment' },
+    deployments: { tab: DECORATORS_TAB_ID, [DECORATOR_TYPE_PARAM]: 'deployment' },
 };
 
 export const EXTENSIONS_TAB_ID = 'extensions';
@@ -56,7 +58,7 @@ export const DIAGRAM_TABS: readonly DiagramTab[] = [
         ),
     },
     {
-        id: 'decorators',
+        id: DECORATORS_TAB_ID,
         label: 'Decorators',
         icon: IoPricetagsOutline,
         isVisible: ({ isArchitecture }) => isArchitecture,

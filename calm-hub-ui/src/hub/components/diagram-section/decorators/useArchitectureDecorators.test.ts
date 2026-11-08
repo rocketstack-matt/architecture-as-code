@@ -23,8 +23,8 @@ describe('useArchitectureDecorators', () => {
     /** Lets pending fetch promises settle and React commit, under fake timers. */
     const flush = () => act(async () => { await vi.advanceTimersByTimeAsync(0); });
     const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
-    const renderFor = (data: Data, isArchitecture = true) =>
-        renderHook(({ d, a }) => useArchitectureDecorators(service, d, a), { initialProps: { d: data, a: isArchitecture } });
+    const renderFor = (data: Data, isArchitecture = true, active = true) =>
+        renderHook(({ d, a, on }) => useArchitectureDecorators(service, d, a, on), { initialProps: { d: data, a: isArchitecture, on: active } });
 
     beforeEach(() => {
         vi.useFakeTimers();
@@ -187,6 +187,54 @@ describe('useArchitectureDecorators', () => {
         await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
         await flush();
         expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('makes no call while inactive, loads at once when it becomes active, and then polls', async () => {
+        fetch.mockResolvedValue([decorator('d1')]);
+        const { result, rerender } = renderFor(architecture, true, false);
+        await flush();
+        await advance(15000);
+        expect(fetch).not.toHaveBeenCalled();
+        expect(result.current).toEqual({ status: 'loading' });
+
+        rerender({ d: architecture, a: true, on: true });
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(result.current).toEqual({ status: 'loaded', decorators: [decorator('d1')] });
+
+        await advance(5000);
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops polling when it becomes inactive, keeps the last list, and keeps the resolved slug', async () => {
+        fetch.mockResolvedValue([decorator('d1')]);
+        const { result, rerender } = renderFor(architecture);
+        await flush();
+        rerender({ d: architecture, a: true, on: false });
+        await advance(15000);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(result.current).toEqual({ status: 'loaded', decorators: [decorator('d1')] });
+
+        rerender({ d: architecture, a: true, on: true });
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(resolve).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the backoff while inactive, so a change of tab does not reset the failure count', async () => {
+        fetch.mockRejectedValue(new Error('hub down'));
+        const { rerender } = renderFor(architecture);
+        await flush();
+        await advance(10000);
+        expect(fetch).toHaveBeenCalledTimes(3);
+
+        rerender({ d: architecture, a: true, on: false });
+        rerender({ d: architecture, a: true, on: true });
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(4);
+        await advance(25000);
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(errorSpy).toHaveBeenCalledTimes(1);
     });
 
     it('stops listening for visibility changes once unmounted', async () => {
