@@ -172,8 +172,11 @@ hidden tab falls back to `diagram`. An unknown tab id is also dropped from the U
 code, so that it can move to a package that the VS Code extension shares. The UI calls them
 "Decorators", never "Metadata", which is the CALM `metadata` field (`MetadataPanel` is the panel
 under the diagram). Hub gets the decorators from `DiagramSection` (`onDecoratorsChange`) and gives
-them to the details drawer through `DecoratorsContext`. The API does not require any decorator
-field, so guard each read. A missing type shows as "(no type)".
+them to the details drawer through `DecoratorsContext`, with the containment map that the overlays use, so a
+container lists each decorator that its badges count. The API does not require any decorator field, so guard each
+read. A missing type shows as "(no type)", and a decorator without a `uniqueId` is keyed by its list index. The card's
+JSON view uses the write field names (`writableDecorator`) and leaves out the Hub-owned times, so it can be copied into
+a `PUT`.
 
 ### Decorator overlays
 
