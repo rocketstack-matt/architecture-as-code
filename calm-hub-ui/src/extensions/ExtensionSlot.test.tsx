@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExtensionSlot } from './ExtensionSlot.js';
 import { ExtensionService } from '../service/extension-service.js';
 import { ExtensionSummary } from '../model/extensions.js';
+import { ExtensionsProvider } from './ExtensionsContext.js';
 const contribution = { id: 'summary', title: 'Summary', route: 'summary' };
 const extension: ExtensionSummary = {
     id: 'test',
@@ -136,4 +137,102 @@ it('loads a GET block route without the optional readOnly flag', async () => {
         <ExtensionSlot extension={{ ...extension, routes: [{ ...extension.routes[0], readOnly: false }] }} contribution={contribution} />
     );
     expect(await screen.findByRole('heading', { name: 'Summary' })).toBeInTheDocument();
+});
+
+describe('ExtensionSlot actions', () => {
+    const target = { namespace: 'finos', resource: 'architecture/trading', version: '1.0.0', selectedElement: 'web-app' };
+    function providerService() {
+        const service = new ExtensionService();
+        vi.spyOn(service, 'fetchExtensions').mockReturnValue(new Promise(() => {}));
+        return service;
+    }
+
+    it('keeps a write disabled across a remount, so it cannot run twice', async () => {
+        let complete: (value: unknown) => void = () => {};
+        const spy = vi.spyOn(ExtensionService.prototype, 'call').mockReturnValue(new Promise((resolve) => (complete = resolve)));
+        const service = providerService();
+        const page = (shown: boolean) => (
+            <ExtensionsProvider service={service}>
+                {shown && <ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />}
+            </ExtensionsProvider>
+        );
+        const view = render(page(true));
+        fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+        await waitFor(() => expect(spy).toHaveBeenCalledOnce());
+
+        view.rerender(page(false));
+        view.rerender(page(true));
+        const button = screen.getByRole('button', { name: 'Summary' });
+        expect(button).toBeDisabled();
+        fireEvent.click(button);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+        await act(async () => complete(undefined));
+        expect(screen.getByRole('button', { name: 'Summary' })).toBeEnabled();
+        expect(spy).toHaveBeenCalledOnce();
+    });
+
+    it('clears a failure when the context changes', async () => {
+        vi.spyOn(ExtensionService.prototype, 'call').mockRejectedValue(new Error());
+        const view = render(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '1' }} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent('failed');
+
+        view.rerender(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '2' }} />);
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('says when an action is done, until the context changes', async () => {
+        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
+        const view = render(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '1' }} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+        expect(await screen.findByRole('status')).toHaveTextContent('Summary: done.');
+
+        view.rerender(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '2' }} />);
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('names the target in the dialog, and sends the context of the click after the context changes', async () => {
+        const spy = vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
+        const view = render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+        const dialog = screen.getByRole('dialog', { name: 'Confirm action' });
+        expect(within(dialog).getAllByRole('definition').map((value) => value.textContent)).toEqual([
+            'finos',
+            'architecture/trading',
+            '1.0.0',
+            'web-app',
+        ]);
+        expect(dialog).toHaveTextContent('Resourcearchitecture/trading');
+        expect(dialog).toHaveTextContent('Version1.0.0');
+        expect(dialog).toHaveTextContent('Elementweb-app');
+
+        view.rerender(
+            <ExtensionSlot action extension={writeExtension} contribution={contribution} context={{ ...target, version: '2.0.0' }} />
+        );
+        expect(screen.getByRole('dialog')).toHaveTextContent('Version1.0.0');
+        fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+        await waitFor(() => expect(spy).toHaveBeenCalledOnce());
+        expect(spy.mock.calls[0][2]).toEqual(target);
+    });
+
+    it('opens the dialog as a modal, and closes it on Escape without a call', () => {
+        const showModal = vi.fn(function (this: HTMLDialogElement) {
+            this.setAttribute('open', '');
+        });
+        Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: showModal });
+        try {
+            const spy = vi.spyOn(ExtensionService.prototype, 'call');
+            render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+            expect(showModal).toHaveBeenCalledOnce();
+
+            fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+            expect(spy).not.toHaveBeenCalled();
+        } finally {
+            delete (HTMLDialogElement.prototype as { showModal?: unknown }).showModal;
+        }
+    });
 });

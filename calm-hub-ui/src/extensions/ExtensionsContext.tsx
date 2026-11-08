@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { ExtensionSummary } from '../model/extensions.js';
 import { ExtensionRegistryError, ExtensionService } from '../service/extension-service.js';
+import { ActionRuns, ActionRunsContext } from './actionRuns.js';
 
 export type ExtensionsStatus = 'loading' | 'loaded' | 'failed' | 'signed-out';
 
@@ -24,6 +25,7 @@ export function ExtensionsProvider({ children, service }: { children: ReactNode;
     const svc = useMemo(() => service ?? new ExtensionService(), [service]);
     const [state, setState] = useState<RegistryState>({ service: svc, extensions: [], status: 'loading' });
     const [attempt, setAttempt] = useState(0);
+    const [runs] = useState(() => new ActionRuns());
     // A new service has its own registry: show loading, not the list of the old one.
     const current = state.service === svc ? state : { service: svc, extensions: [], status: 'loading' as const };
 
@@ -51,9 +53,11 @@ export function ExtensionsProvider({ children, service }: { children: ReactNode;
 
     return (
         <ExtensionServiceContext.Provider value={svc}>
-            <ExtensionsStatusContext.Provider value={current.status}>
-                <ExtensionsContext.Provider value={current.extensions}>{children}</ExtensionsContext.Provider>
-            </ExtensionsStatusContext.Provider>
+            <ActionRunsContext.Provider value={runs}>
+                <ExtensionsStatusContext.Provider value={current.status}>
+                    <ExtensionsContext.Provider value={current.extensions}>{children}</ExtensionsContext.Provider>
+                </ExtensionsStatusContext.Provider>
+            </ActionRunsContext.Provider>
         </ExtensionServiceContext.Provider>
     );
 }
