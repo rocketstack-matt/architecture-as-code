@@ -19,18 +19,20 @@ interface ExtensionSectionsProps {
     /** Injected for tests; see the storage note in calm-hub-ui/AGENTS.md. */
     storage?: Storage;
     compact?: boolean;
+    /** The section open by default: the first of the full list. Without it, the first of `sections`. */
+    defaultOpenId?: string;
     /** The level of each section title. */
     headingLevel?: HeadingLevel;
 }
 
-/** One collapsible section per extension. The first is open until the user chooses. */
-export function ExtensionSections({ sections, storageKey, storage, compact, headingLevel = 3 }: ExtensionSectionsProps) {
+/** One collapsible section per extension. The default section is open until the user chooses. */
+export function ExtensionSections({ sections, storageKey, storage, compact, headingLevel = 3, defaultOpenId }: ExtensionSectionsProps) {
     const { isOpen, setSectionOpen } = useOpenSections(storageKey, storage);
     const baseId = useId();
     return (
         <div className="flex flex-col divide-y divide-base-300 rounded-box border border-base-300">
             {sections.map((section, index) => {
-                const open = isOpen(section.id, index);
+                const open = isOpen(section.id, defaultOpenId ?? sections[0]?.id);
                 const bodyId = `${baseId}-${index}`;
                 const Chevron = open ? IoChevronDownOutline : IoChevronForwardOutline;
                 return (

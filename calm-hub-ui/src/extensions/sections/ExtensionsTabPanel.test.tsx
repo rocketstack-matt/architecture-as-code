@@ -90,3 +90,21 @@ it('puts each extension at h3 and its designer tab title at h4, below the h2 of 
     expect(screen.getByRole('heading', { name: /Extension 1/, level: 3 })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'designer-tab 1', level: 4 })).toBeInTheDocument();
 });
+
+it('keeps the default open section of the full list when a filter changes', async () => {
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+    renderPanel(fakeExtensions(10));
+    const filter = screen.getByRole('searchbox', { name: 'Filter extensions' });
+    const toggle = (id: string) =>
+        screen.getAllByTestId('extension-section').find((section) => section.dataset.extension === id)!.querySelector('button');
+
+    await userEvent.type(filter, 'Provider 3');
+    expect(toggle('ext-3')).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.clear(filter);
+    expect(toggle('ext-1')).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle('ext-3')).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.type(filter, 'Provider 1');
+    expect(toggle('ext-1')).toHaveAttribute('aria-expanded', 'true');
+});

@@ -43,6 +43,7 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
             ) : (
                 <ExtensionSections
                     storageKey={EXTENSIONS_TAB_SECTIONS_KEY}
+                    defaultOpenId={entries[0]?.extension.id}
                     storage={storage}
                     sections={shown.map(({ extension, actions, needsSelection, tabs }, index) => ({
                         id: extension.id,
