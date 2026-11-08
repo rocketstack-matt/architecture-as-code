@@ -31,6 +31,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -826,13 +827,66 @@ class TestMongoDecoratorStoreShould {
         ArgumentCaptor<Bson> filter = ArgumentCaptor.forClass(Bson.class);
         when(decoratorCollection.updateOne(filter.capture(), any(Bson.class))).thenReturn(updateResult);
 
-        assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.deleteCurrentDecoratorHistory("finos", 1));
+        assertThrows(DecoratorSupersededException.class, () -> decoratorStore.deleteCurrentDecoratorHistory("finos", 1));
 
         BsonDocument current = filter.getValue().toBsonDocument().getArray("$and").get(1)
                 .asDocument().getDocument("decorators").getDocument("$elemMatch");
         assertEquals(1, current.getArray("$and").getFirst().asDocument().getInt32("decoratorId").getValue());
         assertEquals(false, current.getArray("$and").get(1).asDocument()
                 .getDocument("supersededBy").getBoolean("$exists").getValue());
+    }
+
+    @Test
+    void should_throw_decorator_not_found_when_a_current_delete_loses_to_another_delete() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(decoratorCollection.find(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(
+                new Document("namespace", "finos").append("decorators", List.of(currentEntry(1, null))),
+                new Document("namespace", "finos").append("decorators", List.of()));
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(0L);
+        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
+
+        assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.deleteCurrentDecoratorHistory("finos", 1));
+    }
+
+    @Test
+    void should_decode_a_decorator_stored_with_wrong_field_types() throws NamespaceNotFoundException {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", new Document("decoratorId", 1).append("decorator",
+                new Document("type", 5).append("target", "t").append("applies-to", List.of("a", 2))
+                        .append("target-type", List.of("architecture")).append("unique-id", 7)));
+
+        Decorator decorator = decoratorStore.getDecoratorById("finos", 1).orElseThrow();
+
+        assertNull(decorator.getType());
+        assertNull(decorator.getTarget());
+        assertNull(decorator.getAppliesTo());
+        assertNull(decorator.getUniqueId());
+        assertEquals(List.of("architecture"), decorator.getTargetType());
+    }
+
+    @Test
+    void should_filter_past_a_decorator_stored_with_wrong_field_types() throws NamespaceNotFoundException {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos",
+                new Document("decoratorId", 1).append("decorator", new Document("type", 5).append("target", "t")),
+                currentEntry(2, null).append("decorator", new Document("type", "deployment").append("target", List.of("t"))));
+
+        assertEquals(List.of(2), decoratorStore.getDecoratorsForNamespace("finos", "t", "deployment"));
+    }
+
+    @Test
+    void should_delete_a_decorator_stored_with_wrong_field_types() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", new Document("decoratorId", 1).append("decorator", new Document("type", 5).append("target", "t")));
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getModifiedCount()).thenReturn(1L);
+        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
+
+        decoratorStore.deleteCurrentDecoratorHistory("finos", 1);
+
+        verify(decoratorCollection).updateOne(any(Bson.class), any(Bson.class));
     }
 
     @Test

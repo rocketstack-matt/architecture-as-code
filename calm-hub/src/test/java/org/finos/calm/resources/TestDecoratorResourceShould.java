@@ -765,6 +765,34 @@ public class TestDecoratorResourceShould {
     }
 
     @Test
+    void return_400_when_a_created_decorator_has_a_type_that_is_not_a_string() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": 5, \"data\": {}}")
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body(containsString("'type' must be a string"));
+
+        verify(decoratorStore, never()).createDecorator(anyString(), anyString());
+    }
+
+    @Test
+    void return_400_when_an_updated_decorator_has_a_target_that_is_not_an_array_of_strings() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": \"threat-model\", \"target\": \"t\"}")
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(400)
+                .body(containsString("'target' must be an array of strings"));
+
+        verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
     void return_400_when_namespace_has_invalid_characters_for_update_decorator() {
         given()
                 .contentType(ContentType.JSON)

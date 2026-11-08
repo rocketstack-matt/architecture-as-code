@@ -7,6 +7,7 @@ import io.quarkus.security.PermissionsAllowed;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.bson.json.JsonParseException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
@@ -140,6 +141,8 @@ public class DecoratorTools {
         } catch (NamespaceNotFoundException e) {
             logger.warn("Namespace not found [{}]", namespace, e);
             return ToolResponse.error("Error: Namespace '" + namespace + "' not found.");
+        } catch (JsonParseException e) {
+            return ToolResponse.error("Error: " + e.getMessage() + ".");
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {
@@ -191,6 +194,8 @@ public class DecoratorTools {
         } catch (DecoratorSupersededException e) {
             logger.warn("Decorator [{}] in namespace [{}] has been superseded", decoratorId, namespace);
             return ToolResponse.error("Error: Decorator " + decoratorId + " has been superseded. Use getDecoratorHistory to find the current decorator.");
+        } catch (JsonParseException e) {
+            return ToolResponse.error("Error: " + e.getMessage() + ".");
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {

@@ -216,16 +216,23 @@ public class MongoDecoratorStore implements DecoratorStore {
 
     @Override
     public void deleteCurrentDecoratorHistory(String namespace, int currentId)
-            throws NamespaceNotFoundException, DecoratorNotFoundException {
-        deleteDecorator(namespace, currentId, true);
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
+        if (!deleteHistory(namespace, currentId, true)) {
+            if (getDecoratorById(namespace, currentId).isPresent()) {
+                throw new DecoratorSupersededException();
+            }
+            throw new DecoratorNotFoundException();
+        }
     }
 
     @Override
     public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
-        deleteDecorator(namespace, id, false);
+        if (!deleteHistory(namespace, id, false)) {
+            throw new DecoratorNotFoundException();
+        }
     }
 
-    private void deleteDecorator(String namespace, int id, boolean requireCurrent)
+    private boolean deleteHistory(String namespace, int id, boolean requireCurrent)
             throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
@@ -245,10 +252,11 @@ public class MongoDecoratorStore implements DecoratorStore {
         ).getModifiedCount();
 
         if (modified == 0) {
-            throw new DecoratorNotFoundException();
+            return false;
         }
 
         LOG.debug("Deleted decorator with ID {} in namespace '{}'", id, namespace);
+        return true;
     }
 
     /**
@@ -333,8 +341,7 @@ public class MongoDecoratorStore implements DecoratorStore {
             return true;
         }
         
-        String decoratorType = decorator.getString("type");
-        return decoratorType != null && decoratorType.equals(type);
+        return type.equals(decorator.get("type"));
     }
 
     /**
@@ -345,7 +352,6 @@ public class MongoDecoratorStore implements DecoratorStore {
             return true;
         }
         
-        List<String> targets = decorator.getList("target", String.class);
-        return targets != null && targets.contains(target);
+        return decorator.get("target") instanceof List<?> targets && targets.contains(target);
     }
 }
