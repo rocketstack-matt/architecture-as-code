@@ -11,6 +11,8 @@ import jakarta.enterprise.inject.spi.ObserverMethod;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.Config;
 import org.finos.calm.config.ExtensionsConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -55,6 +57,7 @@ import java.util.Set;
 @ApplicationScoped
 public class ExtensionIdentitySigner {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ExtensionIdentitySigner.class);
     public static final String HEADER = "X-Calm-Hub-Identity";
     public static final String TYPE = "calm-ext+jwt";
     static final int MAX_TTL_SECONDS = 300;
@@ -63,6 +66,7 @@ public class ExtensionIdentitySigner {
     private static final Base64.Encoder BASE64URL = Base64.getUrlEncoder().withoutPadding();
     private static final int MIN_RSA_BITS = 2048;
     private static final String PREFIX = "calm.extensions.identity.";
+    private static final String DEFAULT_ISSUER = "http://localhost:8080";
 
     private final ExtensionsConfig config;
     private final Config properties;
@@ -94,7 +98,8 @@ public class ExtensionIdentitySigner {
 
     void load() {
         // calm.hub.base-url is read at run time, as the other users of it do.
-        issuer = properties.getOptionalValue("calm.hub.base-url", String.class).orElse("http://localhost:8080");
+        Optional<String> baseUrl = properties.getOptionalValue("calm.hub.base-url", String.class);
+        issuer = baseUrl.orElse(DEFAULT_ISSUER);
         ttlSeconds = config.identity().ttlSeconds();
         if (ttlSeconds < 1 || ttlSeconds > MAX_TTL_SECONDS) {
             throw invalid(PREFIX + "ttl-seconds must be between 1 and " + MAX_TTL_SECONDS + ", but was " + ttlSeconds);
@@ -105,7 +110,7 @@ public class ExtensionIdentitySigner {
             if (!publicLocations.isEmpty()) {
                 throw invalid(PREFIX + "public-key-locations is set, but " + PREFIX + "private-key-location is not");
             }
-            if (registry.enabled().stream().anyMatch(e -> !e.manifest().routes().isEmpty())) {
+            if (hasRoutes()) {
                 throw invalid(PREFIX + "private-key-location must be set, because an enabled extension has routes");
             }
             return;
@@ -135,6 +140,14 @@ public class ExtensionIdentitySigner {
         }
         jwks = List.copyOf(keys);
         signingKey = new SigningKey(privateKey, alg, keys.getFirst().get("kid"));
+        if (baseUrl.isEmpty() && hasRoutes()) {
+            LOG.warn("calm.hub.base-url is not set, so the iss claim of each extension identity assertion is {}. "
+                    + "A backend that expects the real CALM Hub URL refuses every assertion", DEFAULT_ISSUER);
+        }
+    }
+
+    private boolean hasRoutes() {
+        return registry.enabled().stream().anyMatch(e -> !e.manifest().routes().isEmpty());
     }
 
     /** The public keys in JWK form. The first one signs. */
@@ -174,6 +187,9 @@ public class ExtensionIdentitySigner {
         claims.put("scope", assertion.scope());
         if (assertion.ns() != null) {
             claims.put("ns", assertion.ns());
+        }
+        if (assertion.dom() != null) {
+            claims.put("dom", assertion.dom());
         }
         claims.put("htm", assertion.htm());
         claims.put("htp", assertion.htp());

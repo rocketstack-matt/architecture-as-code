@@ -70,6 +70,16 @@ class TestExtensionProxyResourceReadOnlyShould {
 
     @Test
     @TestSecurity(user = "alice")
+    void leave_a_post_with_no_slash_after_api_to_the_proxy() {
+        // The proxy, not the read-only filter, refuses it: the manifest has no route with the path "/".
+        given().contentType("application/json").body("{}")
+                .when().post(BASE)
+                .then().statusCode(404)
+                .body("error", equalTo("The extension has no such route"));
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
     void apply_the_same_path_rule_as_a_hub_that_is_not_read_only() {
         given().when().get(BASE + "/services/architectures")
                 .then().statusCode(200);
@@ -89,6 +99,7 @@ class TestExtensionProxyResourceReadOnlyShould {
         given().contentType("application/json").body("{}")
                 .when().post(BASE + "/namespaces/finos/services")
                 .then().statusCode(405)
+                .header("Allow", "GET")
                 .body("error", equalTo("This CALM Hub instance is read-only"));
         given().contentType("application/json").body("{}")
                 .when().post("/api/calm/namespaces")

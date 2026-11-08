@@ -56,6 +56,8 @@ public interface ExtensionsConfig {
         Optional<String> maxRequestBytes();
 
         Optional<String> maxResponseBytes();
+
+        Optional<String> maxConcurrentCalls();
     }
 
     interface Identity {
@@ -86,5 +88,9 @@ public interface ExtensionsConfig {
 
         @WithDefault("1048576")
         int maxResponseBytes();
+
+        /** Calls to one extension at the same time, so that a slow backend cannot hold every worker thread. */
+        @WithDefault("32")
+        int maxConcurrentCalls();
     }
 }

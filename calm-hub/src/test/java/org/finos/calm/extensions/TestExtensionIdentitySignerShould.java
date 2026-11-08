@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -44,7 +45,7 @@ class TestExtensionIdentitySignerShould {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final long NOW = 1_800_000_000L;
     private static final ExtensionAssertion ASSERTION = new ExtensionAssertion("alice", "team-services", "jti-1",
-            "oidc", 0, "services", "read", "finos.payments", "GET", "/namespaces/finos.payments/services?a=1");
+            "oidc", 0, "services", "read", "finos.payments", null, "GET", "/namespaces/finos.payments/services?a=1");
 
     @TempDir
     Path tempDir;
@@ -110,11 +111,41 @@ class TestExtensionIdentitySignerShould {
         useKeys(keys.privateKey(), keys.publicKey());
 
         String token = signer().sign(new ExtensionAssertion("alice", "team-services", "jti-2", "none", 0,
-                "screen", "authenticated", null, "GET", "/screen"), null);
+                "screen", "authenticated", null, null, "GET", "/screen"), null);
 
         assertThat(part(token, 1).has("ns"), is(false));
+        assertThat(part(token, 1).has("dom"), is(false));
         assertThat(part(token, 1).has("bdh"), is(false));
         assertThat(part(token, 1).get("iss").asText(), is("http://localhost:8080"));
+    }
+
+    @Test
+    void warn_when_an_extension_has_routes_and_the_hub_url_is_not_set() {
+        ExtensionTestKeys.KeyFiles keys = ExtensionTestKeys.rsa(tempDir, "hub");
+        useKeys(keys.privateKey(), keys.publicKey());
+        assertThat(TestExtensionManifestLoaderShould.captureWarnings(ExtensionIdentitySigner.class, this::signer), empty());
+
+        ExtensionManifest manifest = new ExtensionManifest("team-services", "1.0.0", 0, "Team services", null, null,
+                List.of(new ExtensionManifest.Route("screen", "GET", "/screen", "authenticated", false)), null, null);
+        when(registry.enabled()).thenReturn(List.of(new RegisteredExtension(manifest, 0, Optional.empty(),
+                new ExtensionLimits(Duration.ofSeconds(1), Duration.ofSeconds(1), 1, 1, 1))));
+        assertThat(TestExtensionManifestLoaderShould.captureWarnings(ExtensionIdentitySigner.class, this::signer),
+                contains(containsString("calm.hub.base-url is not set")));
+
+        properties.put("calm.hub.base-url", "https://hub.example.com");
+        assertThat(TestExtensionManifestLoaderShould.captureWarnings(ExtensionIdentitySigner.class, this::signer), empty());
+    }
+
+    @Test
+    void name_the_checked_domain_in_dom() throws Exception {
+        ExtensionTestKeys.KeyFiles keys = ExtensionTestKeys.rsa(tempDir, "hub");
+        useKeys(keys.privateKey(), keys.publicKey());
+
+        String token = signer().sign(new ExtensionAssertion("alice", "team-services", "jti-3", "oidc", 0,
+                "domain-services", "domain_read", null, "payments", "GET", "/domains/payments/services"), null);
+
+        assertThat(part(token, 1).get("dom").asText(), is("payments"));
+        assertThat(part(token, 1).has("ns"), is(false));
     }
 
     @Test
@@ -184,7 +215,7 @@ class TestExtensionIdentitySignerShould {
         ExtensionManifest manifest = new ExtensionManifest("team-services", "1.0.0", 0, "Team services", null, null,
                 List.of(new ExtensionManifest.Route("screen", "GET", "/screen", "authenticated", false)), null, null);
         RegisteredExtension extension = new RegisteredExtension(manifest, 0, Optional.empty(),
-                new ExtensionLimits(Duration.ofSeconds(1), Duration.ofSeconds(1), 1, 1));
+                new ExtensionLimits(Duration.ofSeconds(1), Duration.ofSeconds(1), 1, 1, 1));
         when(registry.enabled()).thenReturn(List.of(extension));
 
         IllegalStateException e = assertThrows(IllegalStateException.class, this::signer);

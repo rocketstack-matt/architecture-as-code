@@ -5,6 +5,8 @@ import org.finos.calm.domain.extensions.ExtensionManifest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Matches a checked path against the declared route templates only (ADR 0011). A {@code {name}}
@@ -39,8 +41,20 @@ final class ExtensionRouteMatcher {
             return best;
         }
         throw pathMatched
-                ? new ExtensionProxyException(405, "The extension route does not allow this method")
+                ? new ExtensionProxyException(405, "The extension route does not allow this method",
+                        Map.of("Allow", allowedMethods(manifest, path, route -> true)))
                 : new ExtensionProxyException(404, "The extension has no such route");
+    }
+
+    /** The {@code Allow} value: the methods of the routes that match the path and pass {@code allowed}. */
+    static String allowedMethods(ExtensionManifest manifest, String path, Predicate<ExtensionManifest.Route> allowed) {
+        return manifest.routes().stream()
+                .filter(allowed)
+                .filter(route -> parameters(route.path(), path).isPresent())
+                .map(ExtensionManifest.Route::method)
+                .distinct()
+                .sorted()
+                .collect(Collectors.joining(", "));
     }
 
     static void rejectEncodedLiterals(RouteMatch match, String rawPath) {
