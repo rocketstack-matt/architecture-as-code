@@ -968,6 +968,21 @@ public class TestDecoratorResourceShould {
         verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
     }
 
+    @Test
+    void return_400_when_an_update_sends_a_hub_owned_history_link() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": \"deployment\", \"supersedes\": 3}")
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(400)
+                .body(equalTo("Decorator field is set by Hub and may not be sent: supersedes"));
+
+        verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+        verify(decoratorStore, never()).supersedeDecorator(anyString(), anyInt(), anyString());
+    }
+
     // -Pserver-only and -Dskip.npm do not copy the meta-schemas that the decorator Standards reference.
     private static void assumeMetaSchemasBuilt() {
         assumeTrue(Files.exists(Path.of("target", "classes", "META-INF", "calm-schemas", "1.3", "meta", "decorators.json")),

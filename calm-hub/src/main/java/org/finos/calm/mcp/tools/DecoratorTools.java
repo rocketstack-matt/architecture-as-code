@@ -122,7 +122,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards). Hub sets creationDateTime and updateDateTime; a decorator that sends either is refused.")
+    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards). Hub sets creationDateTime, updateDateTime, supersededDateTime, supersedes and supersededBy; a decorator that sends any of them is refused.")
     public ToolResponse createDecorator(
             @ToolArg(description = "The namespace to create the decorator in") String namespace,
             @ToolArg(description = "The decorator JSON payload (must include $schema, unique-id, type, target, target-type, applies-to, and data fields)") String decoratorJson) {
@@ -153,7 +153,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows, or sends the Hub-owned creationDateTime or updateDateTime. A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
+    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows, or sends a Hub-owned field (creationDateTime, updateDateTime, supersededDateTime, supersedes or supersededBy). A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
     public ToolResponse updateDecorator(
             @ToolArg(description = "The namespace containing the decorator") String namespace,
             @ToolArg(description = "The decorator numeric ID to update (positive integer)") int decoratorId,

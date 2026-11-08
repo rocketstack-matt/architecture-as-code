@@ -31,12 +31,15 @@ import java.util.stream.Collectors;
 /**
  * The write rules for decorators, shared by REST and MCP. A reserved type can only be written by
  * its configured principals, a decorator whose {@code $schema} Hub knows must match it, and a reserved
- * type is append-only. A client may not send the Hub-owned times.
+ * type is append-only. A client may not send the Hub-owned times or history links.
  */
 @ApplicationScoped
 public class DecoratorWriteService {
 
     private static final Logger LOG = LoggerFactory.getLogger(DecoratorWriteService.class);
+    // Hub keeps these beside the decorator, so a client copy would be stored and never returned.
+    private static final List<String> HUB_OWNED_FIELDS = List.of(DecoratorTimestamps.CREATION_DATE_TIME_FIELD,
+            DecoratorTimestamps.UPDATE_DATE_TIME_FIELD, DecoratorTimestamps.SUPERSEDED_DATE_TIME_FIELD, "supersedes", "supersededBy");
 
     private final DecoratorStore decoratorStore;
     private final DecoratorConfig config;
@@ -135,7 +138,7 @@ public class DecoratorWriteService {
     }
 
     private static void rejectHubOwnedFields(JsonObject decorator) throws HubOwnedDecoratorFieldException {
-        for (String field : List.of(DecoratorTimestamps.CREATION_DATE_TIME_FIELD, DecoratorTimestamps.UPDATE_DATE_TIME_FIELD)) {
+        for (String field : HUB_OWNED_FIELDS) {
             if (decorator.containsKey(field)) {
                 throw new HubOwnedDecoratorFieldException(field);
             }

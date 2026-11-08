@@ -400,7 +400,7 @@ class TestDecoratorWriteServiceShould {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"creationDateTime", "updateDateTime"})
+    @ValueSource(strings = {"creationDateTime", "updateDateTime", "supersededDateTime", "supersedes", "supersededBy"})
     void refuse_a_hub_owned_time_on_create_before_any_other_check(String field) {
         String json = "{\"type\": \"control-evaluation\", \"" + field + "\": \"2026-01-01T00:00:00.000Z\"}";
 
@@ -412,7 +412,7 @@ class TestDecoratorWriteServiceShould {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"creationDateTime", "updateDateTime"})
+    @ValueSource(strings = {"creationDateTime", "updateDateTime", "supersededDateTime", "supersedes", "supersededBy"})
     void refuse_a_hub_owned_time_on_update(String field) {
         String json = "{\"type\": \"threat-model\", \"" + field + "\": null}";
 
