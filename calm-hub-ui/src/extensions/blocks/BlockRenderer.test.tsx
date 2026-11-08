@@ -114,6 +114,12 @@ describe('Markdown in a slot', () => {
         expect(screen.getByRole('list')).toHaveClass('list-disc');
     });
 
+    it('styles numbered lists and quotes, which Tailwind base styles reset', () => {
+        const { container } = draw({ type: 'markdown', text: '1. one\n\n> quoted' });
+        expect(screen.getByRole('list')).toHaveClass('list-decimal');
+        expect(container.querySelector('blockquote')).toHaveClass('border-l-4');
+    });
+
     it('starts below h2 when the slot gives no level', () => {
         draw({ type: 'markdown', text: '# Top' });
         expect(screen.getByRole('heading', { name: 'Top', level: 3 })).toBeInTheDocument();
