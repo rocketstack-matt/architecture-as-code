@@ -120,10 +120,16 @@ describe('DecoratorsPanel', () => {
         expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     });
 
-    it('shows an error state', () => {
-        render(<DecoratorsPanel state={{ status: 'error' }} typeFilter={null} onTypeFilterChange={vi.fn()} />);
-        expect(screen.getByText('Could not load decorators.')).toBeInTheDocument();
+    it('shows an error state when Hub does not answer', () => {
+        render(<DecoratorsPanel state={{ status: 'error', reason: 'unavailable' }} typeFilter={null} onTypeFilterChange={vi.fn()} />);
+        expect(screen.getByText('Could not load decorators. CALM Hub did not answer; the page tries again.')).toBeInTheDocument();
         expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    });
+
+    it('says that Hub has no id for an unmapped architecture, not that Hub is down', () => {
+        render(<DecoratorsPanel state={{ status: 'error', reason: 'unmapped' }} typeFilter={null} onTypeFilterChange={vi.fn()} />);
+        expect(screen.getByText('CALM Hub has no id for this architecture, so it cannot find its decorators.')).toBeInTheDocument();
+        expect(screen.queryByText(/did not answer/)).not.toBeInTheDocument();
     });
 
     it('shows an empty state with no filter', () => {

@@ -3,9 +3,12 @@ import type { Data } from '../../../../model/calm.js';
 import type { CalmService } from '../../../../service/calm-service.js';
 import type { Decorator } from '../../../../visualizer/contracts/contracts.js';
 
+/** `unmapped`: Hub answered, but its mappings do not list the slug, so there is no target to look up. */
+export type DecoratorsErrorReason = 'unavailable' | 'unmapped';
+
 export type ArchitectureDecoratorsState =
     | { status: 'loading' }
-    | { status: 'error' }
+    | { status: 'error'; reason: DecoratorsErrorReason }
     | { status: 'loaded'; decorators: Decorator[] };
 
 export const DECORATOR_REFRESH_MS = 5000;
@@ -14,7 +17,10 @@ const DECORATOR_FAILURES_BEFORE_BACKOFF = 3;
 const DECORATOR_BACKOFF_MS = 30000;
 
 const LOADING: ArchitectureDecoratorsState = { status: 'loading' };
-const ERROR: ArchitectureDecoratorsState = { status: 'error' };
+const UNAVAILABLE: ArchitectureDecoratorsState = { status: 'error', reason: 'unavailable' };
+const UNMAPPED: ArchitectureDecoratorsState = { status: 'error', reason: 'unmapped' };
+
+class UnmappedArchitectureError extends Error {}
 const NONE: ArchitectureDecoratorsState = { status: 'loaded', decorators: [] };
 
 /**
@@ -75,7 +81,8 @@ export function useArchitectureDecorators(
             if (failures >= DECORATOR_FAILURES_BEFORE_BACKOFF) {
                 ticksToSkip = DECORATOR_BACKOFF_MS / DECORATOR_REFRESH_MS - 1;
             }
-            setLoaded((prev) => (prev?.source === data && prev.state.status === 'loaded' ? prev : { source: data, state: ERROR }));
+            const state = error instanceof UnmappedArchitectureError ? UNMAPPED : UNAVAILABLE;
+            setLoaded((prev) => (prev?.source === data && (prev.state.status === 'loaded' || prev.state === state) ? prev : { source: data, state }));
         };
         const resolveTarget = async () => {
             const lookup = (target ??= service.resolveArchitectureVersionTarget(name, id, version));
@@ -88,7 +95,7 @@ export function useArchitectureDecorators(
             });
             if (!resolved) {
                 forget();
-                throw new Error(`Could not resolve architecture ${id}`);
+                throw new UnmappedArchitectureError(`Hub has no mapping for architecture ${id}`);
             }
             return resolved;
         };

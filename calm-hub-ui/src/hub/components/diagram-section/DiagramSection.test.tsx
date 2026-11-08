@@ -518,7 +518,7 @@ describe('DiagramSection', () => {
             calmServiceMock.fetchDecoratorsForTarget.mockRejectedValue(new Error('boom'));
             renderArchitecture('/?tab=decorators');
 
-            expect(await screen.findByText('Could not load decorators.')).toBeInTheDocument();
+            expect(await screen.findByText(/^Could not load decorators\./)).toBeInTheDocument();
         });
 
         it('redirects the old Deployments tab to the Decorators tab filtered to deployment', async () => {
@@ -681,7 +681,7 @@ describe('DiagramSection', () => {
 
                 expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(2);
                 expect(screen.getByRole('article', { name: 'deployment decorator dep-1' })).toBeInTheDocument();
-                expect(screen.queryByText('Could not load decorators.')).not.toBeInTheDocument();
+                expect(screen.queryByText(/^Could not load decorators\./)).not.toBeInTheDocument();
             } finally {
                 error.mockRestore();
                 vi.useRealTimers();

@@ -44,8 +44,10 @@ export function DecoratorsPanel({ state, typeFilter, schemaFilter = null, onType
     let body;
     if (state.status === 'loading') {
         body = <Message>Loading decorators…</Message>;
+    } else if (state.status === 'error' && state.reason === 'unmapped') {
+        body = <Message>CALM Hub has no id for this architecture, so it cannot find its decorators.</Message>;
     } else if (state.status === 'error') {
-        body = <Message>Could not load decorators.</Message>;
+        body = <Message>Could not load decorators. CALM Hub did not answer; the page tries again.</Message>;
     } else if (all.length === 0) {
         body = <Message>No decorators for this architecture version.</Message>;
     } else if (shown.length === 0) {

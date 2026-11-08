@@ -1,8 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Data } from '../../../../model/calm.js';
-import type { CalmService } from '../../../../service/calm-service.js';
 import type { Decorator } from '../../../../visualizer/contracts/contracts.js';
+import axios from 'axios';
+import AxiosMockAdapter from 'axios-mock-adapter';
+import { CalmService } from '../../../../service/calm-service.js';
 import { useArchitectureDecorators } from './useArchitectureDecorators.js';
 
 const TARGET = '/api/calm/namespaces/my-namespace/architectures/42/versions/1-0-0';
@@ -127,7 +129,7 @@ describe('useArchitectureDecorators', () => {
         fetch.mockRejectedValueOnce(new Error('hub down')).mockResolvedValue([decorator('d1')]);
         const { result } = renderFor(architecture);
         await flush();
-        expect(result.current).toEqual({ status: 'error' });
+        expect(result.current).toEqual({ status: 'error', reason: 'unavailable' });
 
         await advance(5000);
         expect(result.current).toEqual({ status: 'loaded', decorators: [decorator('d1')] });
@@ -137,7 +139,7 @@ describe('useArchitectureDecorators', () => {
         resolve.mockResolvedValueOnce(undefined);
         const { result } = renderFor(architecture);
         await flush();
-        expect(result.current).toEqual({ status: 'error' });
+        expect(result.current).toEqual({ status: 'error', reason: 'unmapped' });
         expect(fetch).not.toHaveBeenCalled();
 
         await advance(5000);
@@ -149,7 +151,7 @@ describe('useArchitectureDecorators', () => {
         resolve.mockRejectedValueOnce(new Error('mappings 500'));
         const { result } = renderFor(architecture);
         await flush();
-        expect(result.current).toEqual({ status: 'error' });
+        expect(result.current).toEqual({ status: 'error', reason: 'unavailable' });
         expect(fetch).not.toHaveBeenCalled();
     });
 
@@ -165,6 +167,32 @@ describe('useArchitectureDecorators', () => {
 
         await advance(5000);
         expect(resolve).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps telling an unmapped slug from a failed lookup on later refreshes', async () => {
+        resolve.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('mappings 500')).mockResolvedValueOnce(undefined);
+        const { result } = renderFor(architecture);
+        await flush();
+        expect(result.current).toEqual({ status: 'error', reason: 'unmapped' });
+        await advance(5000);
+        expect(result.current).toEqual({ status: 'error', reason: 'unavailable' });
+        await advance(5000);
+        expect(result.current).toEqual({ status: 'error', reason: 'unmapped' });
+    });
+
+    it('logs an unreachable mappings API once, however often the lookup is retried', async () => {
+        const ax = axios.create();
+        const mock = new AxiosMockAdapter(ax);
+        mock.onGet('/calm/namespaces/my-namespace/architectures').reply(500);
+        const real = new CalmService(ax);
+        const { result } = renderHook(() => useArchitectureDecorators(real, architecture, true));
+        await flush();
+        await advance(10000);
+        await advance(30000);
+
+        expect(mock.history.get.length).toBeGreaterThanOrEqual(4);
+        expect(result.current).toEqual({ status: 'error', reason: 'unavailable' });
+        expect(errorSpy).toHaveBeenCalledTimes(1);
     });
 
     it('keeps the last list when a refresh fails', async () => {
