@@ -1,6 +1,7 @@
 package org.finos.calm.security;
 
 import io.quarkus.test.junit.QuarkusTestProfile;
+import org.finos.calm.extensions.FixtureBackend;
 
 import java.security.GeneralSecurityException;
 import java.security.KeyPairGenerator;
@@ -58,6 +59,23 @@ final class OidcTestProfiles {
                     "quarkus.http.ssl.certificate.key-files", "",
                     "quarkus.oidc.auth-server-url", "",
                     "quarkus.oidc.public-key", publicKey());
+        }
+    }
+
+    /** The oidc profile with an identity provider that is down: nothing listens on its port. */
+    public static class IdpDown implements QuarkusTestProfile {
+        @Override
+        public String getConfigProfile() {
+            return "test,oidc";
+        }
+
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            String issuer = "http://127.0.0.1:" + FixtureBackend.freePort() + "/realms/calm";
+            return Map.of(
+                    "CALM_OIDC_ISSUER_URL", issuer,
+                    "CALM_OIDC_CLIENT_ID", "calm-hub",
+                    "quarkus.oidc.auth-server-url", issuer);
         }
     }
 }

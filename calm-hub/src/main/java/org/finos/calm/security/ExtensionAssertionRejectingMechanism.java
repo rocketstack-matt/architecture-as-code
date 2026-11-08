@@ -24,12 +24,11 @@ public class ExtensionAssertionRejectingMechanism implements HttpAuthenticationM
 
     private static final Logger logger = LoggerFactory.getLogger(ExtensionAssertionRejectingMechanism.class);
     private static final String BEARER = "bearer ";
+    private static final String INVALID_TOKEN = "Bearer error=\"invalid_token\"";
 
     @Override
     public Uni<SecurityIdentity> authenticate(RoutingContext context, IdentityProviderManager identityProviderManager) {
-        String authorization = context.request().getHeader(HttpHeaderNames.AUTHORIZATION);
-        if (authorization != null && authorization.regionMatches(true, 0, BEARER, 0, BEARER.length())
-                && ExtensionIdentitySigner.isAssertion(authorization.substring(BEARER.length()).trim())) {
+        if (presentsAssertion(context)) {
             logger.warn("REJECTING a CALM Hub extension identity assertion presented as a credential");
             return Uni.createFrom().failure(new AuthenticationFailedException());
         }
@@ -38,8 +37,17 @@ public class ExtensionAssertionRejectingMechanism implements HttpAuthenticationM
 
     @Override
     public Uni<ChallengeData> getChallenge(RoutingContext context) {
-        // The other mechanisms set the challenge, as they did before this one was added.
-        return Uni.createFrom().nullItem();
+        // Hub answers an assertion itself: the OIDC challenge needs the identity provider, so while the
+        // provider is down it would turn the 401 into a 500. The other mechanisms set every other challenge.
+        return presentsAssertion(context)
+                ? Uni.createFrom().item(new ChallengeData(401, HttpHeaderNames.WWW_AUTHENTICATE, INVALID_TOKEN))
+                : Uni.createFrom().nullItem();
+    }
+
+    private static boolean presentsAssertion(RoutingContext context) {
+        String authorization = context.request().getHeader(HttpHeaderNames.AUTHORIZATION);
+        return authorization != null && authorization.regionMatches(true, 0, BEARER, 0, BEARER.length())
+                && ExtensionIdentitySigner.isAssertion(authorization.substring(BEARER.length()).trim());
     }
 
     @Override

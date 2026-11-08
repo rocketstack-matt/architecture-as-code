@@ -2,6 +2,7 @@ package org.finos.calm.security;
 
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.identity.IdentityProviderManager;
+import io.quarkus.vertx.http.runtime.security.ChallengeData;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -74,8 +76,24 @@ class TestExtensionAssertionRejectingMechanismShould {
     }
 
     @Test
-    void run_before_the_other_mechanisms_and_set_no_challenge() {
+    void run_before_the_other_mechanisms_and_leave_another_challenge_to_them() {
+        when(mockRoutingContext.request()).thenReturn(mockRequest);
+        when(mockRequest.getHeader(any(CharSequence.class))).thenReturn("Bearer " + token("{\"alg\":\"RS256\",\"typ\":\"JWT\"}"));
+
         assertTrue(mechanism.getPriority() > new NoAuthAuthenticationMechanism().getPriority());
         assertNull(mechanism.getChallenge(mockRoutingContext).await().indefinitely());
+    }
+
+    @Test
+    void send_its_own_challenge_for_an_assertion() {
+        when(mockRoutingContext.request()).thenReturn(mockRequest);
+        when(mockRequest.getHeader(any(CharSequence.class)))
+                .thenReturn("Bearer " + token("{\"alg\":\"RS256\",\"typ\":\"calm-ext+jwt\"}"));
+
+        ChallengeData challenge = mechanism.getChallenge(mockRoutingContext).await().indefinitely();
+
+        assertEquals(401, challenge.status);
+        assertTrue("WWW-Authenticate".equalsIgnoreCase(challenge.headerName.toString()));
+        assertEquals("Bearer error=\"invalid_token\"", challenge.headerContent);
     }
 }
