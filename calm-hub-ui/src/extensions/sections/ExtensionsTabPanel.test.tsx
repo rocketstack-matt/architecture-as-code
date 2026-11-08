@@ -83,3 +83,10 @@ describe('ExtensionsTabPanel with an action that needs a selected element', () =
         expect(screen.queryByText(/need a selected node/)).not.toBeInTheDocument();
     });
 });
+
+it('puts each extension at h3 and its designer tab title at h4, below the h2 of the resource', async () => {
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+    renderPanel(fakeExtensions(1));
+    expect(screen.getByRole('heading', { name: /Extension 1/, level: 3 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'designer-tab 1', level: 4 })).toBeInTheDocument();
+});

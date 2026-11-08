@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ExtensionContext, ExtensionContribution, ExtensionScreen, ExtensionSummary } from '../model/extensions.js';
 import { ExtensionActionButton } from './ExtensionActionButton.js';
+import { Heading, HeadingLevel } from './Heading.js';
 import { ScreenErrorBoundary } from './ScreenErrorBoundary.js';
 import { BlockRenderer } from './blocks/BlockRenderer.js';
 import { isBlocksReply } from './blocks/reply.js';
@@ -11,9 +12,11 @@ export interface ExtensionSlotProps {
     contribution: ExtensionContribution;
     context?: ExtensionContext;
     action?: boolean;
+    /** The level of the slot title: one below the heading of the place that holds the slot. */
+    headingLevel?: HeadingLevel;
 }
 
-function SlotContent({ extension, contribution, context = {}, action }: ExtensionSlotProps) {
+function SlotContent({ extension, contribution, context = {}, action, headingLevel = 2 }: ExtensionSlotProps) {
     const service = useExtensionService();
     const route = extension.routes.find((entry) => entry.id === contribution.route);
     const [result, setResult] = useState<ExtensionScreen>();
@@ -41,7 +44,9 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
     if (!result) return <p role="status">Loading extension…</p>;
     return (
         <section className="flex flex-col gap-4 min-w-0 overflow-auto" aria-label={contribution.title}>
-            <h2 className="text-lg font-bold">{result.title ?? contribution.title}</h2>
+            <Heading level={headingLevel} className="text-lg font-bold">
+                {result.title ?? contribution.title}
+            </Heading>
             {result.blocks.map((block, index) => (
                 <BlockRenderer key={index} block={block} />
             ))}

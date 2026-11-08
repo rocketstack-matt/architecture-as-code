@@ -85,6 +85,7 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
                                         extension={extension}
                                         contribution={contribution}
                                         context={context}
+                                        headingLevel={4}
                                     />
                                 ))}
                             </>
