@@ -1,8 +1,8 @@
 import { useContext } from 'react';
-import { ExtensionResourceContext } from '../../../extensions/ExtensionResourceContext.js';
-import { ExtensionDetailPanels } from '../../../extensions/sections/ExtensionDetailPanels.js';
 import { CalmNodeSchema } from '@finos/calm-models/types';
 import { ZoomIn } from 'lucide-react';
+import { ExtensionResourceContext } from '../../../extensions/ExtensionResourceContext.js';
+import { ExtensionDetailPanels } from '../../../extensions/sections/ExtensionDetailPanels.js';
 import { extractNodeType, isNavigableArch, resolveDetailedArchitecture } from '../reactflow/utils/calmHelpers.js';
 import { getNodeTypeColor } from '../../../theme/helpers.js';
 import { useDiagramActions } from '../../context/DiagramActionsContext.js';

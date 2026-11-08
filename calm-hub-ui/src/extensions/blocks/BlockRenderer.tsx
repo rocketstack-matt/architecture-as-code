@@ -1,6 +1,6 @@
-import { ScreenBlock } from '../../model/extensions.js';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ScreenBlock } from '../../model/extensions.js';
 import '../../hub/components/adr-renderer/AdrMarkdown.css';
 import { safeHref } from '../ScreenLink.js';
 import { ALERT_CLASS } from '../tone.js';

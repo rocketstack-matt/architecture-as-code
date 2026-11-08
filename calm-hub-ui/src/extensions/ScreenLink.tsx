@@ -1,10 +1,7 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { resourcePath } from '../hub/routes.js';
 import { ScreenLinkValue } from '../model/extensions.js';
-
-export function hubPath({ namespace, type, id, version }: NonNullable<ScreenLinkValue['hub']>): string {
-    return '/' + [namespace, type, id, version].map(encodeURIComponent).join('/');
-}
 
 /** An extension sends data, so only http and https URLs become external links. */
 export function safeHref(href: string | undefined): string | undefined {
@@ -21,7 +18,7 @@ export function ScreenLink({ link, className, children }: { link: ScreenLinkValu
     const content = children ?? link.label;
     if (link.hub) {
         return (
-            <Link to={hubPath(link.hub)} className={className}>
+            <Link to={resourcePath(link.hub)} className={className}>
                 {content}
             </Link>
         );
