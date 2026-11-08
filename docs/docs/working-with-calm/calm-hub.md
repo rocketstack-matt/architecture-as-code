@@ -238,4 +238,4 @@ An operator can install extensions (see [Extensions](../calm-hub/index.md#extens
 
 CALM Hub uses a hierarchical entitlement model to control who can read, write, and administer namespaces. See [CALM Hub Entitlements](./calm-hub-entitlements) for the full model, worked examples, and API usage.
 
-For Tier 1 extension routes and JSON blocks, see the [blocks author guide](hub-extension-blocks.md).
+For extension routes and JSON blocks, see the [extension blocks reference](../calm-hub/extension-blocks.md).
