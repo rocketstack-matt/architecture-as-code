@@ -4,8 +4,8 @@ import type { AxiosInstance } from 'axios';
 import AxiosMockAdapter from 'axios-mock-adapter';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExtensionsProvider, useExtensions, useExtensionsStatus } from './ExtensionsContext.js';
-import { ExtensionService, extensionService } from '../../service/extension-service.js';
-vi.mock('../../authService.js', () => ({ getAuthHeaders: vi.fn().mockResolvedValue({}) }));
+import { ExtensionService, extensionService } from '../service/extension-service.js';
+vi.mock('../authService.js', () => ({ getAuthHeaders: vi.fn().mockResolvedValue({}) }));
 function Consumer() {
     return (
         <div>

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ExtensionsContext } from '../../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../ExtensionsContext.js';
 import type { ExtensionSummary } from '../../model/extensions.js';
 import { ExtensionService } from '../../service/extension-service.js';
 import { createMemoryStorage } from '../../test-support/memory-storage.js';

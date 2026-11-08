@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ExtensionsContext, ExtensionsProvider } from '../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext, ExtensionsProvider } from './ExtensionsContext.js';
 import { ExtensionService } from '../service/extension-service.js';
 import { ExtensionScreenPage } from './ExtensionScreenPage.js';
 import { fakeExtension } from '../test-support/fake-extensions.js';

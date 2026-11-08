@@ -1,4 +1,4 @@
-import { useExtensions } from '../../components/extensions/ExtensionsContext.js';
+import { useExtensions } from '../ExtensionsContext.js';
 import { ExtensionContext } from '../../model/extensions.js';
 import { ExtensionSlot } from '../ExtensionSlot.js';
 import { ExtensionSections } from './ExtensionSections.js';

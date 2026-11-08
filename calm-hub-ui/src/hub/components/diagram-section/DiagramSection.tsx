@@ -1,4 +1,4 @@
-import { useExtensions } from '../../../components/extensions/ExtensionsContext.js';
+import { useExtensions } from '../../../extensions/ExtensionsContext.js';
 import { resourceExtensions } from '../../../extensions/contributions.js';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';

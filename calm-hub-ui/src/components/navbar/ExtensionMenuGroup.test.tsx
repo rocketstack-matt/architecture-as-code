@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { ExtensionsContext } from '../extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../../extensions/ExtensionsContext.js';
 import type { ExtensionSummary } from '../../model/extensions.js';
 import { fakeExtensions } from '../../test-support/fake-extensions.js';
 import { ExtensionMenuGroup } from './ExtensionMenuGroup.js';

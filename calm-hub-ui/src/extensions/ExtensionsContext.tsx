@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { ExtensionSummary } from '../../model/extensions.js';
-import { ExtensionService, extensionService } from '../../service/extension-service.js';
+import { ExtensionSummary } from '../model/extensions.js';
+import { ExtensionService, extensionService } from '../service/extension-service.js';
 
 export type ExtensionsStatus = 'loading' | 'loaded' | 'failed';
 

@@ -1,4 +1,4 @@
-import { ExtensionsProvider } from './components/extensions/ExtensionsContext.js';
+import { ExtensionsProvider } from './extensions/ExtensionsContext.js';
 import { ExtensionScreenPage } from './extensions/ExtensionScreenPage.js';
 import { HashRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import Hub from './hub/Hub.js';

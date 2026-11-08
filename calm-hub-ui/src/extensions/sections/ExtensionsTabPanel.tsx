@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { useExtensions } from '../../components/extensions/ExtensionsContext.js';
+import { useExtensions } from '../ExtensionsContext.js';
 import { ExtensionContext } from '../../model/extensions.js';
 import { resourceExtensions } from '../contributions.js';
 import { ExtensionSlot } from '../ExtensionSlot.js';

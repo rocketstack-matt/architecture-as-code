@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ExtensionsContext } from '../../../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../../../extensions/ExtensionsContext.js';
 import type { ExtensionSummary } from '../../../model/extensions.js';
 import { ExtensionService } from '../../../service/extension-service.js';
 import { fakeExtension, fakeExtensions } from '../../../test-support/fake-extensions.js';

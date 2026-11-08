@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useExtensions, useExtensionsStatus } from '../components/extensions/ExtensionsContext.js';
+import { useExtensions, useExtensionsStatus } from './ExtensionsContext.js';
 import { Navbar } from '../components/navbar/Navbar.js';
 import { ExtensionSlot } from './ExtensionSlot.js';
 

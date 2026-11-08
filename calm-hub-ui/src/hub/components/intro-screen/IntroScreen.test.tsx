@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { ExtensionsContext } from '../../../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../../../extensions/ExtensionsContext.js';
 import { ExtensionService } from '../../../service/extension-service.js';
 import { fakeExtension } from '../../../test-support/fake-extensions.js';
 import { IntroScreen } from './IntroScreen.js';
