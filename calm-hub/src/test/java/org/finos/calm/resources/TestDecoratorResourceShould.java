@@ -846,19 +846,21 @@ public class TestDecoratorResourceShould {
 
     @Test
     void return_204_when_decorator_deleted_successfully() throws Exception {
+        when(decoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(1, null, null, new Decorator.DecoratorBuilder().setType("deployment").build())));
+
         given()
                 .when()
                 .delete("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(204);
 
-        verify(decoratorStore, times(1)).deleteDecorator("finos", 1);
+        verify(decoratorStore, times(1)).deleteCurrentDecoratorHistory("finos", 1);
     }
 
     @Test
     void return_404_when_decorator_not_found_for_delete() throws Exception {
-        doThrow(new DecoratorNotFoundException())
-                .when(decoratorStore).deleteDecorator(anyString(), anyInt());
+        when(decoratorStore.getDecoratorHistory(anyString(), anyInt())).thenThrow(new DecoratorNotFoundException());
 
         given()
                 .when()
@@ -870,8 +872,7 @@ public class TestDecoratorResourceShould {
 
     @Test
     void return_404_when_namespace_does_not_exist_for_delete_decorator() throws Exception {
-        doThrow(new NamespaceNotFoundException())
-                .when(decoratorStore).deleteDecorator(anyString(), anyInt());
+        when(decoratorStore.getDecoratorHistory(anyString(), anyInt())).thenThrow(new NamespaceNotFoundException());
 
         given()
                 .when()

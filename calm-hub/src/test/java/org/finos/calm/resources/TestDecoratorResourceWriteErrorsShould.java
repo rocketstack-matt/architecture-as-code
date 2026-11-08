@@ -6,7 +6,6 @@ import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
-import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.services.DecoratorWriteService;
 import org.junit.jupiter.api.Test;
 
@@ -19,11 +18,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 // The write service is mocked: the schema tests in TestDecoratorResourceShould skip when the
@@ -90,18 +86,5 @@ class TestDecoratorResourceWriteErrorsShould {
                 .body("errors.location", contains("/target-type"))
                 .body("errors.error", contains("required property is missing"))
                 .body("moreErrors", nullValue());
-    }
-
-    @Test
-    void return_403_when_delete_refuses_a_reserved_type() throws Exception {
-        doThrow(new ReservedDecoratorTypeException("control-evaluation"))
-                .when(decoratorWriteService).deleteDecorator(any(), anyBoolean(), eq("finos"), anyInt());
-
-        given()
-                .when()
-                .delete("/api/calm/namespaces/finos/decorators/1")
-                .then()
-                .statusCode(403)
-                .body(equalTo("Decorator type is reserved and the caller may not write it: control-evaluation"));
     }
 }

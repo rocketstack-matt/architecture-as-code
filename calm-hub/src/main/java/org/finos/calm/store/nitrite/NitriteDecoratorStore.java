@@ -269,49 +269,27 @@ public class NitriteDecoratorStore implements DecoratorStore {
 
         lock.lock();
         try {
-            Document entry = decoratorEntries(requireNamespaceDocument(namespace)).stream()
+            Document namespaceDoc = requireNamespaceDocument(namespace);
+            List<Document> decorators = decoratorEntries(namespaceDoc);
+            Document entry = decorators.stream()
                     .filter(candidate -> Integer.valueOf(currentId).equals(candidate.get(DECORATOR_ID_FIELD, Integer.class)))
                     .findFirst()
                     .orElseThrow(DecoratorNotFoundException::new);
             if (entry.get(SUPERSEDED_BY_FIELD) != null) {
                 throw new DecoratorSupersededException();
             }
-            deleteHistory(namespace, currentId);
+            Set<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespaceDoc, namespace), currentId).stream()
+                    .map(DecoratorHistoryEntry::getId)
+                    .collect(Collectors.toSet());
+            List<Document> remaining = new ArrayList<>(decorators);
+            remaining.removeIf(decoratorEntry -> ids.contains(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)));
+
+            namespaceDoc.put(DECORATORS_FIELD, remaining);
+            decoratorCollection.update(namespaceDoc);
+            LOG.debug("Deleted decorator with ID {} and its history in namespace '{}'", currentId, namespace);
         } finally {
             lock.unlock();
         }
-    }
-
-    @Override
-    public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
-        namespaceStore.requireNamespace(namespace);
-
-        lock.lock();
-        try {
-            deleteHistory(namespace, id);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    // The caller holds the lock.
-    private void deleteHistory(String namespace, int id) throws DecoratorNotFoundException {
-        Document namespaceDoc = requireNamespaceDocument(namespace);
-        List<Document> decorators = decoratorEntries(namespaceDoc);
-
-        Set<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespaceDoc, namespace), id).stream()
-                .map(DecoratorHistoryEntry::getId)
-                .collect(Collectors.toSet());
-        List<Document> mutableDecorators = new ArrayList<>(decorators);
-        boolean removed = mutableDecorators.removeIf(
-                decoratorEntry -> ids.contains(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)));
-        if (!removed) {
-            throw new DecoratorNotFoundException();
-        }
-
-        namespaceDoc.put(DECORATORS_FIELD, mutableDecorators);
-        decoratorCollection.update(namespaceDoc);
-        LOG.debug("Deleted decorator with ID {} in namespace '{}'", id, namespace);
     }
 
     private Document requireNamespaceDocument(String namespace) throws DecoratorNotFoundException {

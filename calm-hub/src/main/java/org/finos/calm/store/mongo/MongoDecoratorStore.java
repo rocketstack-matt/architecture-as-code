@@ -223,40 +223,23 @@ public class MongoDecoratorStore implements DecoratorStore {
     @Override
     public void deleteCurrentDecoratorHistory(String namespace, int currentId)
             throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
-        if (!deleteHistory(namespace, currentId, true)) {
-            throwSupersededOrNotFound(namespace, currentId);
-        }
-    }
-
-    @Override
-    public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
-        if (!deleteHistory(namespace, id, false)) {
-            throw new DecoratorNotFoundException();
-        }
-    }
-
-    private boolean deleteHistory(String namespace, int id, boolean requireCurrent)
-            throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
-        List<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespace), id).stream()
+        List<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespace), currentId).stream()
                 .map(DecoratorHistoryEntry::getId)
                 .toList();
         if (ids.isEmpty()) {
             throw new DecoratorNotFoundException();
         }
 
-        long modified = decoratorCollection.updateOne(
-                requireCurrent ? currentEntryFilter(namespace, id) : Filters.eq("namespace", namespace),
-                Updates.pull("decorators", Filters.in(DECORATOR_ID_FIELD, ids))
-        ).getModifiedCount();
+        long modified = decoratorCollection.updateOne(currentEntryFilter(namespace, currentId),
+                Updates.pull("decorators", Filters.in(DECORATOR_ID_FIELD, ids))).getModifiedCount();
 
         if (modified == 0) {
-            return false;
+            throwSupersededOrNotFound(namespace, currentId);
         }
 
-        LOG.debug("Deleted decorator with ID {} in namespace '{}'", id, namespace);
-        return true;
+        LOG.debug("Deleted decorator with ID {} and its history in namespace '{}'", currentId, namespace);
     }
 
     private static Bson currentEntryFilter(String namespace, int id) {

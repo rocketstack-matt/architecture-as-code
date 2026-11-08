@@ -153,7 +153,6 @@ class TestReservedDecoratorResourceShould {
     void delete_a_reserved_history_for_a_global_admin_who_is_not_a_writer() throws Exception {
         when(mockUserAccessStore.getGrantsForUser("admin")).thenReturn(List.of(
                 new UserAccess("admin", UserAccess.Permission.admin, CalmHubPermissionChecker.GLOBAL_ACCESS)));
-        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("threat-model")));
         when(mockDecoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
                 new DecoratorHistoryEntry(2, 1, null, decorator("control-evaluation")),
                 new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
@@ -184,13 +183,11 @@ class TestReservedDecoratorResourceShould {
                 .statusCode(403);
 
         verify(mockDecoratorStore, never()).deleteCurrentDecoratorHistory(anyString(), anyInt());
-        verify(mockDecoratorStore, never()).deleteDecorator(anyString(), anyInt());
     }
 
     @Test
     @TestSecurity(user = "alice", authorizationEnabled = false)
     void return_409_when_a_delete_loses_to_a_supersede() throws Exception {
-        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("control-evaluation")));
         when(mockDecoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
                 new DecoratorHistoryEntry(1, null, null, decorator("control-evaluation"))));
         doThrow(new DecoratorSupersededException()).when(mockDecoratorStore).deleteCurrentDecoratorHistory("finos", 1);
@@ -205,9 +202,7 @@ class TestReservedDecoratorResourceShould {
 
     @Test
     @TestSecurity(user = "policy-engine", authorizationEnabled = false)
-    void delete_a_reserved_decorator_for_a_configured_writer() throws Exception {
-        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("control-evaluation")));
-
+    void delete_a_reserved_decorator_through_its_current_decorator() throws Exception {
         when(mockDecoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
                 new DecoratorHistoryEntry(1, null, null, decorator("control-evaluation"))));
 

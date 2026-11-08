@@ -112,29 +112,14 @@ public class DecoratorWriteService {
     }
 
     /**
-     * Deletes a decorator with its whole history. A global admin may delete any history; any other caller
-     * must be a writer of each reserved type in it.
+     * Deletes a decorator with its whole history. Only a global admin may delete (the REST endpoint needs
+     * GLOBAL_ADMIN, and MCP has no delete tool), and a global admin need not be a writer of the reserved types.
+     * The delete fails if another write supersedes the current decorator first.
      */
-    public void deleteDecorator(String principal, boolean globalAdmin, String namespace, int id)
-            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException,
-            ReservedDecoratorTypeException {
-        Optional<Decorator> existing = decoratorStore.getDecoratorById(namespace, id);
-        if (existing.isPresent()) {
-            if (!globalAdmin) {
-                requireWriter(principal, existing.get().getType());
-            }
-            var history = decoratorStore.getDecoratorHistory(namespace, id);
-            if (!globalAdmin) {
-                for (var entry : history) {
-                    if (entry.getDecorator() != null) {
-                        requireWriter(principal, entry.getDecorator().getType());
-                    }
-                }
-            }
-            decoratorStore.deleteCurrentDecoratorHistory(namespace, history.getFirst().getId());
-            return;
-        }
-        decoratorStore.deleteDecorator(namespace, id);
+    public void deleteDecorator(String namespace, int id)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
+        int currentId = decoratorStore.getDecoratorHistory(namespace, id).getFirst().getId();
+        decoratorStore.deleteCurrentDecoratorHistory(namespace, currentId);
     }
 
     private static void rejectHubOwnedFields(JsonObject decorator) throws HubOwnedDecoratorFieldException {

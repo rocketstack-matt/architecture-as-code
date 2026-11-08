@@ -782,7 +782,7 @@ class TestMongoDecoratorStoreShould {
         when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
 
         // When
-        decoratorStore.deleteDecorator(namespace, decoratorId);
+        decoratorStore.deleteCurrentDecoratorHistory(namespace, decoratorId);
 
         // Then
         verify(namespaceStore).namespaceExists(namespace);
@@ -804,7 +804,7 @@ class TestMongoDecoratorStoreShould {
 
         // When & Then
         assertThrows(DecoratorNotFoundException.class,
-                () -> decoratorStore.deleteDecorator(namespace, decoratorId));
+                () -> decoratorStore.deleteCurrentDecoratorHistory(namespace, decoratorId));
 
         verify(namespaceStore).namespaceExists(namespace);
         verify(decoratorCollection).updateOne(any(Bson.class), any(Bson.class));
@@ -818,7 +818,7 @@ class TestMongoDecoratorStoreShould {
 
         // When & Then
         assertThrows(NamespaceNotFoundException.class,
-                () -> decoratorStore.deleteDecorator(namespace, 1));
+                () -> decoratorStore.deleteCurrentDecoratorHistory(namespace, 1));
 
         verify(namespaceStore).namespaceExists(namespace);
         verify(decoratorCollection, never()).updateOne(any(Bson.class), any(Bson.class));
@@ -830,7 +830,7 @@ class TestMongoDecoratorStoreShould {
         when(decoratorCollection.find(any(Bson.class))).thenReturn(findIterable);
         when(findIterable.first()).thenReturn(null);
 
-        assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.deleteDecorator("finos", 1));
+        assertThrows(DecoratorNotFoundException.class, () -> decoratorStore.deleteCurrentDecoratorHistory("finos", 1));
 
         verify(decoratorCollection, never()).updateOne(any(Bson.class), any(Bson.class));
     }
@@ -844,7 +844,7 @@ class TestMongoDecoratorStoreShould {
         ArgumentCaptor<Bson> update = ArgumentCaptor.forClass(Bson.class);
         when(decoratorCollection.updateOne(any(Bson.class), update.capture())).thenReturn(updateResult);
 
-        decoratorStore.deleteDecorator("finos", 1);
+        decoratorStore.deleteCurrentDecoratorHistory("finos", 2);
 
         assertEquals(List.of(2, 1), update.getValue().toBsonDocument()
                 .getDocument("$pull").getDocument("decorators").getDocument("decoratorId")

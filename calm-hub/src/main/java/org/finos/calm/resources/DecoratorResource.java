@@ -285,8 +285,7 @@ public class DecoratorResource {
             @PathParam("id") @Min(value = 1, message = "ID must be a positive integer") int id
     ) {
         try {
-            // The endpoint requires GLOBAL_ADMIN, so the caller need not be a writer of the reserved types.
-            decoratorWriteService.deleteDecorator(DecoratorWriteService.principalName(identity), true, namespace, id);
+            decoratorWriteService.deleteDecorator(namespace, id);
         } catch (DecoratorNotFoundException e) {
             logger.error("Decorator [{}] not found in namespace [{}] when deleting", id, namespace, e);
             return CalmResourceErrorResponses.decoratorNotFoundResponse(namespace, id);
@@ -296,9 +295,6 @@ public class DecoratorResource {
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when deleting decorator [{}]", namespace, id, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
-        } catch (ReservedDecoratorTypeException e) {
-            logger.warn("Refused a reserved decorator type when deleting decorator [{}] in namespace [{}]", id, namespace);
-            return CalmResourceErrorResponses.reservedDecoratorTypeResponse(e.getType());
         }
         return Response.noContent().build();
     }
