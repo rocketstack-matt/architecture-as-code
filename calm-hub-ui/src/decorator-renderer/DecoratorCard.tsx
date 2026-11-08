@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DecoratorValue } from './DecoratorValue.js';
 import { decoratorTypeLabel, isWebUrl } from './value-shape.js';
+import { writableDecorator } from './writable.js';
 
 /**
  * The decorator fields the renderer reads. Kept structural so the renderer does not depend on Hub types. The API does
@@ -11,6 +12,7 @@ export interface RenderableDecorator {
     type?: string;
     schema?: string;
     target?: string[];
+    targetType?: string[];
     appliesTo?: string[];
     creationDateTime?: string;
     updateDateTime?: string;
@@ -83,9 +85,14 @@ export function DecoratorCard({ decorator }: { decorator: RenderableDecorator })
                 {view === 'data' ? (
                     <DecoratorValue value={decorator.data} />
                 ) : (
-                    <pre className="text-xs font-mono bg-base-200 rounded-box p-2 overflow-auto max-h-96 m-0">
-                        {JSON.stringify(decorator, null, 2)}
-                    </pre>
+                    <>
+                        <p className="text-xs text-base-content/60 m-0">
+                            The JSON that a decorator write takes. CALM Hub sets the created and updated times, so they are not in it.
+                        </p>
+                        <pre className="text-xs font-mono bg-base-200 rounded-box p-2 overflow-auto max-h-96 m-0">
+                            {JSON.stringify(writableDecorator(decorator), null, 2)}
+                        </pre>
+                    </>
                 )}
             </div>
         </article>

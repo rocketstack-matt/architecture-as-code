@@ -42,10 +42,28 @@ describe('DecoratorCard', () => {
         await user.click(screen.getByRole('button', { name: 'JSON' }));
         expect(screen.getByRole('button', { name: 'JSON' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.queryByRole('link', { name: 'https://grafana.example.com/d/abc' })).not.toBeInTheDocument();
-        expect(screen.getByText(/"uniqueId": "obs-1"/)).toBeInTheDocument();
+        expect(screen.getByText(/"unique-id": "obs-1"/)).toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: 'Data' }));
         expect(screen.getByRole('link', { name: 'https://grafana.example.com/d/abc' })).toBeInTheDocument();
+    });
+
+    it('shows the JSON that a write takes, without the Hub-owned times, which show apart from it', async () => {
+        const user = userEvent.setup();
+        render(<DecoratorCard decorator={{ ...decorator, creationDateTime: '2026-11-01T10:00:00Z', updateDateTime: '2026-11-02T10:00:00Z' }} />);
+        await user.click(screen.getByRole('button', { name: 'JSON' }));
+
+        const json = JSON.parse(document.querySelector('pre')!.textContent!);
+        expect(json).toEqual({
+            $schema: decorator.schema,
+            'unique-id': 'obs-1',
+            type: 'observability',
+            target: decorator.target,
+            'applies-to': ['api-service', 'db'],
+            data: decorator.data,
+        });
+        expect(screen.getByText('Created')).toBeInTheDocument();
+        expect(screen.getByText('Updated')).toBeInTheDocument();
     });
 
     it('tolerates a decorator with no schema and no applies-to', () => {

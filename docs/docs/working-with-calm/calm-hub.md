@@ -117,7 +117,7 @@ When you select an **Architecture** or **Pattern** artifact, CALM Hub renders th
 
 * **Diagram Tab:** The interactive visual representation of the model.
 * **JSON Tab:** The raw, validated CALM JSON backing the diagram.
-* **Decorators Tab:** Lists all decorators of the architecture version, of every type. Each shows its type (or "(no type)"), `applies-to`, its created and updated times when Hub returns them, and `data`, with links, dates, lists, tables and collapsible nested values, or as raw JSON. Filter by type. The filter is in the URL, for example `?tab=decorators&type=deployment`.
+* **Decorators Tab:** Lists all decorators of the architecture version, of every type. Each shows its type (or "(no type)"), `applies-to`, its created and updated times when Hub returns them, and `data`, with links, dates, lists, tables and collapsible nested values. The JSON view shows the decorator as a write takes it, without the Hub-owned times, so you can copy it into a `PUT`. Filter by type and by `$schema`. The filters are in the URL, for example `?tab=decorators&type=deployment`.
 
 An unknown `?tab=` value opens the Diagram tab. The old `?tab=deployments` link opens the Decorators tab filtered to `deployment`.
 
