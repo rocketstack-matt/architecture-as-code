@@ -224,7 +224,10 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     const usedByOpen = activeTab.id === 'used-by' && !comparing;
     const usedBy = usePatternImplementations(implementationService, data.name, patternName, data.version, usedByOpen);
 
+    // "View all" opens the Decorators tab and unmounts itself, so the tab takes focus.
+    const [focusPanel, setFocusPanel] = useState(false);
     const setActiveTab = (tab: DiagramTab) => {
+        setFocusPanel(false);
         setSearchParams({ tab: tab.id }, { replace: true, state: location.state });
     };
     const setTabParams = (params: Record<string, string>) => {
@@ -235,6 +238,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
         if (redirectTo !== undefined) setSearchParams(new URLSearchParams(redirectTo), { replace: true, state: location.state });
     }, [redirectTo, setSearchParams, location.state]);
     const openDecoratorView = useCallback((view: DecoratorView) => {
+        setFocusPanel(true);
         setSearchParams(
             { tab: 'decorators', ...decoratorFilterParams(view.match.type, view.match.schema) },
             { replace: true, state: location.state }
@@ -497,6 +501,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
         ),
         decorators: decoratorsState,
         usedBy,
+        focusPanel,
     };
 
     // Desktop: inline tabs in the section header (unchanged).

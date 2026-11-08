@@ -21,6 +21,15 @@ const loaded = { status: 'loaded' as const, decorators };
 const withSchema = (uniqueId: string, type: string, schema: string): Decorator => ({ ...decorator(uniqueId, type), schema });
 
 describe('DecoratorsPanel', () => {
+    it('takes focus on mount when asked, and not otherwise', () => {
+        const { unmount } = render(<DecoratorsPanel state={loaded} typeFilter={null} onTypeFilterChange={vi.fn()} autoFocus />);
+        expect(screen.getByRole('region', { name: 'Decorators' })).toHaveFocus();
+        unmount();
+
+        render(<DecoratorsPanel state={loaded} typeFilter={null} onTypeFilterChange={vi.fn()} />);
+        expect(screen.getByRole('region', { name: 'Decorators' })).not.toHaveFocus();
+    });
+
     describe('schema filter', () => {
         const scans = { status: 'loaded' as const, decorators: [...decorators, withSchema('scan-1', 'scan', 'https://example.org/scan.json')] };
 

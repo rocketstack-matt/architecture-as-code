@@ -551,6 +551,18 @@ describe('DiagramSection', () => {
             expect(screen.queryByRole('article', { name: 'deployment decorator dep-1' })).not.toBeInTheDocument();
         });
 
+        it('moves focus to the Decorators tab content after View all, but not after a tab click', async () => {
+            const user = userEvent.setup();
+            renderArchitecture();
+
+            await user.click(screen.getByText('simulate-open-view'));
+            expect(await screen.findByRole('region', { name: 'Decorators' })).toHaveFocus();
+
+            await user.click(screen.getByRole('tab', { name: 'Diagram' }));
+            await user.click(screen.getByRole('tab', { name: 'Decorators' }));
+            expect(screen.getByRole('region', { name: 'Decorators' })).not.toHaveFocus();
+        });
+
         it('filters on both the type and the $schema of a view that matches on both', async () => {
             calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, observability, scan]);
             const user = userEvent.setup();

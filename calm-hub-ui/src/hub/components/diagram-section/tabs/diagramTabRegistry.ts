@@ -23,6 +23,8 @@ export interface DiagramTabContext extends DiagramTabScope {
     diagram: ReactNode;
     decorators: ArchitectureDecoratorsState;
     usedBy: ImplementationsState;
+    /** The tab opened from a control that it replaces, such as "View all", so its content takes focus. */
+    focusPanel?: boolean;
 }
 
 export interface DiagramTab {

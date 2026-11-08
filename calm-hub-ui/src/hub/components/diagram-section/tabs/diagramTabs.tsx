@@ -61,12 +61,13 @@ export const DIAGRAM_TABS: readonly DiagramTab[] = [
         icon: IoPricetagsOutline,
         isVisible: ({ isArchitecture }) => isArchitecture,
         searchParams: [DECORATOR_TYPE_PARAM, DECORATOR_SCHEMA_PARAM],
-        render: ({ decorators, searchParams, setTabParams }) => {
+        render: ({ decorators, searchParams, setTabParams, focusPanel }) => {
             const typeFilter = searchParams.get(DECORATOR_TYPE_PARAM) || null;
             const schemaFilter = searchParams.get(DECORATOR_SCHEMA_PARAM) || null;
             return (
                 <DecoratorsPanel
                     state={decorators}
+                    autoFocus={focusPanel}
                     typeFilter={typeFilter}
                     schemaFilter={schemaFilter}
                     onTypeFilterChange={(type) => setTabParams(decoratorFilterParams(type, schemaFilter))}

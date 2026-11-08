@@ -112,6 +112,7 @@ export function OverlayLegend() {
                     <button
                         type="button"
                         className="link"
+                        aria-label={`View all ${viewTitle(view)}`}
                         style={{ marginLeft: 'auto', color: THEME.colors.accentText }}
                         onClick={() => onOpenView(view)}
                     >

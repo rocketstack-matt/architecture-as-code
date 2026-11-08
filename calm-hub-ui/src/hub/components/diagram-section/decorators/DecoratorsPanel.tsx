@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { DecoratorCard, decoratorTypeLabel } from '../../../../decorator-renderer/index.js';
 import type { ArchitectureDecoratorsState } from './useArchitectureDecorators.js';
 
@@ -10,13 +10,20 @@ interface DecoratorsPanelProps {
     schemaFilter?: string | null;
     onTypeFilterChange: (type: string | null) => void;
     onSchemaFilterChange?: (schema: string | null) => void;
+    /** Takes focus on mount. */
+    autoFocus?: boolean;
 }
 
 function Message({ children }: { children: string }) {
     return <p className="text-sm text-base-content/60 text-center py-8">{children}</p>;
 }
 
-export function DecoratorsPanel({ state, typeFilter, schemaFilter = null, onTypeFilterChange, onSchemaFilterChange }: DecoratorsPanelProps) {
+export function DecoratorsPanel({ state, typeFilter, schemaFilter = null, onTypeFilterChange, onSchemaFilterChange, autoFocus }: DecoratorsPanelProps) {
+    const ref = useRef<HTMLDivElement>(null);
+    const focusOnMount = useRef(autoFocus);
+    useEffect(() => {
+        if (focusOnMount.current) ref.current?.focus({ preventScroll: true });
+    }, []);
     const all = useMemo(() => (state.status === 'loaded' ? state.decorators : []), [state]);
     const decorators = useMemo(
         () => (schemaFilter === null ? all : all.filter((decorator) => decorator.schema === schemaFilter)),
@@ -54,7 +61,7 @@ export function DecoratorsPanel({ state, typeFilter, schemaFilter = null, onType
     }
 
     return (
-        <div className="h-full bg-base-200 overflow-auto p-4 flex flex-col gap-3">
+        <div ref={ref} tabIndex={-1} role="region" aria-label="Decorators" className="h-full bg-base-200 overflow-auto p-4 flex flex-col gap-3 outline-none">
             {state.status === 'loaded' && schemaFilter !== null && all.length > 0 && (
                 <div role="group" aria-label="Schema filter" className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-base-content/70">Schema</span>
