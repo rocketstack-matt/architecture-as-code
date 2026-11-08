@@ -199,6 +199,24 @@ class TestExtensionRegistryShould {
     }
 
     @Test
+    void reject_a_decorator_view_id_that_two_enabled_extensions_declare() throws IOException {
+        write("scanner", decoratorViewsOnly("scanner", "deployment"));
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> registry(dir(), BUILTIN_BASE));
+
+        assertThat(e.getMessage(), containsString(
+                "decorator view id 'deployment' is declared by extensions 'builtin-views' and 'scanner'"));
+    }
+
+    @Test
+    void allow_a_decorator_view_id_of_a_disabled_extension() throws IOException {
+        write("scanner", decoratorViewsOnly("scanner", "deployment"));
+        properties.put("calm.extensions.\"builtin-views\".enabled", "false");
+
+        assertThat(ids(registry(dir(), BUILTIN_BASE)), contains("scanner"));
+    }
+
+    @Test
     void stop_on_an_invalid_manifest() throws IOException {
         write("team-services", valid().put("hubApi", 2));
 
@@ -345,11 +363,15 @@ class TestExtensionRegistryShould {
     }
 
     private static JsonObject decoratorViewsOnly(String id) {
+        return decoratorViewsOnly(id, id + "-view");
+    }
+
+    private static JsonObject decoratorViewsOnly(String id, String viewId) {
         JsonObject manifest = valid().put("id", id);
         manifest.remove("routes");
         manifest.remove("commands");
         manifest.put("contributes", new JsonObject().put("decorator-views",
-                new JsonArray().add(TestExtensionManifestLoaderShould.decoratorView("view"))));
+                new JsonArray().add(TestExtensionManifestLoaderShould.decoratorView(viewId))));
         return manifest;
     }
 

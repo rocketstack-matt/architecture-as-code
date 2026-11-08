@@ -141,6 +141,21 @@ class TestExtensionManifestLoaderShould {
         assertThat(manifest.contributes().decoratorViews().getFirst().overlay(), nullValue());
     }
 
+    @Test
+    void accept_routes_that_one_path_cannot_match_twice_or_where_one_has_more_literals() {
+        JsonObject m = valid();
+        m.getJsonArray("routes")
+                .add(route("service", "GET", "/services/{service}", "authenticated"))
+                .add(route("service-admin", "GET", "/services/admin", "global_admin"))
+                .add(route("delete-service", "DELETE", "/services/{service}", "authenticated"))
+                .add(route("root", "GET", "/", "authenticated"))
+                .add(route("item", "GET", "/{item}", "authenticated"))
+                .add(route("report", "GET", "/{namespace}/report/full", "read"))
+                .add(route("public", "GET", "/public/{id}/all", "authenticated"));
+
+        assertThat(loader.parse(m.encode(), ID, "test").routes(), hasSize(11));
+    }
+
     static Stream<Arguments> invalidManifests() {
         return Stream.<Arguments>of(
                 // Schema
@@ -171,6 +186,13 @@ class TestExtensionManifestLoaderShould {
                 invalid("an id that is not the folder name", m -> m.put("id", "other"), "id 'other' must equal the folder name 'team-services'"),
                 invalid("a duplicate route id", m -> m.getJsonArray("routes").add(route("screen", "GET", "/other", "authenticated")), "route 'screen' is declared more than once"),
                 invalid("a duplicate method and path", m -> m.getJsonArray("routes").add(route("other", "GET", "/namespaces/{ns}/services", "authenticated")), "route 'other' has the same method and path"),
+                invalid("two routes that can match one path", m -> m.getJsonArray("routes")
+                        .add(route("report", "GET", "/{namespace}/report", "read"))
+                        .add(route("public", "GET", "/public/{id}", "authenticated")),
+                        "route 'public' and route 'report' can match the same path with the same number of literal segments"),
+                invalid("a parameter route that shadows a write route", m -> m.getJsonArray("routes")
+                        .add(route("bulk", "POST", "/namespaces/bulk/{id}", "authenticated")),
+                        "route 'bulk' and route 'add-service' can match the same path"),
                 invalid("a dot-dot segment", m -> routes(m).put("path", "/a/../b"), "route 'screen' path must not have a '..' segment"),
                 invalid("a repeated parameter", m -> routes(m).put("path", "/{a}/{a}"), "route 'screen' path has a parameter more than once"),
                 invalid("a namespace scope with no {namespace}", m -> routes(m).put("scope", "admin"), "route 'screen' has scope 'admin', so its path needs a {namespace} parameter"),
