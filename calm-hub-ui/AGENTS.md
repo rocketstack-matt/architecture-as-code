@@ -181,7 +181,8 @@ One engine (`visualizer/overlay/`) draws decorators on the diagram from `decorat
 `overlay` (types in `visualizer/contracts/decorator-view-contracts.ts`). Status values map to the fixed scale
 `ok`, `warn`, `error`, `info`. The built-in views for `control-evaluation` and `deployment` come from classpath manifests through
 `GET /api/calm/extensions`. If the registry is unavailable, `useDecoratorViews()` returns the bundled copy in
-`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. `DiagramSection` polls all decorators of
+`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. Only the registry says that an operator turned a
+built-in off (`calm.extensions."<id>".enabled=false`), so the fallback draws both built-ins. `DiagramSection` polls all decorators of
 the version every 5 s while the diagram, the Decorators tab or the details drawer shows (`useArchitectureDecorators`, one request) and gives the one list to the Decorators tab, the
 details drawer and `Drawer`. Do not add a second request. `Drawer` gives the overlays to the diagram through
 `DecoratorOverlayContext`. Nodes and
