@@ -9,7 +9,8 @@ import java.util.Map;
 
 /**
  * The oidc and secure profiles, with a local public key in place of the identity provider, so that
- * Hub starts with no OIDC server.
+ * Hub starts with no OIDC server. Quarkus ignores the public key while an auth server URL is set,
+ * and then fails each OIDC call with a 500, so both profiles clear the URL.
  */
 final class OidcTestProfiles {
 
@@ -37,6 +38,7 @@ final class OidcTestProfiles {
             return Map.of(
                     "CALM_OIDC_ISSUER_URL", "https://idp.invalid/realms/calm",
                     "CALM_OIDC_CLIENT_ID", "calm-hub",
+                    "quarkus.oidc.auth-server-url", "",
                     "quarkus.oidc.public-key", publicKey());
         }
     }
@@ -54,6 +56,7 @@ final class OidcTestProfiles {
                     "quarkus.http.insecure-requests", "enabled",
                     "quarkus.http.ssl.certificate.files", "",
                     "quarkus.http.ssl.certificate.key-files", "",
+                    "quarkus.oidc.auth-server-url", "",
                     "quarkus.oidc.public-key", publicKey());
         }
     }

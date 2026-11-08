@@ -1,12 +1,17 @@
 package org.finos.calm.security;
 
+import io.quarkus.vertx.http.runtime.security.HttpAuthenticationMechanism;
 import io.restassured.specification.RequestSpecification;
+import jakarta.enterprise.inject.Any;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 import static io.restassured.RestAssured.given;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Each auth profile must fail a request that presents a CALM Hub extension assertion with 401, not
@@ -15,6 +20,10 @@ import static io.restassured.RestAssured.given;
 abstract class ExtensionAssertionRejection {
 
     static final String PROTECTED_PATH = "/api/calm/extensions/schema/0/blocks.schema.json";
+
+    @Inject
+    @Any
+    Instance<HttpAuthenticationMechanism> mechanisms;
 
     static String assertion() {
         Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
@@ -34,5 +43,15 @@ abstract class ExtensionAssertionRejection {
         caller().header("Authorization", "Bearer " + assertion())
                 .when().get(PROTECTED_PATH)
                 .then().statusCode(401);
+    }
+
+    /** The 401 alone does not prove the order: OIDC with a local key also refuses a forged token. */
+    @Test
+    void run_the_assertion_check_before_every_other_mechanism() {
+        int rejecting = mechanisms.select(ExtensionAssertionRejectingMechanism.class).get().getPriority();
+        mechanisms.stream()
+                .filter(mechanism -> !(mechanism instanceof ExtensionAssertionRejectingMechanism))
+                .forEach(mechanism -> assertTrue(mechanism.getPriority() < rejecting,
+                        mechanism.getClass().getName() + " runs before the assertion check"));
     }
 }
