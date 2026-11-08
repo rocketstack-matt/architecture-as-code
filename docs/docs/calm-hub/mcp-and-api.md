@@ -109,7 +109,7 @@ The decorator endpoints (`/api/calm/namespaces/{namespace}/decorators`) and the 
 
 | Rule | When | Status |
 |:-----|:-----|:-------|
-| Field types | `type` is not a string, or `target`, `target-type` or `applies-to` is not an array of strings. Hub reads these fields, so it checks them also when there is no `$schema` | `400` |
+| Field types | `$schema`, `unique-id` or `type` is not a string, or `target`, `target-type` or `applies-to` is not an array of strings. Hub reads these fields, so it checks them also when there is no `$schema` | `400` |
 | Reserved type | The old or new decorator `type` is reserved, and the caller is not one of its writers. Applies to create and update | `403` |
 | Schema check | The decorator `$schema` is one that Hub knows, and the decorator does not match it. The body lists each error with its `location` (a JSON Pointer) | `400` |
 | Hub-owned times | The decorator has a top-level `creationDateTime` or `updateDateTime`. Hub sets these fields | `400` |
@@ -132,12 +132,12 @@ A reserved type is also append-only. An update of a reserved-type decorator does
 | `GET .../decorators`, `GET .../decorators/values` | Lists only current decorators |
 | `GET .../decorators/{id}` | Returns the decorator, current or superseded |
 | `GET .../decorators/{id}/history` | Returns the history that contains `{id}`, current first. Each entry has `id`, `supersedes`, `supersededBy`, `supersededDateTime` and `decorator` |
-| `PUT .../decorators/{id}` on a superseded decorator | `409 Conflict`. Update the current decorator |
-| `DELETE .../decorators/{id}` | Deletes the whole history. Needs `global_admin`. The caller does not have to be a writer of the reserved types in it. If another write supersedes the decorator during the delete, Hub returns `409 Conflict` and deletes nothing |
+| `PUT .../decorators/{id}` on a superseded decorator | `409 Conflict`. Update the current decorator (the id that the last write returned) |
+| `DELETE .../decorators/{id}` | Deletes the whole history. Needs `global_admin`. The caller does not have to be a writer of the reserved types in it. If another write supersedes the decorator during the delete, Hub returns `409 Conflict` and deletes nothing. Retry the delete |
 
 The MCP tool `getDecoratorHistory` returns the same history.
 
-A history grows on each update and Hub does not remove old entries. Each update of a reserved type adds a full copy of the decorator. In MongoDB, all decorators of a namespace are in one document, and MongoDB limits a document to 16 MB. At the limit, each write that makes that document larger fails with `500`, for all decorators in the namespace. To recover, a global admin deletes histories that are no longer necessary with `DELETE .../decorators/{id}`. This deletes the whole history, current decorator included, so the writer must then create the current result again. NitriteDB has no such limit, but its storage also grows.
+An update grows a history only when the old or new type is reserved. Then Hub adds a full copy of the decorator, and it does not remove old entries. Other updates change the decorator in place. In MongoDB, all decorators of a namespace are in one document, and MongoDB limits a document to 16 MB. At the limit, each write that makes that document larger fails with `500`, for all decorators in the namespace. To recover, a global admin deletes histories that are no longer necessary with `DELETE .../decorators/{id}`. This deletes the whole history, current decorator included, so the writer must then create the current result again. NitriteDB has no such limit, but its storage also grows.
 
 Hub records when it writes each decorator. Every read returns the times: `GET .../decorators/{id}`, `.../decorators/values`, each `decorator` in a history, and the MCP decorator tools.
 
