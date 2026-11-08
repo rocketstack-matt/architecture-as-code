@@ -169,7 +169,8 @@ public class NitriteDecoratorStore implements DecoratorStore {
     }
 
     @Override
-    public void updateDecorator(String namespace, int id, String decoratorJson) throws NamespaceNotFoundException, DecoratorNotFoundException {
+    public void updateDecorator(String namespace, int id, String decoratorJson)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
         namespaceStore.requireNamespace(namespace);
 
         lock.lock();
@@ -188,10 +189,12 @@ public class NitriteDecoratorStore implements DecoratorStore {
             Document updatedDoc = parseJsonToNitriteDocument(decoratorJson);
 
             Document entry = decorators.stream()
-                    .filter(decoratorEntry -> decoratorEntry.get(SUPERSEDED_BY_FIELD) == null)
                     .filter(decoratorEntry -> Integer.valueOf(id).equals(decoratorEntry.get(DECORATOR_ID_FIELD, Integer.class)))
                     .findFirst()
                     .orElseThrow(DecoratorNotFoundException::new);
+            if (entry.get(SUPERSEDED_BY_FIELD) != null) {
+                throw new DecoratorSupersededException();
+            }
             entry.put("decorator", updatedDoc);
             entry.put(UPDATE_DATE_TIME_FIELD, DecoratorTimestamps.now());
 

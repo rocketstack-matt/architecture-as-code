@@ -230,7 +230,7 @@ class NitriteDecoratorStoreTest {
     }
 
     @Test
-    void testUpdateDecorator_Success() throws NamespaceNotFoundException, DecoratorNotFoundException {
+    void testUpdateDecorator_Success() throws Exception {
         String namespace = "test-namespace";
         int decoratorId = 1;
         String updatedJson = "{\"type\":\"deployment\",\"unique-id\":\"updated-id\"}";

@@ -163,15 +163,15 @@ class TestDecoratorWriteServiceShould {
     }
 
     @Test
-    void refuse_updating_an_unreserved_entry_that_has_been_superseded() throws Exception {
+    void pass_on_that_an_unreserved_entry_has_been_superseded_without_reading_its_history() throws Exception {
         when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
-        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
-                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
+        doThrow(new DecoratorSupersededException())
+                .when(mockDecoratorStore).updateDecorator(NAMESPACE, 1, UNRESERVED_JSON);
 
         assertThrows(DecoratorSupersededException.class,
                 () -> service.updateDecorator("alice", NAMESPACE, 1, UNRESERVED_JSON));
 
-        verify(mockDecoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+        verify(mockDecoratorStore, never()).getDecoratorHistory(anyString(), anyInt());
     }
 
     @Test

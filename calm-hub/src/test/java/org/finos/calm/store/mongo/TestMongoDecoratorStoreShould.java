@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -70,6 +71,7 @@ class TestMongoDecoratorStoreShould {
     void setUp() throws NamespaceNotFoundException {
         doCallRealMethod().when(namespaceStore).requireNamespace(anyString());
         when(database.getCollection("decorators")).thenReturn(decoratorCollection);
+        lenient().when(findIterable.projection(any(Bson.class))).thenReturn(findIterable);
         decoratorStore = new MongoDecoratorStore(database, namespaceStore, counterStore);
     }
 
@@ -680,7 +682,7 @@ class TestMongoDecoratorStoreShould {
     }
 
     @Test
-    void should_update_decorator_successfully() throws NamespaceNotFoundException, DecoratorNotFoundException {
+    void should_update_decorator_successfully() throws Exception {
         // Given
         String namespace = "finos";
         int decoratorId = 1;
@@ -689,7 +691,7 @@ class TestMongoDecoratorStoreShould {
         when(namespaceStore.namespaceExists(namespace)).thenReturn(true);
 
         UpdateResult updateResult = mock(UpdateResult.class);
-        when(updateResult.getModifiedCount()).thenReturn(1L);
+        when(updateResult.getMatchedCount()).thenReturn(1L);
         when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
 
         // When / Then (no exception)
@@ -709,7 +711,7 @@ class TestMongoDecoratorStoreShould {
         when(namespaceStore.namespaceExists(namespace)).thenReturn(true);
 
         UpdateResult updateResult = mock(UpdateResult.class);
-        when(updateResult.getModifiedCount()).thenReturn(0L);
+        when(updateResult.getMatchedCount()).thenReturn(0L);
         when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
 
         // When & Then
@@ -718,6 +720,36 @@ class TestMongoDecoratorStoreShould {
 
         verify(namespaceStore).namespaceExists(namespace);
         verify(decoratorCollection).updateOne(any(Bson.class), any(Bson.class));
+    }
+
+    @Test
+    void should_throw_decorator_superseded_when_an_in_place_update_finds_a_superseded_entry() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getMatchedCount()).thenReturn(0L);
+        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
+        ArgumentCaptor<Bson> anyEntry = ArgumentCaptor.forClass(Bson.class);
+        when(decoratorCollection.countDocuments(anyEntry.capture())).thenReturn(1L);
+
+        assertThrows(DecoratorSupersededException.class,
+                () -> decoratorStore.updateDecorator("finos", 1, "{\"type\": \"deployment\"}"));
+
+        BsonDocument withId = anyEntry.getValue().toBsonDocument().getArray("$and").get(1)
+                .asDocument().getDocument("decorators").getDocument("$elemMatch");
+        assertEquals(1, withId.getInt32("decoratorId").getValue());
+        assertFalse(withId.containsKey("supersededBy"));
+    }
+
+    @Test
+    void should_update_an_entry_that_matched_even_if_nothing_changed() throws Exception {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        UpdateResult updateResult = mock(UpdateResult.class);
+        when(updateResult.getMatchedCount()).thenReturn(1L);
+        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
+
+        decoratorStore.updateDecorator("finos", 1, "{\"type\": \"deployment\"}");
+
+        verify(decoratorCollection, never()).countDocuments(any(Bson.class));
     }
 
     @Test
@@ -828,6 +860,8 @@ class TestMongoDecoratorStoreShould {
         ArgumentCaptor<Bson> filter = ArgumentCaptor.forClass(Bson.class);
         when(decoratorCollection.updateOne(filter.capture(), any(Bson.class))).thenReturn(updateResult);
 
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(1L);
+
         assertThrows(DecoratorSupersededException.class, () -> decoratorStore.deleteCurrentDecoratorHistory("finos", 1));
 
         BsonDocument current = filter.getValue().toBsonDocument().getArray("$and").get(1)
@@ -842,8 +876,7 @@ class TestMongoDecoratorStoreShould {
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
         when(decoratorCollection.find(any(Bson.class))).thenReturn(findIterable);
         when(findIterable.first()).thenReturn(
-                new Document("namespace", "finos").append("decorators", List.of(currentEntry(1, null))),
-                new Document("namespace", "finos").append("decorators", List.of()));
+                new Document("namespace", "finos").append("decorators", List.of(currentEntry(1, null))));
         UpdateResult updateResult = mock(UpdateResult.class);
         when(updateResult.getModifiedCount()).thenReturn(0L);
         when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenReturn(updateResult);
@@ -902,6 +935,7 @@ class TestMongoDecoratorStoreShould {
 
     @Test
     void should_supersede_a_current_decorator() throws Exception {
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(1L);
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
         when(counterStore.getNextDecoratorSequenceValue()).thenReturn(5);
         UpdateResult updateResult = mock(UpdateResult.class);
@@ -926,28 +960,38 @@ class TestMongoDecoratorStoreShould {
     }
 
     @Test
-    void should_throw_decorator_superseded_when_superseding_an_old_decorator() {
+    void should_throw_decorator_superseded_without_taking_an_id_when_superseding_an_old_decorator() {
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
-        UpdateResult updateResult = mock(UpdateResult.class);
-        when(updateResult.getModifiedCount()).thenReturn(0L);
-        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
-        mockNamespaceDocument("finos", supersededEntry(1, 2), currentEntry(2, 1));
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(0L, 1L);
 
         assertThrows(DecoratorSupersededException.class,
                 () -> decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}"));
 
-        verify(decoratorCollection, times(1)).updateOne(any(Bson.class), anyList());
+        verify(counterStore, never()).getNextDecoratorSequenceValue();
+        verify(decoratorCollection, never()).updateOne(any(Bson.class), anyList());
     }
 
     @Test
-    void should_throw_decorator_not_found_when_superseding_a_missing_decorator() {
+    void should_throw_decorator_not_found_without_taking_an_id_when_superseding_a_missing_decorator() {
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(0L, 0L);
+
+        assertThrows(DecoratorNotFoundException.class,
+                () -> decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}"));
+
+        verify(counterStore, never()).getNextDecoratorSequenceValue();
+    }
+
+    @Test
+    void should_throw_decorator_superseded_when_a_supersede_loses_the_race_to_another() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(1L, 1L);
+        when(counterStore.getNextDecoratorSequenceValue()).thenReturn(5);
         UpdateResult updateResult = mock(UpdateResult.class);
         when(updateResult.getModifiedCount()).thenReturn(0L);
         when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenReturn(updateResult);
-        mockNamespaceDocument("finos", currentEntry(2, null));
 
-        assertThrows(DecoratorNotFoundException.class,
+        assertThrows(DecoratorSupersededException.class,
                 () -> decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}"));
     }
 
@@ -1000,7 +1044,7 @@ class TestMongoDecoratorStoreShould {
     void should_store_extended_json_keys_as_plain_data_on_update() throws Exception {
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
         UpdateResult updateResult = mock(UpdateResult.class);
-        when(updateResult.getModifiedCount()).thenReturn(1L);
+        when(updateResult.getMatchedCount()).thenReturn(1L);
         ArgumentCaptor<Bson> update = ArgumentCaptor.forClass(Bson.class);
         when(decoratorCollection.updateOne(any(Bson.class), update.capture())).thenReturn(updateResult);
 
@@ -1012,6 +1056,7 @@ class TestMongoDecoratorStoreShould {
 
     @Test
     void should_store_extended_json_keys_as_plain_data_on_supersede() throws Exception {
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(1L);
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
         when(counterStore.getNextDecoratorSequenceValue()).thenReturn(5);
         UpdateResult updateResult = mock(UpdateResult.class);

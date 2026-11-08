@@ -82,11 +82,8 @@ public class DecoratorWriteService {
         if (existing.isPresent() && (isReserved(existing.get().getType()) || isReserved(type))) {
             return decoratorStore.supersedeDecorator(namespace, id, decoratorJson);
         }
-        if (existing.isPresent() && decoratorStore.getDecoratorHistory(namespace, id).stream()
-                .anyMatch(entry -> entry.getId() == id && entry.getSupersededBy() != null)) {
-            throw new DecoratorSupersededException();
-        }
-        // A missing decorator is left to the store, which reports it in its own way (GitHub mode: 501).
+        // The store refuses a missing decorator (GitHub mode: 501) or a superseded one, also when a concurrent write
+        // supersedes it after the checks above.
         decoratorStore.updateDecorator(namespace, id, decoratorJson);
         return id;
     }

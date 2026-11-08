@@ -64,8 +64,10 @@ public interface DecoratorStore {
      * @param decoratorJson the updated decorator as a raw JSON string
      * @throws NamespaceNotFoundException  if the namespace does not exist
      * @throws DecoratorNotFoundException  if no decorator with the given ID exists
+     * @throws DecoratorSupersededException if the decorator exists but has been superseded
      */
-    void updateDecorator(String namespace, int id, String decoratorJson) throws NamespaceNotFoundException, DecoratorNotFoundException;
+    void updateDecorator(String namespace, int id, String decoratorJson)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException;
 
     /**
      * Store a new decorator that supersedes an existing one, for an append-only (reserved) type. The

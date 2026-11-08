@@ -253,6 +253,22 @@ class TestReservedDecoratorResourceShould {
                 .body(containsString("Update the current decorator"));
     }
 
+    @Test
+    @TestSecurity(user = "alice", authorizationEnabled = false)
+    void return_409_when_another_write_supersedes_a_decorator_during_an_in_place_update() throws Exception {
+        when(mockDecoratorStore.getDecoratorById("finos", 1)).thenReturn(Optional.of(decorator("threat-model")));
+        doThrow(new DecoratorSupersededException()).when(mockDecoratorStore).updateDecorator(eq("finos"), eq(1), anyString());
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(UNRESERVED_DECORATOR_JSON)
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(409)
+                .body(containsString("Update the current decorator"));
+    }
+
     private static Decorator decorator(String type) {
         return new Decorator.DecoratorBuilder().setType(type).build();
     }
