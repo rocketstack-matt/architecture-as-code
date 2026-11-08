@@ -24,7 +24,8 @@ function Flow({ children, onStore }: { children: ReactNode; onStore?: (store: Fl
 }
 
 function StoreProbe({ onStore }: { onStore?: (store: FlowStore) => void }) {
-    onStore?.(useStoreApi());
+    const store = useStoreApi();
+    onStore?.(store);
     return null;
 }
 
