@@ -130,7 +130,7 @@ Some decorator types are drawn on the diagram as an overlay. Each node or relati
 | Control evaluations | `control-evaluation` | The latest result of each control: see [Control Evaluations](#control-evaluations) |
 | Deployments | `deployment` | The status of the latest deployment, by `start-time`: completed (OK), pending or in progress (Info), rolled back (Warning), failed (Error) |
 
-The legend at the bottom of the diagram lists each overlay that has decorators on screen, with how many elements show each status. Clear an overlay's checkbox to hide it. On a narrow screen, the legend is closed: tap **Overlays** to open it. **View all** opens the Decorators tab filtered to the type and the `$schema` of that overlay. While the diagram or the Decorators tab is open, they refresh every 5 seconds.
+The legend at the bottom of the diagram lists each overlay that has decorators on screen, with how many elements show each status. Clear an overlay's checkbox to hide it. On a screen less than 1024 pixels wide, the legend is closed: tap **Overlays** to open it. **View all** opens the Decorators tab filtered to the type and the `$schema` of that overlay. While the diagram or the Decorators tab is open, they refresh every 5 seconds.
 
 ![CALM Hub Raw JSON Viewer](/img/hub-ui/json-view.png)
 

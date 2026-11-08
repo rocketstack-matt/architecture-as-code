@@ -131,7 +131,7 @@ describe('OverlayLegend with extensions', () => {
     });
 });
 
-describe('OverlayLegend on a narrow screen', () => {
+describe('OverlayLegend below 1024px', () => {
     let restoreViewport = () => {};
     afterEach(() => restoreViewport());
 
