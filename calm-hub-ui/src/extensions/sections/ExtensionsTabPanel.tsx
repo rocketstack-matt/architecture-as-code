@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useExtensions } from '../../components/extensions/ExtensionsContext.js';
 import { ExtensionContext } from '../../model/extensions.js';
 import { resourceExtensions } from '../contributions.js';
@@ -18,6 +18,7 @@ interface ExtensionsTabPanelProps {
 export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps) {
     const entries = resourceExtensions(useExtensions(), context);
     const [filter, setFilter] = useState('');
+    const baseId = useId();
     const needle = filter.trim().toLowerCase();
     const shown = needle
         ? entries.filter(({ extension }) =>
@@ -43,13 +44,13 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
                 <ExtensionSections
                     storageKey={EXTENSIONS_TAB_SECTIONS_KEY}
                     storage={storage}
-                    sections={shown.map(({ extension, actions, tabs }) => ({
+                    sections={shown.map(({ extension, actions, needsSelection, tabs }, index) => ({
                         id: extension.id,
                         title: extension.name,
                         subtitle: extension.provider,
                         content: () => (
                             <>
-                                {actions.length > 0 && (
+                                {actions.length + needsSelection.length > 0 && (
                                     <div className="flex flex-wrap gap-2" role="group" aria-label={`${extension.name} actions`}>
                                         {actions.map((contribution) => (
                                             <ExtensionSlot
@@ -60,7 +61,23 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
                                                 action
                                             />
                                         ))}
+                                        {needsSelection.map((contribution) => (
+                                            <button
+                                                key={contribution.id}
+                                                type="button"
+                                                className="btn btn-sm"
+                                                disabled
+                                                aria-describedby={`${baseId}-${index}`}
+                                            >
+                                                {contribution.title}
+                                            </button>
+                                        ))}
                                     </div>
+                                )}
+                                {needsSelection.length > 0 && (
+                                    <p id={`${baseId}-${index}`} className="text-xs text-base-content/60">
+                                        Some actions need a selected node. Open this tab from a link that names a node.
+                                    </p>
                                 )}
                                 {tabs.map((contribution) => (
                                     <ExtensionSlot

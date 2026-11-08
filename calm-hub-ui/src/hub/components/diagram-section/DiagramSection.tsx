@@ -216,7 +216,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
 
     const implementationService = useMemo(() => new PatternImplementationService(), []);
     const extensions = useExtensions();
-    const hasExtensions = !showsDroppedFile && resourceExtensions(extensions, extensionContext(data, selectedElement)).length > 0;
+    const hasExtensions = !showsDroppedFile && resourceExtensions(extensions, extensionContext(data)).length > 0;
     const tabScope = { isArchitecture, patternName, hasExtensions };
     const visibleTabs = visibleDiagramTabs(DIAGRAM_TABS, tabScope);
     const activeTab = resolveDiagramTab(DIAGRAM_TABS, searchParams.get('tab'), tabScope);

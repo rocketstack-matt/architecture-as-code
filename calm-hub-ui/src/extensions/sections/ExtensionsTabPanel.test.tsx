@@ -59,3 +59,27 @@ describe('ExtensionsTabPanel', () => {
         expect(screen.queryAllByTestId('extension-section')).toHaveLength(0);
     });
 });
+
+describe('ExtensionsTabPanel with an action that needs a selected element', () => {
+    const scanner = (() => {
+        const extension = fakeExtensions(1, ['action'])[0];
+        return { ...extension, routes: extension.routes.map((r) => (r.id === 'run' ? { ...r, path: '/scan/{selectedElement}' } : r)) };
+    })();
+
+    it('shows the action disabled with a hint when no element is selected', () => {
+        render(
+            <ExtensionsContext.Provider value={[scanner]}>
+                <ExtensionsTabPanel context={{ namespace: 'demo' }} storage={createMemoryStorage()} />
+            </ExtensionsContext.Provider>
+        );
+        const button = screen.getByRole('button', { name: 'Run 1' });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAccessibleDescription('Some actions need a selected node. Open this tab from a link that names a node.');
+    });
+
+    it('enables the action when an element is selected', () => {
+        renderPanel([scanner]);
+        expect(screen.getByRole('button', { name: 'Run 1' })).toBeEnabled();
+        expect(screen.queryByText(/need a selected node/)).not.toBeInTheDocument();
+    });
+});

@@ -132,6 +132,7 @@ A button in the extension's section of the **Extensions** tab.
 - Hub asks the user to confirm when the route is not `readOnly`.
 - Hub does not cancel a confirmed call when the user changes the selection or leaves the page.
 - The action shows only when the context gives a value for each placeholder in the route path.
+  An action that needs only `{selectedElement}` shows disabled until a link names a node.
 - An action does not accept user input, and Hub does not show its reply. A failed call shows
   "Extension request failed."
 - A read-only Hub leaves out an action whose route changes data and is not `readOnly`.
