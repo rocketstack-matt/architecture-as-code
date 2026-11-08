@@ -60,6 +60,7 @@ npm run copy-workspace-templates # Copy `workspace new` templates from src/comma
    - `hub push <resource> <file>` / `hub pull <resource>` / `hub list <resources>` / `hub create <resource>`
    - Resources span architectures, patterns, standards, interfaces, flows, control-requirements, control-configurations, namespaces, and domains (which subcommands exist varies per verb).
    - `hub push` auto-bumps by default (creates a new version off the latest). The `--fail-if-modified` flag (supported on `architecture`, `pattern`, `standard`, `interface`, `flow`, `control-requirement` and `control-configuration`) switches to a strict, non-bumping mode: a brand-new mapping is still created at `1.0.0`, an unchanged document is skipped, and a document that differs from the latest published version fails the push. The local document is normalised the same way Hub stores it (via `updateDocumentMetadata`/`updateControlDocumentMetadata`) before comparing with `canonicalEqual` from `@finos/calm-shared`, so a version-only or defaulted-field difference is not mistaken for a content change. A document whose `$id` is at a `-SNAPSHOT` version is never bumped: it is pushed at that version (overwritten in place, or skipped if unchanged), and `--fail-if-modified` does not apply.
+   - `hub extensions list` / `hub extensions describe <id> [command]` list and describe the extensions that CALM Hub enabled. `hub ext <id> <command>` runs an extension command through CALM Hub. These are static commands, so `--help` works with no CALM Hub (ADR 0014)
 10. **workspace** - Command **group** for a local, git-rooted bundle of CALM documents (`.calm-workspace/`). Subcommands include `init`, `add`, `rm`, `new`, `tree`, `list`, `show`, `switch`, `clean`, and the CalmHub sync trio:
     - `workspace push` — pushes the exact version each document's `$id` declares (no auto-bump). An existing version with unchanged content is skipped; `--fail-if-modified` (or `push.failIfModified: true` in `.calm-workspace/config.json`) fails when a document already published at its declared version has changed on disk, for strict merge-time CI. A changed `-SNAPSHOT` version is overwritten regardless of `--fail-if-modified` — CalmHub treats it as mutable. An unchanged snapshot is skipped.
     - `workspace check` — CI/PR gate: exits non-zero if any tracked document changed on disk relative to CalmHub but wasn't version-bumped, if any architecture/pattern in the workspace fails validation, or if a non-snapshot document references a `-SNAPSHOT` version: a tracked document still at one, or a ref pinned to one of any resource. Prints a pass/fail validation summary alongside the bump check. A modified snapshot document never triggers the bump check.
@@ -83,7 +84,7 @@ The `command-helpers/` directory now holds the substantial per-command logic tha
 `cli.ts` dynamically imports:
 - `diff.ts` - document and timeline diffing
 - `timeline.ts` - timeline synthesis
-- `hub-commands.ts` - CALM Hub push/pull/list/create implementations
+- `hub-commands.ts` - CALM Hub push/pull/list/create and extension (`extensions`, `ext`) implementations
 - `hub-output.ts` - formatting of Hub command output
 - `template.ts` - template processing helpers (e.g. URL-to-local-file mapping)
 - `validate.ts` - validation option checks and execution
