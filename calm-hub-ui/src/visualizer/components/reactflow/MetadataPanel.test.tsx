@@ -204,6 +204,15 @@ describe('MetadataPanel', () => {
         ];
         const onlyEvaluations = { ...defaultProps, controls: {}, adrs: [], evaluations };
 
+        it('gives the evaluations panel the overlay that colours its chips', () => {
+            const { unmount } = render(<MetadataPanel {...onlyEvaluations} />);
+            expect(screen.getByTestId('control-evaluation-chip').textContent).toBe('met');
+            unmount();
+
+            render(<MetadataPanel {...onlyEvaluations} evaluationOverlay={{ status: '/status', map: { met: 'ok' } }} />);
+            expect(screen.getByTestId('control-evaluation-chip').textContent).toBe('Met');
+        });
+
         it('counts evaluations in the collapsed bar', () => {
             render(<MetadataPanel {...onlyEvaluations} isCollapsed={true} />);
 
