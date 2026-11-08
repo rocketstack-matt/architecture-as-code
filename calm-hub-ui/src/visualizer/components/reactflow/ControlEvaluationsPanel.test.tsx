@@ -5,7 +5,7 @@ import { ControlEvaluationsPanel } from './ControlEvaluationsPanel.js';
 import { THEME } from './theme.js';
 import type { ControlEvaluationDecorator } from '../../contracts/contracts.js';
 
-const overlay = BUILTIN_DECORATOR_VIEWS.find((view) => view.id === 'control-evaluation')!.overlay;
+const overlay = BUILTIN_DECORATOR_VIEWS.find((view) => view.id === 'control-evaluation')!.overlay!;
 
 const make = (id: string, status: 'met' | 'not-met' | 'not-applicable', at: string, extra = {}): ControlEvaluationDecorator => ({
     schema: 's', uniqueId: id, type: 'control-evaluation', target: ['t'], appliesTo: ['trade-api', 'trade-api-to-client-ledger'],
