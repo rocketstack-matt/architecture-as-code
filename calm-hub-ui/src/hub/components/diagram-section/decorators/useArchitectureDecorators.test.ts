@@ -94,7 +94,7 @@ describe('useArchitectureDecorators', () => {
         await flush();
 
         fetch.mockImplementation(() => new Promise(() => {}));
-        rerender({ d: { ...architecture, version: '2.0.0' }, a: true });
+        rerender({ d: { ...architecture, version: '2.0.0' }, a: true, on: true });
         await flush();
 
         expect(fetch).toHaveBeenLastCalledWith('my-namespace', TARGET.replace('1-0-0', '2-0-0'));
