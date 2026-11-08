@@ -21,19 +21,22 @@ const verifyAssertion = createVerifier({
 
 createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const text = Buffer.concat(chunks);
     let claims;
     try {
-        claims = await verifyAssertion(req.headers['x-calm-hub-identity'], { method: req.method, pathAndQuery: req.url });
+        // The bdh claim binds the body, so read it before the check.
+        claims = await verifyAssertion(req.headers['x-calm-hub-identity'],
+            { method: req.method, pathAndQuery: req.url, body: text });
     } catch (e) {
         console.warn(`rejected ${req.method} ${url.pathname}: ${e.message}`);
         res.writeHead(401).end();
         return;
     }
     let body = {};
-    let text = '';
-    for await (const chunk of req) text += chunk;
     try {
-        if (text) body = JSON.parse(text);
+        if (text.length) body = JSON.parse(text.toString('utf8'));
     } catch {
         console.warn(`rejected ${req.method} ${url.pathname}: the body is not valid JSON`);
         res.writeHead(400, { 'Content-Type': 'application/json' });

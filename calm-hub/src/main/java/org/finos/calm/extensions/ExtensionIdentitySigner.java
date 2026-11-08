@@ -146,8 +146,11 @@ public class ExtensionIdentitySigner {
         return ttlSeconds;
     }
 
-    /** Returns a compact JWS with the claims of ADR 0010. */
-    public String sign(ExtensionAssertion assertion) {
+    /**
+     * Returns a compact JWS with the claims of ADR 0010. When {@code body} is not empty, the
+     * {@code bdh} claim binds the assertion to it.
+     */
+    public String sign(ExtensionAssertion assertion, byte[] body) {
         SigningKey key = signingKey;
         if (key == null) {
             throw new IllegalStateException("No extension identity key is configured");
@@ -174,6 +177,9 @@ public class ExtensionIdentitySigner {
         }
         claims.put("htm", assertion.htm());
         claims.put("htp", assertion.htp());
+        if (body != null && body.length > 0) {
+            claims.put("bdh", encode(sha256(body)));
+        }
 
         try {
             String signingInput = encode(MAPPER.writeValueAsBytes(header)) + "." + encode(MAPPER.writeValueAsBytes(claims));
@@ -281,8 +287,12 @@ public class ExtensionIdentitySigner {
     }
 
     private static byte[] sha256(String value) {
+        return sha256(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static byte[] sha256(byte[] value) {
         try {
-            return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return MessageDigest.getInstance("SHA-256").digest(value);
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException(e);
         }

@@ -29,6 +29,7 @@ import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -55,7 +56,9 @@ public class ExtensionProxyService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExtensionProxyService.class);
     private static final Set<String> REPLY_TYPES = Set.of("application/json", "text/event-stream", "text/plain");
-    private static final List<String> REPLY_HEADERS = List.of("Content-Type", "Cache-Control", "ETag");
+    private static final List<String> REPLY_HEADERS = List.of("Content-Type", "ETag");
+    /** The scopes for which Hub checks the namespace, so the only ones that get the {@code ns} claim. */
+    private static final Set<String> NAMESPACE_SCOPES = Set.of("read", "write", "admin");
     private static final Pattern NAMESPACE = Pattern.compile(ResourceValidationConstants.NAMESPACE_REGEX);
     private static final Pattern DOMAIN = Pattern.compile(ResourceValidationConstants.DOMAIN_REGEX);
 
@@ -113,10 +116,16 @@ public class ExtensionProxyService {
         URI target = ExtensionPaths.resolve(access.backend(), pathAndQuery);
         ExtensionLimits limits = extension.limits();
         byte[] body = readBody(request.body(), limits.maxRequestBytes());
+        // JSON only, so that a cross-site form cannot reach a route with the victim's identity.
+        if (body.length > 0 && !isJson(request.contentType())) {
+            throw new ExtensionProxyException(415, "The request body must be JSON");
+        }
 
         String jti = UUID.randomUUID().toString();
+        String checkedNamespace = NAMESPACE_SCOPES.contains(route.scope()) ? namespace : null;
         String assertion = signer.sign(new ExtensionAssertion(identity.getPrincipal().getName(), extension.id(), jti,
-                authMode, extension.manifest().hubApi(), route.id(), route.scope(), namespace, method, pathAndQuery));
+                authMode, extension.manifest().hubApi(), route.id(), route.scope(), checkedNamespace, method,
+                pathAndQuery), body);
         HttpRequest outbound = outboundRequest(request, method, target, body, limits, assertion);
         AuditOutcome outcome = AuditOutcome.UNKNOWN;
         try {
@@ -267,7 +276,8 @@ public class ExtensionProxyService {
         // A 401 or 407 would start a login in the caller; a redirect cannot be followed with no Location.
         boolean passOn = (status >= 200 && status < 300) || (status >= 400 && status < 500 && status != 401 && status != 407);
         String contentType = response.headers().firstValue("Content-Type").orElse(null);
-        boolean typeAllowed = contentType == null ? response.body().length == 0 : REPLY_TYPES.contains(mediaType(contentType));
+        boolean typeAllowed = contentType == null ? response.body().length == 0
+                : REPLY_TYPES.contains(mediaType(contentType)) || (status >= 400 && isJson(contentType));
         if (!passOn || !typeAllowed) {
             LOG.warn("Extension {} route {} returned status {} and content type {}, which Hub does not pass on",
                     extension.id(), route.id(), status,
@@ -278,7 +288,47 @@ public class ExtensionProxyService {
         for (String name : REPLY_HEADERS) {
             response.headers().firstValue(name).ifPresent(value -> headers.put(name, value));
         }
+        headers.put("Cache-Control", privateCacheControl(response.headers().firstValue("Cache-Control").orElse(null)));
         return new ExtensionProxyResponse(status, headers, response.body());
+    }
+
+    /**
+     * Each reply is for one caller, so a shared cache must never keep it. Hub drops {@code public}
+     * and {@code private}, keeps the other directives, and puts {@code private} first.
+     */
+    static String privateCacheControl(String value) {
+        List<String> directives = new ArrayList<>();
+        directives.add("private");
+        if (value != null) {
+            for (String directive : splitDirectives(value)) {
+                int equals = directive.indexOf('=');
+                String name = (equals < 0 ? directive : directive.substring(0, equals)).trim().toLowerCase(Locale.ROOT);
+                if (!directive.isEmpty() && !name.equals("public") && !name.equals("private")) {
+                    directives.add(directive);
+                }
+            }
+        }
+        return String.join(", ", directives);
+    }
+
+    /** Splits on the commas that are not in a quoted string, such as {@code no-cache="a, b"}. */
+    private static List<String> splitDirectives(String value) {
+        List<String> parts = new ArrayList<>();
+        StringBuilder part = new StringBuilder();
+        boolean quoted = false;
+        for (char c : value.toCharArray()) {
+            if (c == '"') {
+                quoted = !quoted;
+            }
+            if (c == ',' && !quoted) {
+                parts.add(part.toString().trim());
+                part.setLength(0);
+            } else {
+                part.append(c);
+            }
+        }
+        parts.add(part.toString().trim());
+        return parts;
     }
 
     private HttpClient client(RegisteredExtension extension) {
@@ -305,6 +355,15 @@ public class ExtensionProxyService {
         } catch (IOException e) {
             throw new ExtensionProxyException(400, "The request body cannot be read");
         }
+    }
+
+    /** {@code application/json}, or an {@code application/*+json} type such as {@code application/problem+json}. */
+    static boolean isJson(String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        String type = mediaType(contentType);
+        return type.equals("application/json") || (type.startsWith("application/") && type.endsWith("+json"));
     }
 
     private static String mediaType(String contentType) {

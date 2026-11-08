@@ -1,6 +1,6 @@
 // Verifies the identity assertion that CALM Hub sends in X-Calm-Hub-Identity (ADR 0010).
 // It needs only the public JWKS at GET /api/calm/auth/jwks, and no CALM Hub credentials.
-import { createPublicKey, verify } from 'node:crypto';
+import { createHash, createPublicKey, verify } from 'node:crypto';
 
 const ALGORITHMS = { RS256: { hash: 'sha256' }, ES256: { hash: 'sha256', dsaEncoding: 'ieee-p1363' } };
 const CLOCK_SKEW_SECONDS = 30;
@@ -12,6 +12,7 @@ function decode(part) {
 /**
  * Returns a function that verifies one assertion and returns its claims, or throws.
  * fetchJwks() returns the JWKS; it is called again when a token names an unknown key id.
+ * pathAndQuery is relative to the backend URL that the operator set in CALM Hub. body is the raw request body.
  */
 export function createVerifier({ issuer, audience, fetchJwks, now = () => Date.now() / 1000 }) {
     let keys = new Map();
@@ -22,7 +23,7 @@ export function createVerifier({ issuer, audience, fetchJwks, now = () => Date.n
         keys = new Map(jwks.map((jwk) => [jwk.kid, { alg: jwk.alg, key: createPublicKey({ key: jwk, format: 'jwk' }) }]));
     }
 
-    return async function verifyAssertion(token, { method, pathAndQuery }) {
+    return async function verifyAssertion(token, { method, pathAndQuery, body }) {
         const parts = token?.split('.');
         if (parts?.length !== 3) throw new Error('not a JWT');
         const [h, p, s] = parts;
@@ -46,6 +47,9 @@ export function createVerifier({ issuer, audience, fetchJwks, now = () => Date.n
         // The assertion is bound to this request, so it cannot be replayed against another route.
         if (claims.htm !== method) throw new Error('wrong method');
         if (claims.htp !== pathAndQuery) throw new Error('wrong path');
+        // CALM Hub sends bdh only for a request with a body.
+        const bodyHash = body?.length ? createHash('sha256').update(body).digest('base64url') : undefined;
+        if (claims.bdh !== bodyHash) throw new Error('wrong body');
         if (seen.has(claims.jti)) throw new Error('replayed');
         seen.set(claims.jti, claims.exp);
         for (const [jti, exp] of seen) if (exp + CLOCK_SKEW_SECONDS < time) seen.delete(jti);

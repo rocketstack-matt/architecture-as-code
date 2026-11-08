@@ -226,6 +226,45 @@ class TestExtensionProxyResourceShould {
     }
 
     @Test
+    @TestSecurity(user = "alice")
+    void refuse_a_cross_site_form_post_before_signing() {
+        given().contentType("text/plain").body("{\"q\":\"pay\"}")
+                .when().post(BASE + "/search")
+                .then().statusCode(415)
+                .header("Content-Security-Policy", CSP)
+                .body("error", equalTo("The request body must be JSON"));
+
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void forward_a_json_post_and_bind_its_body() throws Exception {
+        given().contentType("application/json").body("{\"q\":\"pay\"}")
+                .when().post(BASE + "/search")
+                .then().statusCode(200);
+
+        String payload = backend.received().header("X-Calm-Hub-Identity").split("\\.")[1];
+        JsonNode claims = new ObjectMapper().readTree(Base64.getUrlDecoder().decode(payload));
+        assertThat(claims.get("bdh"), notNullValue());
+        assertThat(claims.has("ns"), is(false));
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void pass_on_a_problem_json_client_error_as_a_private_reply() {
+        backend.reply(new FixtureBackend.Reply(409, Map.of("Content-Type", "application/problem+json",
+                "Cache-Control", "public, max-age=60"),
+                "{\"title\":\"Name is taken\"}".getBytes(StandardCharsets.UTF_8), 0));
+
+        given().when().get(BASE + "/screen")
+                .then().statusCode(409)
+                .contentType("application/problem+json")
+                .header("Cache-Control", "private, max-age=60")
+                .body(equalTo("{\"title\":\"Name is taken\"}"));
+    }
+
+    @Test
     void return_401_when_not_authenticated() {
         given()
                 .when()

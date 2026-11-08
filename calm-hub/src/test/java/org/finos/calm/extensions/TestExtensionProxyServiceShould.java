@@ -19,6 +19,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +30,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.security.Principal;
 import java.time.Duration;
 import java.util.Base64;
@@ -127,7 +129,88 @@ class TestExtensionProxyServiceShould {
         assertThat(reply.status(), is(200));
         assertThat(new String(reply.body(), StandardCharsets.UTF_8), is("{\"services\":[]}"));
         assertThat(reply.headers(), equalTo(Map.of(
-                "Content-Type", "application/json; charset=utf-8", "Cache-Control", "no-store", "ETag", "\"v1\"")));
+                "Content-Type", "application/json; charset=utf-8", "Cache-Control", "private, no-store", "ETag", "\"v1\"")));
+    }
+
+    @Test
+    void mark_each_reply_private_so_that_a_shared_cache_does_not_keep_it() {
+        backend.reply(new FixtureBackend.Reply(200, Map.of("Content-Type", "application/json",
+                "Cache-Control", "public, max-age=600"), "{}".getBytes(StandardCharsets.UTF_8), 0));
+        assertThat(service.call(alice, request("GET", "/screen", null, null)).headers().get("Cache-Control"),
+                is("private, max-age=600"));
+
+        backend.reply(FixtureBackend.Reply.json(200, "{}"));
+        assertThat(service.call(alice, request("GET", "/screen", null, null)).headers().get("Cache-Control"),
+                is("private"));
+    }
+
+    @Test
+    void keep_quoted_cache_directives_whole() {
+        assertThat(ExtensionProxyService.privateCacheControl("PUBLIC, no-cache=\"Set-Cookie, ETag\", private=\"x\""),
+                is("private, no-cache=\"Set-Cookie, ETag\""));
+        assertThat(ExtensionProxyService.privateCacheControl(" , no-store"), is("private, no-store"));
+    }
+
+    @Test
+    void refuse_a_body_that_is_not_json_before_signing() {
+        for (String type : new String[]{"text/plain", "application/x-www-form-urlencoded", "multipart/form-data",
+                "text/json", null}) {
+            ExtensionProxyRequest form = new ExtensionProxyRequest("team-services", "POST", "/search", null, type,
+                    null, null, new ByteArrayInputStream("{\"q\":\"pay\"}".getBytes(StandardCharsets.UTF_8)));
+
+            assertThat(String.valueOf(type), status(form), is(415));
+        }
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    void accept_a_json_media_type_or_an_empty_body_of_any_type() {
+        for (String type : new String[]{"application/json; charset=utf-8", "Application/JSON",
+                "application/merge-patch+json"}) {
+            ExtensionProxyRequest json = new ExtensionProxyRequest("team-services", "POST", "/search", null, type,
+                    null, null, new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)));
+
+            assertThat(type, service.call(alice, json).status(), is(200));
+        }
+        ExtensionProxyRequest empty = new ExtensionProxyRequest("team-services", "POST", "/search", null, "text/plain",
+                null, null, new ByteArrayInputStream(new byte[0]));
+        assertThat(service.call(alice, empty).status(), is(200));
+    }
+
+    @Test
+    void bind_the_body_in_the_assertion() throws Exception {
+        service.call(alice, request("POST", "/search", null, "{\"q\":\"pay\"}"));
+        String expected = Base64.getUrlEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256")
+                .digest("{\"q\":\"pay\"}".getBytes(StandardCharsets.UTF_8)));
+        assertThat(claims(backend.received().header("X-Calm-Hub-Identity")).get("bdh").asText(), is(expected));
+
+        backend.reset();
+        service.call(alice, request("GET", "/screen", null, null));
+        assertThat(claims(backend.received().header("X-Calm-Hub-Identity")).has("bdh"), is(false));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"authenticated,false", "global_admin,false", "domain_read,false", "domain_write,false",
+            "domain_admin,false", "read,true", "write,true", "admin,true"})
+    void send_ns_only_for_a_scope_that_checks_the_namespace(String scope, boolean sendsNs) throws IOException {
+        ExtensionManifest manifest = new ExtensionManifest("team-services", "1.0.0", 0, "Team services", null, null,
+                List.of(new Route("route", "GET", "/domains/{domain}/namespaces/{namespace}", scope, false)), null, null);
+        when(registry.find("team-services")).thenReturn(Optional.of(new RegisteredExtension(manifest, 0,
+                Optional.of(backend.url("/base")), limits(1024, 1024, Duration.ofSeconds(5)))));
+        when(permissions.hasGlobalAdmin(alice)).thenReturn(true);
+        when(permissions.allowNamespaceAdmin(alice, "finos")).thenReturn(true);
+        when(permissions.canReadByDomain(alice, "payments")).thenReturn(true);
+        when(permissions.canWriteByDomain(alice, "payments")).thenReturn(true);
+        when(permissions.allowDomainAdmin(alice, "payments")).thenReturn(true);
+
+        service.call(alice, request("GET", "/domains/payments/namespaces/finos", null, null));
+
+        JsonNode claims = claims(backend.received().header("X-Calm-Hub-Identity"));
+        assertThat(claims.has("ns"), is(sendsNs));
+        if (sendsNs) {
+            assertThat(claims.get("ns").asText(), is("finos"));
+        }
+        assertThat(claims.has("domain"), is(false));
     }
 
     @Test
@@ -148,6 +231,29 @@ class TestExtensionProxyServiceShould {
         backend.reply(FixtureBackend.Reply.json(404, "{\"error\":\"no such team\"}"));
 
         assertThat(service.call(alice, request("GET", "/screen", null, null)).status(), is(404));
+    }
+
+    @Test
+    void pass_on_a_problem_json_client_error() {
+        String problem = "{\"title\":\"Name is taken\",\"status\":409}";
+        backend.reply(new FixtureBackend.Reply(409, Map.of("Content-Type", "application/problem+json"),
+                problem.getBytes(StandardCharsets.UTF_8), 0));
+
+        ExtensionProxyResponse reply = service.call(alice, request("GET", "/screen", null, null));
+
+        assertThat(reply.status(), is(409));
+        assertThat(reply.headers().get("Content-Type"), is("application/problem+json"));
+        assertThat(new String(reply.body(), StandardCharsets.UTF_8), is(problem));
+    }
+
+    @Test
+    void return_502_for_problem_json_on_a_success_or_a_server_error() {
+        for (int code : List.of(200, 500)) {
+            backend.reply(new FixtureBackend.Reply(code, Map.of("Content-Type", "application/problem+json"),
+                    "{}".getBytes(StandardCharsets.UTF_8), 0));
+
+            assertThat(String.valueOf(code), status(request("GET", "/screen", null, null)), is(502));
+        }
     }
 
     @Test
