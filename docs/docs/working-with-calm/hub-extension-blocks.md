@@ -71,5 +71,6 @@ the first `screen` of the extension. A card without a `screen` is not a link.
 
 An `action` contribution declares a button in the Extensions tab. Hub calls its route and asks for confirmation when
 `readOnly` is false. Context also goes in the JSON body for methods other than GET and DELETE.
+Hub does not cancel a confirmed call when the user changes the selection or leaves the page.
 Actions show only when their route placeholders have context values.
 Actions do not accept user input or render a reply in this version.

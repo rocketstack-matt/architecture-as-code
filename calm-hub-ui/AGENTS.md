@@ -199,6 +199,9 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 - Menu: `ExtensionMenuGroup` in the navbar drawer.
 - Architecture: one `extensions` tab in `DIAGRAM_TABS`, hidden (not unknown) until the registry loads, so a link
   to it keeps the tab. `resourceExtensions()` decides if it shows.
+- Actions: `ExtensionActionButton`. A route that is not `readOnly` asks in `ConfirmActionDialog`, not
+  `window.confirm`. Do not abort it: the backend can still finish it, so a retry can write twice. An action slot
+  key leaves out the context, so a change of selection does not remount it.
 - Node details: `ExtensionDetailPanels`.
 - Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
   closed section renders nothing, so it sends no request.

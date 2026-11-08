@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ExtensionContext, ExtensionContribution, ExtensionScreen, ExtensionSummary } from '../model/extensions.js';
 import { ExtensionService } from '../service/extension-service.js';
+import { ExtensionActionButton } from './ExtensionActionButton.js';
 import { ScreenErrorBoundary } from './ScreenErrorBoundary.js';
 import { BlockRenderer } from './blocks/BlockRenderer.js';
 import { isBlocksReply } from './landingCard.js';
@@ -17,9 +18,6 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
     const route = extension.routes.find((entry) => entry.id === contribution.route);
     const [result, setResult] = useState<ExtensionScreen>();
     const [error, setError] = useState(false);
-    const [busy, setBusy] = useState(false);
-    const actionRequest = useRef<AbortController | null>(null);
-    useEffect(() => () => actionRequest.current?.abort(), []);
     const { namespace, resource, resourceType, resourceId, version, selectedElement } = context;
     useEffect(() => {
         if (action || !route) return;
@@ -37,32 +35,7 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
         return () => controller.abort();
     }, [service, extension.id, extension.hubApi, route, action, namespace, resource, resourceType, resourceId, version, selectedElement]);
     if (!route) return <p role="alert">Extension route unavailable.</p>;
-    if (action)
-        return (
-            <div>
-                <button
-                    className="btn btn-sm"
-                    disabled={busy}
-                    onClick={async () => {
-                        if (!route.readOnly && !window.confirm(`Run ${contribution.title}?`)) return;
-                        const controller = new AbortController();
-                        actionRequest.current = controller;
-                        setBusy(true);
-                        setError(false);
-                        try {
-                            await service.call(extension.id, route, context, controller.signal);
-                        } catch {
-                            if (!controller.signal.aborted) setError(true);
-                        } finally {
-                            if (!controller.signal.aborted) setBusy(false);
-                        }
-                    }}
-                >
-                    {contribution.title}
-                </button>
-                {error && <p role="alert">Extension request failed.</p>}
-            </div>
-        );
+    if (action) return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} />;
     if (error) return <p role="alert">Extension request failed.</p>;
     if (route.method !== 'GET') return <p role="alert">Block routes must use GET.</p>;
     if (!result) return <p role="status">Loading extension…</p>;
@@ -77,7 +50,8 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
 }
 
 export function ExtensionSlot(props: ExtensionSlotProps) {
-    const key = JSON.stringify([props.extension.id, props.contribution.id, props.context]);
+    // An action keeps its state when the context changes, so a change of selection does not reset a running write.
+    const key = JSON.stringify([props.extension.id, props.contribution.id, props.action ? null : props.context]);
     return (
         <ScreenErrorBoundary key={key}>
             <SlotContent key={key} {...props} />
