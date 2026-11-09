@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'fs/promises';
-import { CalmHubClient, CalmHubOptions, HubClientError, HubDomainSummary, HubControlSummary, HubDomainCreateResult, DocumentMetadata, extractDocumentMetadata, computeSemVerBump, sortSemVer, latestReleaseVersion, isSnapshotVersion, toReleaseVersion, toSnapshotVersion, ResourceChangeType, ResourceType, updateDocumentMetadata, constructDocumentId, constructControlDocumentId, ControlDocumentMetadata, ControlDocumentKind, extractControlMetadata, updateControlDocumentMetadata, canonicalEqual, HubExtension, HubExtensionCommand, HubExtensionRoute } from '@finos/calm-shared';
+import { CalmHubClient, CalmHubOptions, HubClientError, HubDomainSummary, HubControlSummary, HubDomainCreateResult, DocumentMetadata, extractDocumentMetadata, computeSemVerBump, sortSemVer, latestReleaseVersion, isSnapshotVersion, toReleaseVersion, toSnapshotVersion, ResourceChangeType, ResourceType, updateDocumentMetadata, constructDocumentId, constructControlDocumentId, ControlDocumentMetadata, ControlDocumentKind, extractControlMetadata, updateControlDocumentMetadata, canonicalEqual, HubExtension, HubExtensionCommand, HubExtensionRoute, numberText } from '@finos/calm-shared';
 import { OutputFormat, parseOutputFormat, printError, printJsonSuccess, printTableSuccess } from './hub-output';
 import * as cliConfig from '../cli-config';
 
@@ -1097,6 +1097,8 @@ export interface RunExtensionCommandOptions {
     input?: string;
     /** `key=value` pairs that set top-level input properties. */
     args?: string[];
+    /** Seconds to wait for the reply. With none, CALM Hub ends the call at the timeout of the extension. */
+    timeout?: string;
     format?: string;
 }
 
@@ -1162,6 +1164,7 @@ export async function runExtensionCommand(options: RunExtensionCommandOptions): 
     const request = `ext ${options.id} ${options.command}`;
     const input = await readExtensionInput(options.input, request, format);
     const args = parseExtensionArgs(options.args ?? [], request, format);
+    const timeoutMs = parseExtensionTimeout(options.timeout, request, format);
     const calmHubOptions = await handleOptionsLoadError(options.calmHubOptions, format);
     const client = new CalmHubClient(calmHubOptions);
 
@@ -1171,7 +1174,7 @@ export async function runExtensionCommand(options: RunExtensionCommandOptions): 
         for (const [key, value] of args) {
             input[key] = coerceArg(value, command.input?.['properties'], key);
         }
-        const reply = await client.callExtension(extension.id, route, input);
+        const reply = await client.callExtension(extension.id, route, input, { timeoutMs });
         if (typeof reply.data === 'string') {
             if (reply.data !== '') {
                 process.stdout.write(reply.data.endsWith('\n') ? reply.data : `${reply.data}\n`);
@@ -1229,7 +1232,8 @@ function describeCommand(extension: HubExtension, name: string): DescribedExtens
         method: route.method,
         path: route.path,
         scope: route.scope,
-        readOnly: route.readOnly ?? false,
+        // As the MCP readOnlyHint: Hub treats every GET as a read.
+        readOnly: route.method.toUpperCase() === 'GET' || route.readOnly === true,
     };
 }
 
@@ -1319,14 +1323,37 @@ function parseExtensionArgs(args: string[], request: string, format: OutputForma
             printError(0, `--arg must have the form key=value: ${arg}`, request, format);
             process.exit(1);
         }
-        return [arg.slice(0, separator), arg.slice(separator + 1)];
+        const key = arg.slice(0, separator);
+        // Assigning __proto__ would set the prototype of the input, so the value would be lost.
+        if (key === '__proto__') {
+            printError(0, '--arg cannot set __proto__. Use --input to send it', request, format);
+            process.exit(1);
+        }
+        return [key, arg.slice(separator + 1)];
     });
+}
+
+// Node runs a timer above 2^31-1 ms after 1 ms, which would stop waiting at once.
+const MAX_TIMEOUT_SECONDS = 2147483;
+const DECIMAL_SECONDS = /^(\d+(\.\d*)?|\.\d+)$/;
+
+function parseExtensionTimeout(timeout: string | undefined, request: string, format: OutputFormat): number | undefined {
+    if (timeout === undefined) {
+        return undefined;
+    }
+    const seconds = Number(timeout);
+    if (!DECIMAL_SECONDS.test(timeout.trim()) || seconds <= 0 || seconds > MAX_TIMEOUT_SECONDS) {
+        printError(0, `--timeout must be a positive number of seconds: ${timeout}`, request, format);
+        process.exit(1);
+    }
+    return Math.ceil(seconds * 1000);
 }
 
 /**
  * Converts an `--arg` value to the type that the input schema declares for the property, so that
  * `--arg limit=5` sends a number. A value that does not convert stays a string. The REST proxy does
- * not check the input, so the extension must reject it.
+ * not check the input, so the extension must reject it. A number converts only when it is in the form
+ * that it is sent in, so that `0x10`, `1e3` and an integer above 2^53 do not change value.
  */
 function coerceArg(value: string, properties: unknown, key: string): unknown {
     const schema = properties && typeof properties === 'object' && Object.prototype.hasOwnProperty.call(properties, key)
@@ -1337,8 +1364,11 @@ function coerceArg(value: string, properties: unknown, key: string): unknown {
     if (declared === undefined || types.includes('string')) {
         return value;
     }
-    if ((types.includes('integer') || types.includes('number')) && value.trim() !== '' && Number.isFinite(Number(value))) {
-        return Number(value);
+    if (types.includes('integer') || types.includes('number')) {
+        const number = Number(value);
+        if (numberText(number) === value.trim() && (types.includes('number') || Number.isSafeInteger(number))) {
+            return number;
+        }
     }
     if (types.includes('boolean') && (value === 'true' || value === 'false')) {
         return value === 'true';

@@ -8,13 +8,21 @@ import { buildExtensionRequest, extensionProxyPath, HubExtension, HubExtensionRe
 
 export { ResourceType, RESOURCE_TYPES, isValidResourceType } from './resource-types.js';
 export type { HubExtension, HubExtensionCommand, HubExtensionRoute, HubExtensionRequest } from './extensions.js';
-export { buildExtensionRequest, extensionProxyPath } from './extensions.js';
+export { buildExtensionRequest, extensionProxyPath, numberText } from './extensions.js';
 
 export interface HubExtensionResponse {
     status: number;
     contentType?: string;
     /** Parsed JSON for a JSON reply, else the text as sent. */
     data: unknown;
+}
+
+export interface HubExtensionCallOptions {
+    /**
+     * How long to wait for the reply, in milliseconds. The default 0 sets no client limit, because CALM Hub ends
+     * each call at the `request-timeout-seconds` of the extension, which can be longer than the 30 s of other calls.
+     */
+    timeoutMs?: number;
 }
 
 export interface CalmHubOptions {
@@ -261,9 +269,15 @@ export class CalmHubClient {
      * @param extensionId Extension id.
      * @param route The route that the command names.
      * @param input The command input object.
+     * @param options The client timeout. When it ends a write, CALM Hub and the extension can still complete the write.
      * @returns The reply status, content type and body.
      */
-    async callExtension(extensionId: string, route: HubExtensionRoute, input: Record<string, unknown>): Promise<HubExtensionResponse> {
+    async callExtension(
+        extensionId: string,
+        route: HubExtensionRoute,
+        input: Record<string, unknown>,
+        options: HubExtensionCallOptions = {}
+    ): Promise<HubExtensionResponse> {
         let request: HubExtensionRequest;
         try {
             request = buildExtensionRequest(extensionId, route, input);
@@ -281,13 +295,23 @@ export class CalmHubClient {
                 headers: request.method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
                 responseType: 'text',
                 transformResponse: (data: unknown) => data,
+                timeout: options.timeoutMs ?? 0,
             });
             const contentType = contentTypeOf(response.headers);
             return { status: response.status, contentType, data: parseReply(response.data, contentType) };
         } catch (err) {
             if (axios.isAxiosError(err) && err.response) {
+                const status = err.response.status;
                 const body = parseReply(err.response.data, contentTypeOf(err.response.headers));
-                throw new HubClientError(err.response.status, replyMessage(body, err.message), endpoint, body);
+                // An auth gateway can send an empty 401 or 403.
+                if (body === '' || body === undefined) {
+                    throw new HubClientError(status, EMPTY_REPLY_MESSAGES[status] ?? err.message, endpoint);
+                }
+                throw new HubClientError(status, replyMessage(body, err.message), endpoint, body);
+            }
+            if (axios.isAxiosError(err) && (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') && request.method !== 'GET') {
+                throw new HubClientError(0, `${err.message}. CALM Hub and the extension can still complete the call, `
+                    + 'so check whether the write happened before you send it again', endpoint);
             }
             throw this.wrapError(err, endpoint);
         }
@@ -627,10 +651,19 @@ function parseReply(data: unknown, contentType: string | undefined): unknown {
     }
 }
 
+const EMPTY_REPLY_MESSAGES: Record<number, string> = {
+    401: 'Authentication is required, or the credentials are not valid',
+    403: 'Access is denied',
+};
+
+// Hub sends { error }. An extension can pass through an RFC 9457 problem+json body with a title and a detail.
 function replyMessage(body: unknown, fallback: string): string {
     if (typeof body === 'string' && body.trim() !== '') return body;
-    if (body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string') {
-        return (body as { error: string }).error;
+    if (body && typeof body === 'object') {
+        const { error, title, detail } = body as { error?: unknown, title?: unknown, detail?: unknown };
+        if (typeof error === 'string') return error;
+        const parts = [title, detail].filter((part): part is string => typeof part === 'string' && part !== '');
+        if (parts.length > 0) return parts.join(': ');
     }
     return fallback;
 }

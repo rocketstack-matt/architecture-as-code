@@ -6,6 +6,8 @@ import { ExtensionRoute } from '../model/extensions.js';
 import { migrationStore } from './utils/migration-store.js';
 import { authStore } from './utils/auth-store.js';
 import { apiClient } from './utils/api-client.js';
+// One list for the clients and Hub: TestExtensionToolsShould checks it against ExtensionPaths.
+import PATH_VALUES from '../../../calm-hub/src/test/resources/extensions-test/path-values.json' with { type: 'json' };
 vi.mock('../authService.js', () => ({ getAuthHeaders: vi.fn().mockResolvedValue({ Authorization: 'test' }) }));
 const ax = axios.create();
 vi.spyOn(axios, 'create').mockReturnValue(ax);
@@ -105,11 +107,18 @@ describe('ExtensionService', () => {
     it('rejects missing route context', () => {
         expect(() => extensionRequest('test', route, {})).toThrow('Missing extension context');
     });
-    it.each(['', '.', '..', 'a..b', 'a/b', 'a\\b', '50%', 'alice@x', 'a\u0000b'])('rejects the invalid path value %j', (value) => {
+    // Some JSON parsers refuse a lone surrogate, so the shared list has none.
+    it.each([...PATH_VALUES.refused, '\ud800', 'a\udc00b'])('rejects the invalid path value %j', (value) => {
         expect(() => extensionRequest('test', route, { namespace: value })).toThrow(`Invalid extension context: namespace`);
     });
-    it.each(['.a', 'v1.2', '~x_y-z'])('accepts the path value %j', (value) => {
-        expect(extensionRequest('test', route, { namespace: value }).url).toContain(`/${value}`);
+    it('rejects the delete control character in a path value', () => {
+        expect(() => extensionRequest('test', route, { namespace: 'a\u007fb' })).toThrow('Invalid extension context: namespace');
+    });
+    it.each(PATH_VALUES.accepted)('accepts the path value %j', (value) => {
+        expect(extensionRequest('test', route, { namespace: value }).url).toBe(`/api/calm/extensions/test/api/summary/${encodeURIComponent(value)}`);
+    });
+    it.each(['a\nb', 'a\tb', 'a\u007fb', '\ud800'])('rejects a context value for the query with %j', (value) => {
+        expect(() => extensionRequest('test', route, { namespace: 'ns', selectedElement: value })).toThrow('Invalid extension context: selectedElement');
     });
     it('treats a path value with a slash as invalid, and keeps it in the query', () => {
         const typed = { ...route, path: '/releases/{resourceType}/{resourceId}' };

@@ -14,7 +14,7 @@ import java.util.stream.Stream;
  * segment matches one non-empty segment. When two templates match, the one with more literal
  * segments wins, as in JAX-RS.
  */
-final class ExtensionRouteMatcher {
+public final class ExtensionRouteMatcher {
 
     /** The matched route, and its path parameters in their raw, percent-encoded form. */
     record RouteMatch(ExtensionManifest.Route route, Map<String, String> parameters) {}
@@ -78,7 +78,8 @@ final class ExtensionRouteMatcher {
         }
     }
 
-    static Optional<Map<String, String>> parameters(String template, String path) {
+    /** The parameters of {@code path} when it matches {@code template}, in their raw form. */
+    public static Optional<Map<String, String>> parameters(String template, String path) {
         String[] templateSegments = template.split("/", -1);
         String[] pathSegments = path.split("/", -1);
         if (templateSegments.length != pathSegments.length) {

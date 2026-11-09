@@ -6,10 +6,20 @@ import { isBuiltInExtension } from '../extensions/extensionIdentity.js';
 
 type RegistryEntry = ExtensionSummary & { contributes?: { 'decorator-views'?: DecoratorView[] } };
 
-// Hub refuses these parts of a path (ADR 0011). The same rule as @finos/calm-shared buildExtensionRequest.
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+// Hub refuses these parts of a path (ADR 0011), also a look-alike of / or \. The same rule as @finos/calm-shared
+// buildExtensionRequest; calm-hub/src/test/resources/extensions-test/path-values.json ties the copies together.
 function isPathValue(value: string): boolean {
+    return value !== '' && value !== '.' && !LONE_SURROGATE.test(value)
+        // eslint-disable-next-line no-control-regex
+        && !/\.\.|[/\\%@\u0000-\u001f\u007f\u2044\u2215\u2216\u29f5\u29f8\ufe68\uff0f\uff3c]/.test(value);
+}
+
+// Hub refuses an encoded control character in a query, and axios throws on a lone surrogate.
+function isQueryValue(value: string): boolean {
     // eslint-disable-next-line no-control-regex
-    return value !== '' && value !== '.' && !/\.\.|[/\\%@\u0000-\u001f\u007f]/.test(value);
+    return !LONE_SURROGATE.test(value) && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
 export function extensionRequest(id: string, route: ExtensionRoute, context: ExtensionContext) {
@@ -22,6 +32,9 @@ export function extensionRequest(id: string, route: ExtensionRoute, context: Ext
     });
     if (!path.startsWith('/') || path.split('/').some((part) => part === '.' || part === '..')) {
         throw new Error('Invalid extension route');
+    }
+    for (const [key, value] of Object.entries(context)) {
+        if (typeof value === 'string' && !isQueryValue(value)) throw new Error(`Invalid extension context: ${key}`);
     }
     return { url: `/api/calm/extensions/${encodeURIComponent(id)}/api${path}`, params: context };
 }

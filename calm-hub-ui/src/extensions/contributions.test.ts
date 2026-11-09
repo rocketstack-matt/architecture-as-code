@@ -27,6 +27,18 @@ describe('extension contributions', () => {
         ]);
     });
 
+    it('hides a designer tab whose path needs a parameter that no context gives', () => {
+        const extension = fakeExtension(1, ['designer-tab']);
+        const unfillable = { ...extension, routes: extension.routes.map((r) => (r.id === 'data' ? { ...r, path: '/data/{resource}' } : r)) };
+        expect(resourceExtensions([unfillable], { namespace: 'ns' })).toEqual([]);
+    });
+
+    it('hides an action when a context value has a control character', () => {
+        const extension = fakeExtension(1, ['action']);
+        expect(actionContributions(extension, { namespace: 'ns\n' })).toEqual([]);
+        expect(actionContributions(extension, { namespace: 'ns\u007f' })).toEqual([]);
+    });
+
     it('builds an encoded screen path', () => {
         const extension = { ...fakeExtension(1), id: 'a b' };
         expect(screenPath(extension, { id: 'x/y', title: 'X', route: 'data' })).toBe('/extensions/a%20b/x%2Fy');

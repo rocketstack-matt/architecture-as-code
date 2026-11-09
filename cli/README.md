@@ -819,17 +819,18 @@ Run the commands of the extensions that a CalmHub operator enabled. The commands
 ```
 calm hub extensions list [options]
 calm hub extensions describe <id> [command] [options]
-calm hub ext <id> <command> [--input <file|->] [--arg key=value]... [options]
+calm hub ext <id> <command> [--input <file|->] [--arg key=value]... [--timeout <seconds>] [options]
 ```
 
 | Option | Applies to | Description |
 |--------|------------|-------------|
 | `--input <file>` | `ext` | JSON file with the command input object, or `-` for stdin. |
-| `--arg <key=value>` | `ext` | Sets a top-level input property. Repeatable, and overrides `--input`. The value gets the type that the input schema declares for the property. |
+| `--arg <key=value>` | `ext` | Sets a top-level input property. Repeatable, and overrides `--input`. The value gets the type that the input schema declares for the property. A number converts only when it is written as it is sent, so `0x10`, `1e3`, `1.0` and an integer above 2^53 stay strings. It cannot set `__proto__`. |
+| `--timeout <seconds>` | `ext` | Stops waiting for the reply, after a decimal number of seconds up to 2147483. With none, CalmHub ends the call at the `request-timeout-seconds` of the extension. A write can still complete after the CLI stops waiting. |
 | `-c, --calm-hub-url <url>` | all | CalmHub instance. |
 | `-f, --format <format>` | all | Output format: `json` (default) or `pretty`. For `ext`, it changes only the error format. |
 
-`ext` reads the command's route from CalmHub. Input properties that match a `{param}` in the route path fill the path. A value that fills the path cannot be empty or `.`, or contain `..`, `/`, `\`, `%`, `@` or a control character: `ext` refuses it before the call (see [the CLI hub docs](../docs/docs/calm-cli/hub.md#run-a-command)). The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. CalmHub checks the route, the path and the scope, but not the input: the extension checks it. An error is printed with its body as CalmHub sent it. CalmHub sends a generic `502` in place of the reply when the extension refuses the connection, when the reply is too large, when the extension replies with a 3xx, 401, 407 or 5xx status, or when the reply has a content type that CalmHub does not pass on. It sends `504` when the connection or the reply takes too long.
+`ext` reads the command's route from CalmHub. Input properties that match a `{param}` in the route path fill the path. A value that fills the path must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@`, a look-alike of `/` or `\`, a control character or a lone surrogate. A query name or value must not contain a control character or a lone surrogate. `ext` refuses such a value before the call (see [the CLI hub docs](../docs/docs/calm-cli/hub.md#run-a-command)). The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. A number fills the path or query in plain notation, as for an MCP tool. CalmHub checks the route, the path and the scope, but not the input: the extension checks it. An error is printed with its body as CalmHub sent it. CalmHub sends a generic `502` in place of the reply when the extension refuses the connection, when the reply is too large, when the extension replies with a 3xx, 401, 407 or 5xx status, or when the reply has a content type that CalmHub does not pass on. It sends `504` when the connection or the reply takes too long.
 
 ```shell
 calm hub extensions list -f pretty

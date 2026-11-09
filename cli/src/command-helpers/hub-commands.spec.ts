@@ -2222,6 +2222,7 @@ describe('hub-commands', () => {
                             namespace: { type: 'string' },
                             name: { type: 'string' },
                             replicas: { type: 'integer' },
+                            ratio: { type: 'number' },
                             enabled: { type: 'boolean' },
                             tags: { type: 'array' },
                             note: { type: ['string', 'null'] },
@@ -2306,8 +2307,22 @@ describe('hub-commands', () => {
                     method: 'GET',
                     path: '/namespaces/{namespace}/services',
                     scope: 'read',
-                    readOnly: false,
+                    readOnly: true,
                 });
+            });
+
+            it('marks a GET route as read-only, as MCP does, and a write route only when it is readOnly', async () => {
+                const { mockClient } = await getSharedMocks();
+                vi.mocked(mockClient.listExtensions).mockResolvedValue([{
+                    ...extension,
+                    routes: [{ ...extension.routes[0], method: 'get' }, { ...extension.routes[1], readOnly: true }],
+                }]);
+
+                await runDescribeExtension({ calmHubOptions: hub, id: 'example', command: 'list-services' });
+                await runDescribeExtension({ calmHubOptions: hub, id: 'example', command: 'add-service' });
+
+                expect(hubOutput.printJsonSuccess).toHaveBeenNthCalledWith(1, expect.objectContaining({ readOnly: true }));
+                expect(hubOutput.printJsonSuccess).toHaveBeenNthCalledWith(2, expect.objectContaining({ readOnly: true }));
             });
 
             it('renders the commands of the extension when format is pretty', async () => {
@@ -2403,7 +2418,7 @@ describe('hub-commands', () => {
                 await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'add-service', input: 'in.json' });
 
                 expect(fs.readFile).toHaveBeenCalledWith('in.json', 'utf-8');
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', addService, { namespace: 'finos', name: 'payments' });
+                expect(mockClient.callExtension).toHaveBeenCalledWith('example', addService, { namespace: 'finos', name: 'payments' }, { timeoutMs: undefined });
                 expect(hubOutput.printJsonSuccess).toHaveBeenCalledWith({ ok: true });
             });
 
@@ -2414,7 +2429,7 @@ describe('hub-commands', () => {
 
                 await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services', input: '-' });
 
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], { namespace: 'finos' });
+                expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], { namespace: 'finos' }, { timeoutMs: undefined });
                 stdin.mockRestore();
             });
 
@@ -2423,7 +2438,7 @@ describe('hub-commands', () => {
 
                 await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services' });
 
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], {});
+                expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], {}, { timeoutMs: undefined });
             });
 
             it('sets --arg values over the input, with the types that the input schema declares', async () => {
@@ -2437,7 +2452,69 @@ describe('hub-commands', () => {
 
                 expect(mockClient.callExtension).toHaveBeenCalledWith('example', addService, {
                     namespace: 'finos', name: 'payments', replicas: 3, enabled: true, tags: ['a'], note: 'null', owner: { team: 'x' }, extra: '1',
-                });
+                }, { timeoutMs: undefined });
+            });
+
+            it.each([
+                ['replicas', '9007199254740993'], ['replicas', '0x10'], ['replicas', '1e3'], ['replicas', '1.0'], ['replicas', '1.5'],
+                ['replicas', '-0'], ['replicas', '+5'], ['ratio', '0x10'], ['ratio', '1e3'], ['ratio', '9007199254740993'], ['ratio', '.5'],
+            ])('keeps --arg %s=%s as a string, so that its value does not change', async (key, value) => {
+                const { mockClient } = await getSharedMocks();
+
+                await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'add-service', args: [`${key}=${value}`] });
+
+                expect(vi.mocked(mockClient.callExtension).mock.calls[0][2]).toEqual({ [key]: value });
+            });
+
+            it.each([
+                ['replicas', '9007199254740991', 9007199254740991], ['replicas', '-3', -3], ['replicas', ' 7 ', 7],
+                ['ratio', '1.5', 1.5], ['ratio', '0.000001', 0.000001], ['ratio', '9007199254740992', 9007199254740992],
+            ])('converts --arg %s=%s to a number', async (key, value, number) => {
+                const { mockClient } = await getSharedMocks();
+
+                await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'add-service', args: [`${key}=${value}`] });
+
+                expect(vi.mocked(mockClient.callExtension).mock.calls[0][2]).toEqual({ [key]: number });
+            });
+
+            it('exits without a call when --arg sets __proto__', async () => {
+                const { mockClient } = await getSharedMocks();
+
+                await expect(runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'add-service', args: ['__proto__=x'] }))
+                    .rejects.toThrow('process.exit');
+
+                expect(hubOutput.printError).toHaveBeenCalledWith(0, '--arg cannot set __proto__. Use --input to send it', 'ext example add-service', 'json');
+                expect(mockClient.listExtensions).not.toHaveBeenCalled();
+            });
+
+            it('sends __proto__ from the input file as an input property', async () => {
+                vi.mocked(fs.readFile).mockResolvedValue('{"__proto__":"x"}' as unknown as Uint8Array);
+                const { mockClient } = await getSharedMocks();
+
+                await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'add-service', input: 'in.json', args: ['name=a'] });
+
+                const input = vi.mocked(mockClient.callExtension).mock.calls[0][2];
+                expect(Object.prototype.hasOwnProperty.call(input, '__proto__')).toBe(true);
+                expect(input.name).toBe('a');
+            });
+
+            it.each([['90', 90000], ['0.5', 500], ['1.0001', 1001], [' 2147483 ', 2147483000]])('passes --timeout %s as %d ms', async (timeout, timeoutMs) => {
+                const { mockClient } = await getSharedMocks();
+
+                await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services', timeout });
+
+                expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], {}, { timeoutMs });
+            });
+
+            it.each(['0', '-1', 'soon', '', 'Infinity', '2147483.001', '2147484', '0x10', '1e3'])('exits without a call when --timeout is %j', async (timeout) => {
+                const { mockClient } = await getSharedMocks();
+
+                await expect(runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services', timeout }))
+                    .rejects.toThrow('process.exit');
+
+                expect(hubOutput.printError).toHaveBeenCalledWith(
+                    0, `--timeout must be a positive number of seconds: ${timeout}`, 'ext example list-services', 'json');
+                expect(mockClient.listExtensions).not.toHaveBeenCalled();
             });
 
             it('keeps an --arg value as a string when it does not convert, for the extension to reject', async () => {
@@ -2450,7 +2527,7 @@ describe('hub-commands', () => {
 
                 expect(mockClient.callExtension).toHaveBeenCalledWith('example', addService, {
                     namespace: 'finos', replicas: 'many', enabled: 'yes', tags: '[oops', name: 'a=b', replicas2: ' ',
-                });
+                }, { timeoutMs: undefined });
             });
 
             it('writes a text reply as is, with one final newline', async () => {

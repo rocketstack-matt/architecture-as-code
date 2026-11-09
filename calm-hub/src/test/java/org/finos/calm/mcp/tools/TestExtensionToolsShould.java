@@ -7,6 +7,7 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.finos.calm.domain.extensions.ExtensionManifest;
 import org.finos.calm.extensions.ExtensionManifestLoader;
+import org.finos.calm.extensions.ExtensionPaths;
 import org.finos.calm.extensions.ExtensionProxyException;
 import org.finos.calm.extensions.ExtensionProxyRequest;
 import org.finos.calm.extensions.ExtensionProxyResponse;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
@@ -24,18 +26,24 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -84,6 +92,34 @@ class TestExtensionToolsShould {
     @BeforeEach
     void setup() {
         extensionTools.mcpEnabled = true;
+    }
+
+    private static final String PATH_RULE = "must not be empty or ., or contain .., /, \\, %, @, a look-alike of / or \\, "
+            + "a control character or a lone surrogate";
+    private static final String LINE_TOO_LONG = "The path and query are too long: the request line of the same REST call "
+            + "would be longer than 4096 characters.";
+    private static final JsonObject PATH_VALUES = pathValues();
+
+    private static JsonObject pathValues() {
+        try {
+            return new JsonObject(Files.readString(Path.of("src/test/resources/extensions-test/path-values.json")));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    static Stream<String> refusedPathValues() {
+        return PATH_VALUES.getJsonArray("refused").stream().map(String.class::cast);
+    }
+
+    static Stream<String> acceptedPathValues() {
+        return PATH_VALUES.getJsonArray("accepted").stream().map(String.class::cast);
+    }
+
+    // The encodeURIComponent form, which the CLI and the UI send.
+    private static String uriComponent(String value) {
+        return ExtensionTools.encode(value).replace("%21", "!").replace("%2A", "*").replace("%27", "'")
+                .replace("%28", "(").replace("%29", ")");
     }
 
     private static String text(ToolResponse r) {
@@ -530,7 +566,7 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void match_a_long_argument_that_overflows_the_stack_of_java_util_regex() {
+    void match_a_one_megabyte_argument_against_a_repeated_group() {
         ExtensionManifest.Route route = new ExtensionManifest.Route("r", "POST", "/r", "authenticated", false);
         Map<String, Object> input = Map.of("type", "object",
                 "properties", Map.of("text", Map.of("type", "string", "pattern", "^(a|b)*$")));
@@ -683,7 +719,7 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void refuse_an_input_format_that_hub_has_not_timed_as_linear() {
+    void refuse_an_input_format_that_hub_cannot_check_in_linear_time() {
         for (String format : List.of("url", "uri", "uri-reference", "uri-template", "regex", "byte", "json-pointer",
                 "relative-json-pointer", "json-pointer-uri-fragment", "idn-hostname", "idn-email", "custom")) {
             assertThat(format, ExtensionTools.inputSchemaError(Map.of("properties", Map.of("a", Map.of("format", format)))),
@@ -737,7 +773,7 @@ class TestExtensionToolsShould {
     }
 
     @Test
-    void refuse_an_input_schema_whose_pattern_properties_vertx_cannot_see() {
+    void refuse_unevaluated_properties_or_refs_into_pattern_properties_in_an_input_schema() {
         Map<String, Object> patternProperties = Map.of("x-", Map.of("type", "integer"));
 
         assertThat(ExtensionTools.inputSchemaError(Map.of("patternProperties", patternProperties,
@@ -938,46 +974,172 @@ class TestExtensionToolsShould {
         assertThat(request.path(), is("/namespaces/finos/services/.a%3Fc%23d%20%C3%A9~"));
     }
 
+    // --- the path value rule: the clients test the same list (extensions-test/path-values.json) ---
+
     @ParameterizedTest
-    @ValueSource(strings = {"", ".", "..", "a..b", "architectures/1", "a\\b", "50%", "alice@x", "a\0b", "a\177b"})
-    void refuse_a_path_value_that_the_proxy_refuses(String value) {
+    @MethodSource("refusedPathValues")
+    void refuse_a_path_value_that_hub_refuses_once_it_is_encoded(String value) {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
                 tool("remove-service"), new JsonObject().put("namespace", "finos").put("name", value)));
 
-        assertThat(e.getMessage(), is("Input property 'name' must not be empty or ., or contain .., /, \\, %, @ or a "
-                + "control character, because it fills the path " + tool("remove-service").route().path()));
+        assertThat(e.getMessage(), is("Input property 'name' " + PATH_RULE + ", because it fills the path "
+                + tool("remove-service").route().path()));
+        for (String encoded : List.of(ExtensionTools.encode(value), uriComponent(value))) {
+            assertThrows(ExtensionProxyException.class, () -> ExtensionPaths.checkPath("/x/" + encoded + "/y"), encoded);
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("acceptedPathValues")
+    void accept_a_path_value_that_hub_accepts_once_it_is_encoded(String value) {
+        ExtensionProxyRequest request = ExtensionTools.request(tool("remove-service"),
+                new JsonObject().put("namespace", "finos").put("name", value));
+
+        assertThat(request.path(), is("/namespaces/finos/services/" + ExtensionTools.encode(value)));
+        // MCP encodes !*'() and encodeURIComponent in the CLI and the UI does not. Hub accepts and keeps both forms.
+        for (String encoded : List.of(ExtensionTools.encode(value), uriComponent(value))) {
+            assertThat(ExtensionPaths.checkPath("/x/" + encoded + "/y"), is("/x/" + encoded + "/y"));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\ud800", "a\udc00b", "\udbff\ud800"})
+    void refuse_a_path_value_with_a_lone_surrogate(String value) {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
+                tool("remove-service"), new JsonObject().put("namespace", "finos").put("name", value)));
+
+        assertThat(e.getMessage(), startsWith("Input property 'name' " + PATH_RULE));
     }
 
     @Test
-    void accept_a_path_and_query_of_the_rest_limit() {
-        String query = "x=" + "a".repeat(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH - "/namespaces/finos/services?x=".length());
+    void cover_each_part_that_hub_refuses_with_a_refused_path_value() {
+        List<String> encodedNever = PATH_VALUES.getJsonArray("encodedNever").stream().map(String.class::cast).toList();
+        for (String part : ExtensionPaths.FORBIDDEN) {
+            boolean covered = refusedPathValues().anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(part)
+                    || ExtensionTools.encode(value).toLowerCase(Locale.ROOT).contains(part));
+            assertThat(part, covered || encodedNever.contains(part), is(true));
+        }
+        for (String part : encodedNever) {
+            assertThat(part, ExtensionPaths.FORBIDDEN.contains(part), is(true));
+            assertThat(part, ExtensionTools.encode(part).contains(part), is(false));
+        }
+    }
+
+    @Test
+    void refuse_a_missing_or_null_path_value_as_required() {
+        String message = "Input property 'name' is required, because it fills the path "
+                + tool("remove-service").route().path();
+
+        assertThat(assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(tool("remove-service"),
+                new JsonObject().put("namespace", "finos"))).getMessage(), is(message));
+        assertThat(assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(tool("remove-service"),
+                new JsonObject("{\"namespace\":\"finos\",\"name\":null}"))).getMessage(), is(message));
+    }
+
+    @Test
+    void write_a_number_in_the_path_and_the_query_in_plain_notation() {
+        ExtensionProxyRequest request = ExtensionTools.request(tool("remove-service"),
+                new JsonObject("{\"namespace\":1.0,\"name\":1e21,\"limit\":1.50,\"small\":1.5e-7,\"big\":9007199254740993}"));
+
+        assertThat(request.path(), is("/namespaces/1/services/1000000000000000000000"));
+        assertThat(request.rawQuery(), is("limit=1.5&small=0.00000015&big=9007199254740993"));
+    }
+
+    @Test
+    void write_a_big_decimal_and_a_float_in_plain_notation() {
+        assertThat(ExtensionTools.scalarText(new BigDecimal("1.2300E+5")), is("123000"));
+        assertThat(ExtensionTools.scalarText(new BigDecimal("0.000")), is("0"));
+        assertThat(ExtensionTools.scalarText(2.5f), is("2.5"));
+        assertThat(ExtensionTools.scalarText(-0.0), is("0"));
+        assertThat(ExtensionTools.scalarText(new BigInteger("123456789012345678901234567890")), is("123456789012345678901234567890"));
+        assertThat(ExtensionTools.scalarText(true), is("true"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a\nb", "a\tb", "a\u0000b", "a\u007fb", "\ud800", "a\udc00b"})
+    void refuse_a_query_value_or_name_that_hub_refuses_and_name_the_property(String value) {
+        String message = "must not contain a control character or a lone surrogate, because it goes in the query";
+
+        assertThat(assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(tool("list-services"),
+                new JsonObject().put("namespace", "finos").put("q", value))).getMessage(), is("Input property 'q' " + message));
+        assertThat(assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(tool("list-services"),
+                new JsonObject().put("namespace", "finos").put("tag", new JsonArray().add("ok").add(value)))).getMessage(),
+                is("Input property 'tag' " + message));
+        assertThat(assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(tool("list-services"),
+                new JsonObject().put("namespace", "finos").put(value, "x"))).getMessage(), is("Input property '" + value + "' " + message));
+    }
+
+    @Test
+    void send_a_control_character_in_an_object_query_value_or_a_body_as_json() throws IOException {
+        ExtensionProxyRequest query = ExtensionTools.request(tool("list-services"),
+                new JsonObject().put("namespace", "finos").put("filter", new JsonObject().put("q", "a\nb")));
+        ExtensionProxyRequest body = ExtensionTools.request(tool("add-service"),
+                new JsonObject().put("namespace", "finos").put("note", "a\nb"));
+
+        assertThat(query.rawQuery(), is("filter=%7B%22q%22%3A%22a%5Cnb%22%7D"));
+        assertThat(body(body), is("{\"note\":\"a\\nb\"}"));
+    }
+
+    @Test
+    void refuse_a_parameter_value_that_matches_another_route() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
+                tool("get-service"), new JsonObject().put("service", "admin")));
+
+        assertThat(e.getMessage(), is("The input fills the path /services/{service} so that it matches route "
+                + "'service-admin', not route 'service' of this command."));
+        assertThat(ExtensionTools.request(tool("get-service"), new JsonObject().put("service", "admins")).path(),
+                is("/services/admins"));
+    }
+
+    @Test
+    void return_a_value_that_matches_another_route_as_a_tool_error_before_the_scope_check() {
+        ToolResponse response = extensionTools.call(tool("get-service"), Map.of("service", "admin"));
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), startsWith("Error: The input fills the path /services/{service} so that it matches route"));
+        verify(proxyService, never()).checkAccess(any(), any());
+        verify(proxyService, never()).call(any(), any());
+    }
+
+    // GET /api/calm/extensions/mcp-test/api/namespaces/finos/services?x=<value> HTTP/1.1
+    private static final int LIST_SERVICES_LINE = "GET /api/calm/extensions/mcp-test/api/namespaces/finos/services?x= HTTP/1.1".length();
+
+    @Test
+    void accept_a_request_line_of_the_rest_limit() {
+        String value = "a".repeat(ExtensionTools.MAX_REQUEST_LINE_LENGTH - LIST_SERVICES_LINE);
 
         ExtensionProxyRequest request = ExtensionTools.request(tool("list-services"),
-                new JsonObject().put("namespace", "finos").put("x", query.substring(2)));
+                new JsonObject().put("namespace", "finos").put("x", value));
 
-        assertThat(request.path().length() + 1 + request.rawQuery().length(), is(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH));
+        assertThat(request.rawQuery(), is("x=" + value));
     }
 
     @Test
-    void refuse_a_path_and_query_longer_than_the_rest_limit() {
-        String value = "a".repeat(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH - "/namespaces/finos/services?x=".length() + 1);
+    void refuse_a_request_line_longer_than_the_rest_limit() {
+        String value = "a".repeat(ExtensionTools.MAX_REQUEST_LINE_LENGTH - LIST_SERVICES_LINE + 1);
+        // POST /api/calm/extensions/mcp-test/api/namespaces/<namespace>/services HTTP/1.1
+        String namespace = "a".repeat(ExtensionTools.MAX_REQUEST_LINE_LENGTH
+                - "POST /api/calm/extensions/mcp-test/api/namespaces//services HTTP/1.1".length() + 1);
 
         IllegalArgumentException query = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
                 tool("list-services"), new JsonObject().put("namespace", "finos").put("x", value)));
         IllegalArgumentException path = assertThrows(IllegalArgumentException.class, () -> ExtensionTools.request(
-                tool("add-service"), new JsonObject().put("namespace", "a".repeat(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH))));
+                tool("add-service"), new JsonObject().put("namespace", namespace)));
+        ExtensionProxyRequest longest = ExtensionTools.request(tool("add-service"),
+                new JsonObject().put("namespace", namespace.substring(1)));
 
-        assertThat(query.getMessage(), is("The path and query are longer than 4096 characters."));
-        assertThat(path.getMessage(), is("The path and query are longer than 4096 characters."));
+        assertThat(query.getMessage(), is(LINE_TOO_LONG));
+        assertThat(path.getMessage(), is(LINE_TOO_LONG));
+        assertThat(longest.path(), is("/namespaces/" + namespace.substring(1) + "/services"));
     }
 
     @Test
     void return_a_long_query_as_a_tool_error_without_calling_the_extension() {
         ToolResponse response = extensionTools.call(tool("list-services"),
-                Map.of("namespace", "finos", "tag", List.of("a".repeat(ExtensionTools.MAX_PATH_AND_QUERY_LENGTH))));
+                Map.of("namespace", "finos", "tag", List.of("a".repeat(ExtensionTools.MAX_REQUEST_LINE_LENGTH))));
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), is("Error: The path and query are longer than 4096 characters."));
+        assertThat(text(response), is("Error: " + LINE_TOO_LONG));
         verify(proxyService, never()).checkAccess(any(), any());
         verify(proxyService, never()).call(any(), any());
     }

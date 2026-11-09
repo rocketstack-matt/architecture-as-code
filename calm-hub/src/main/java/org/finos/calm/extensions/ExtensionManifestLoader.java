@@ -58,6 +58,9 @@ public class ExtensionManifestLoader {
                     + "|Property name \".*\" does not match schema");
     private static final Pattern ADDITIONAL_PROPERTY = Pattern.compile("Property \".*\" does not match additional properties schema");
     private static final Set<String> GET_ONLY_POINTS = Set.of("screen", "designer-tab", "landing-card", "detail-panel");
+    /** The path parameters that the UI can fill for a designer tab (calm-hub-ui contributions.ts). */
+    static final List<String> DESIGNER_TAB_PARAMS = List.of("namespace", "resourceType", "resourceId", "version",
+            "selectedElement");
 
     private final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
@@ -150,6 +153,7 @@ public class ExtensionManifestLoader {
         if (!problems.isEmpty()) {
             throw invalid(source, problems);
         }
+        warnUnfillableTabs(manifest, source);
         return manifest;
     }
 
@@ -287,6 +291,20 @@ public class ExtensionManifestLoader {
                     problems.add("decorator-views '" + view.id() + "' is declared more than once");
                 }
             }
+        }
+    }
+
+    /**
+     * The UI fills a designer tab path only from the resource it shows, so it hides a tab whose path needs
+     * another parameter. Hub still loads the manifest, because the route can serve other contributions.
+     */
+    private static void warnUnfillableTabs(ExtensionManifest manifest, String source) {
+        for (ExtensionManifest.RouteContribution tab : manifest.contributes().byRoutePoint().getOrDefault("designer-tab", List.of())) {
+            manifest.route(tab.route()).ifPresent(route -> pathParams(route.path()).stream()
+                    .filter(param -> !DESIGNER_TAB_PARAMS.contains(param))
+                    .forEach(param -> LOG.warn("Extension manifest {}: the UI hides designer-tab '{}', because it cannot fill "
+                            + "{{}} in the path of route '{}'. It fills only {}", source, tab.id(), param, route.id(),
+                            DESIGNER_TAB_PARAMS)));
         }
     }
 

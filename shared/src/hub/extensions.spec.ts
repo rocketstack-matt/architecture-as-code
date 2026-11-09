@@ -1,5 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { buildExtensionRequest, extensionProxyPath, HubExtensionRoute } from './extensions';
+import { buildExtensionRequest, extensionProxyPath, HubExtensionRoute, numberText } from './extensions';
+
+// One list for the clients and Hub: TestExtensionToolsShould checks it against ExtensionPaths.
+const PATH_VALUES: { refused: string[], accepted: string[] } = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '../../../calm-hub/src/test/resources/extensions-test/path-values.json'), 'utf-8'));
+const PATH_RULE = 'must not be empty or ., or contain .., /, \\, %, @, a look-alike of / or \\, a control character or a lone surrogate';
 
 const route = (method: string, path: string): HubExtensionRoute => ({ id: 'r', method, path, scope: 'read' });
 
@@ -57,17 +64,48 @@ describe('buildExtensionRequest', () => {
         expect(request.path).toBe('/api/calm/extensions/ext/api/namespaces/.admin%3Fx%3D1%20%C3%A9');
     });
 
-    it.each(['', '.', '..', 'a..b', 'architectures/1', '/', '../admin', 'a\\b', '50%', 'alice@x', 'a\u0000b', 'a\u007fb'])(
-        'fails when a path parameter has a part that Hub refuses: %j', (value) => {
-            expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
-                .toThrow('Input property \'namespace\' must not be empty or ., or contain .., /, \\, %, @ or a control character, '
-                    + 'because it fills the path /namespaces/{namespace}');
-        });
+    // Some JSON parsers refuse a lone surrogate, so the shared list has none.
+    it.each([...PATH_VALUES.refused, '\ud800', 'a\udc00b'])('fails when a path parameter has a part that Hub refuses: %j', (value) => {
+        expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
+            .toThrow(`Input property 'namespace' ${PATH_RULE}, because it fills the path /namespaces/{namespace}`);
+    });
 
-    it.each(['.a', 'a.', 'v1.2', '~x_y-z', 1.5])('accepts the path parameter %j', (value) => {
+    it.each(PATH_VALUES.accepted)('accepts the path parameter %j', (value) => {
         const request = buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value });
 
-        expect(request.path).toBe(`/api/calm/extensions/ext/api/namespaces/${value}`);
+        expect(request.path).toBe(`/api/calm/extensions/ext/api/namespaces/${encodeURIComponent(value)}`);
+    });
+
+    it('accepts a number that fills the path', () => {
+        expect(buildExtensionRequest('ext', route('GET', '/items/{id}'), { id: 1.5 }).path).toBe('/api/calm/extensions/ext/api/items/1.5');
+    });
+
+    it.each([[1.0, '1'], [1e21, '1000000000000000000000'], [1.5e-7, '0.00000015'], [-0, '0']])(
+        'writes the number %j in the path and the query in plain notation as MCP does', (value, text) => {
+            const request = buildExtensionRequest('ext', route('GET', '/items/{id}'), { id: value, n: value });
+
+            expect(request.path).toBe(`/api/calm/extensions/ext/api/items/${text}`);
+            expect(request.query).toEqual([['n', text]]);
+        });
+
+    it.each(['a\nb', 'a\tb', 'a\u0000b', 'a\u007fb', '\ud800'])('fails when a query value has a character that Hub refuses: %j', (value) => {
+        expect(() => buildExtensionRequest('ext', route('GET', '/search'), { q: value }))
+            .toThrow('Input property \'q\' must not contain a control character or a lone surrogate, because it goes in the query');
+        expect(() => buildExtensionRequest('ext', route('DELETE', '/search'), { tags: ['ok', value] }))
+            .toThrow('Input property \'tags\'');
+    });
+
+    it('fails when a query name has a control character', () => {
+        expect(() => buildExtensionRequest('ext', route('GET', '/search'), { 'a\nb': 'x' }))
+            .toThrow('Input property \'a\nb\' must not contain a control character');
+    });
+
+    it('sends a control character in an object query value as JSON escapes', () => {
+        expect(buildExtensionRequest('ext', route('GET', '/search'), { q: { text: 'a\nb' } }).query).toEqual([['q', '{"text":"a\\nb"}']]);
+    });
+
+    it('sends a control character in the body of a write', () => {
+        expect(buildExtensionRequest('ext', route('POST', '/search'), { q: 'a\nb' }).body).toEqual({ q: 'a\nb' });
     });
 
     it('fills a parameter that the path uses twice', () => {
@@ -84,13 +122,23 @@ describe('buildExtensionRequest', () => {
         expect(input).toEqual({ namespace: 'finos', name: 'payments' });
     });
 
-    it('fails when a path parameter is missing', () => {
+    it.each([undefined, null])('fails when a path parameter is %j', (value) => {
+        expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
+            .toThrow('Input property \'namespace\' is required, because it fills the path /namespaces/{namespace}');
         expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), {}))
-            .toThrow('Input property \'namespace\' must be a string, number or boolean, because it fills the path /namespaces/{namespace}');
+            .toThrow('Input property \'namespace\' is required');
     });
 
     it('fails when a path parameter is an object', () => {
         expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: { a: 1 } }))
-            .toThrow('Input property \'namespace\'');
+            .toThrow('Input property \'namespace\' must be a string, number or boolean');
     });
+});
+
+describe('numberText', () => {
+    it.each([[0, '0'], [42, '42'], [-1.25, '-1.25'], [1e21, '1000000000000000000000'], [1.5e21, '1500000000000000000000'],
+        [1.2345e22, '12345000000000000000000'], [1e-7, '0.0000001'], [-1.23e-7, '-0.000000123'], [0.000001, '0.000001']])(
+        'writes %j as %j', (value, text) => {
+            expect(numberText(value)).toBe(text);
+        });
 });

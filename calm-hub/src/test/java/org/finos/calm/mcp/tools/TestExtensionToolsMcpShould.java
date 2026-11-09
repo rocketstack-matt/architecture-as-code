@@ -262,7 +262,7 @@ class TestExtensionToolsMcpShould {
     @TestSecurity(user = "alice")
     void refuse_encoded_and_dot_segment_parameter_values_as_the_rest_proxy_does() {
         for (String value : new String[]{"%61dmin", "%2e%2e", "%2F", "a/../b", "architectures/1", "..", "a..b", "a\\b",
-                "alice@x", "50%"}) {
+                "alice@x", "50%", "a\u0000b", "a\tb", "a\u007fb", "a\u2215b", "a\uff3cb"}) {
             JsonObject result = callTool("ext_mcp-test_get-service", new JsonObject().put("service", value));
 
             assertThat(value, result.getBoolean("isError"), is(true));
@@ -277,11 +277,24 @@ class TestExtensionToolsMcpShould {
 
     @Test
     @TestSecurity(user = "alice")
-    void match_a_parameter_value_against_a_protected_literal_route_as_the_rest_proxy_does() {
+    void refuse_an_empty_parameter_value_that_rest_does_not_route() {
+        JsonObject result = callTool("ext_mcp-test_get-service", new JsonObject().put("service", ""));
+
+        assertThat(result.getBoolean("isError"), is(true));
+        assertThat(text(result), containsString("Input property 'service' must not be empty or ., or contain"));
+        given().when().get("/api/calm/extensions/mcp-test/api/services/")
+                .then().statusCode(404);
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void refuse_a_parameter_value_that_matches_another_route_where_rest_checks_that_route() {
         JsonObject result = callTool("ext_mcp-test_get-service", new JsonObject().put("service", "admin"));
 
         assertThat(result.getBoolean("isError"), is(true));
-        assertThat(text(result), is("Error: You do not have the scope that this extension route needs"));
+        assertThat(text(result), is("Error: The input fills the path /services/{service} so that it matches route "
+                + "'service-admin', not route 'service' of this command."));
         given().when().get("/api/calm/extensions/mcp-test/api/services/admin")
                 .then().statusCode(403).body("error", is("You do not have the scope that this extension route needs"));
         assertThat(backend.received(), nullValue());
@@ -350,7 +363,7 @@ class TestExtensionToolsMcpShould {
                 Map.of("type", "object", "properties", Map.of("limit", "integer")), null, null, null);
 
         extensionTools.register(List.of(new ExtensionTools.ExtensionTool("ext_mcp-test_refused", "mcp-test", "MCP test",
-                "refused", command, route, null)));
+                "refused", command, route, null, List.of(route))));
 
         assertThat(toolManager.getTool("ext_mcp-test_refused"), nullValue());
         assertThat(listTools().stream().map(t -> ((JsonObject) t).getString("name")).toList()

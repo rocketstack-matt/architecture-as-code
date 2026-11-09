@@ -47,46 +47,86 @@ export function extensionProxyPath(extensionId: string, routePath: string): stri
  * Maps a command input to a request on the route (ADR 0012). Input properties that match a
  * `{param}` fill the path. The rest go to the query for GET and DELETE, and to the JSON body otherwise.
  * The extension validates the input (the REST proxy does not), so this checks only what it needs to build the request.
- * @throws Error when a path parameter is missing, is not a string, number or boolean, or has a part that Hub refuses in a path.
+ * @throws Error when a path parameter is missing, is not a string, number or boolean, or has a part that Hub refuses
+ * in a path, or when a query name or value has a character that Hub refuses in a query.
  */
 export function buildExtensionRequest(extensionId: string, route: HubExtensionRoute, input: Record<string, unknown>): HubExtensionRequest {
     const rest: Record<string, unknown> = { ...input };
     const path = route.path.replace(PATH_PARAM, (_match, name: string) => {
         const value = input[name];
+        if (value === undefined || value === null) {
+            throw new Error(`Input property '${name}' is required, because it fills the path ${route.path}`);
+        }
         if (!isScalar(value)) {
             throw new Error(`Input property '${name}' must be a string, number or boolean, because it fills the path ${route.path}`);
         }
-        if (!isPathValue(String(value))) {
+        const text = scalarText(value);
+        if (!isPathValue(text)) {
             throw new Error(`Input property '${name}' ${PATH_VALUE_RULE}, because it fills the path ${route.path}`);
         }
         delete rest[name];
-        return encodeURIComponent(String(value));
+        return encodeURIComponent(text);
     });
     const method = route.method.toUpperCase();
     const request: HubExtensionRequest = { method, path: extensionProxyPath(extensionId, path), query: [] };
     if (method === 'GET' || method === 'DELETE') {
-        request.query = Object.entries(rest).flatMap(([key, value]) => toQueryValues(value).map((v): [string, string] => [key, v]));
+        request.query = Object.entries(rest).flatMap(([key, value]) => toQueryValues(value).map((v): [string, string] => {
+            if (!isQueryText(key) || !isQueryText(v)) {
+                throw new Error(`Input property '${key}' ${QUERY_VALUE_RULE}, because it goes in the query`);
+            }
+            return [key, v];
+        }));
     } else {
         request.body = rest;
     }
     return request;
 }
 
-const PATH_VALUE_RULE = 'must not be empty or ., or contain .., /, \\, %, @ or a control character';
+const PATH_VALUE_RULE = 'must not be empty or ., or contain .., /, \\, %, @, a look-alike of / or \\, a control character or a lone surrogate';
+const QUERY_VALUE_RULE = 'must not contain a control character or a lone surrogate';
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
-// Hub refuses these parts of a path (ADR 0011), so a value with one would get a generic 400.
+// Hub refuses these parts of a path (ADR 0011), so a value with one would get a generic 400. A look-alike of / or \
+// is refused because a backend that normalises Unicode can read it as one. encodeURIComponent throws on a lone surrogate.
 function isPathValue(value: string): boolean {
+    return value !== '' && value !== '.' && !LONE_SURROGATE.test(value)
+        // eslint-disable-next-line no-control-regex
+        && !/\.\.|[/\\%@\u0000-\u001f\u007f⁄∕∖⧵⧸﹨／＼]/.test(value);
+}
+
+// Hub refuses an encoded control character in a query. URLSearchParams would send a lone surrogate as U+FFFD.
+function isQueryText(value: string): boolean {
     // eslint-disable-next-line no-control-regex
-    return value !== '' && value !== '.' && !/\.\.|[/\\%@\u0000-\u001f\u007f]/.test(value);
+    return !LONE_SURROGATE.test(value) && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
 function isScalar(value: unknown): value is string | number | boolean {
     return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
 
+function scalarText(value: string | number | boolean): string {
+    return typeof value === 'number' ? numberText(value) : String(value);
+}
+
+/**
+ * A number in plain notation, with no exponent and no trailing zeros, as MCP writes it, so that both fill a
+ * path or query with the same text: `1e21` gives `1000000000000000000000` and `1e-7` gives `0.0000001`.
+ */
+export function numberText(value: number): string {
+    const text = String(value);
+    const match = /^(-?)(\d)(?:\.(\d+))?e([+-]\d+)$/.exec(text);
+    if (!match) return text;
+    const [, sign, first, fraction = '', exponent] = match;
+    const digits = first + fraction;
+    const point = 1 + Number(exponent);
+    if (point <= 0) return `${sign}0.${'0'.repeat(-point)}${digits}`;
+    if (point >= digits.length) return sign + digits + '0'.repeat(point - digits.length);
+    return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
+}
+
 // An array repeats the key; an object or null is sent as JSON.
 function toQueryValues(value: unknown): string[] {
     if (value === undefined) return [];
     if (Array.isArray(value)) return value.flatMap(toQueryValues);
-    return [isScalar(value) ? String(value) : JSON.stringify(value)];
+    return [isScalar(value) ? scalarText(value) : JSON.stringify(value)];
 }
