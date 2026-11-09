@@ -97,9 +97,8 @@ public class ExtensionIdentitySigner {
     }
 
     void load() {
-        // calm.hub.base-url is read at run time, as the other users of it do.
-        Optional<String> baseUrl = properties.getOptionalValue("calm.hub.base-url", String.class);
-        issuer = baseUrl.orElse(DEFAULT_ISSUER);
+        // The same default as PluginAuthResource and CalmDocumentParser, which inject calm.hub.base-url.
+        issuer = properties.getOptionalValue("calm.hub.base-url", String.class).orElse(DEFAULT_ISSUER);
         ttlSeconds = config.identity().ttlSeconds();
         if (ttlSeconds < 1 || ttlSeconds > MAX_TTL_SECONDS) {
             throw invalid(PREFIX + "ttl-seconds must be between 1 and " + MAX_TTL_SECONDS + ", but was " + ttlSeconds);
@@ -140,8 +139,9 @@ public class ExtensionIdentitySigner {
         }
         jwks = List.copyOf(keys);
         signingKey = new SigningKey(privateKey, alg, keys.getFirst().get("kid"));
-        if (baseUrl.isEmpty() && hasRoutes()) {
-            LOG.warn("calm.hub.base-url is not set, so the iss claim of each extension identity assertion is {}. "
+        // application-oidc.properties sets the default when CALM_HUB_BASE_URL is not set, so check the value.
+        if (DEFAULT_ISSUER.equals(issuer) && hasRoutes()) {
+            LOG.warn("calm.hub.base-url is the default {}, so it is the iss claim of each extension identity assertion. "
                     + "A backend that expects the real CALM Hub URL refuses every assertion", DEFAULT_ISSUER);
         }
     }

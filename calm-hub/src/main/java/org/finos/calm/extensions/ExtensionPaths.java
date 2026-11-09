@@ -11,8 +11,8 @@ import java.util.Locale;
  * check works on the raw, percent-encoded form, so that an encoded or double-encoded form cannot
  * hide a dot segment, an extra segment or user info. An encoded slash is not allowed, because a
  * backend that decodes it before routing sees a path other than the one that Hub matched. For the
- * same reason, an encoded look-alike of a slash or a backslash is not allowed: a backend that
- * normalises Unicode (NFKC) before routing reads U+FF0F as a slash. A matrix parameter is not
+ * same reason, an encoded look-alike of /, \, ., %, @ or ; is not allowed: a backend that
+ * normalises Unicode (NFKC) before routing reads U+FF0F as a slash, and U+2025 as "..". A matrix parameter is not
  * allowed, because JAX-RS drops it from the path that Hub matches.
  */
 public final class ExtensionPaths {
@@ -21,7 +21,11 @@ public final class ExtensionPaths {
     public static final List<String> FORBIDDEN = List.of("..", "%2e", "%2f", "%5c", "%25", "%40", "\\", "//", "@", ";",
             // U+2044 fraction slash, U+2215 division slash, U+2216 set minus, U+29F5 reverse solidus operator,
             // U+29F8 big solidus, U+FE68 small reverse solidus, U+FF0F fullwidth solidus, U+FF3C fullwidth reverse solidus.
-            "%e2%81%84", "%e2%88%95", "%e2%88%96", "%e2%a7%b5", "%e2%a7%b8", "%ef%b9%a8", "%ef%bc%8f", "%ef%bc%bc");
+            "%e2%81%84", "%e2%88%95", "%e2%88%96", "%e2%a7%b5", "%e2%a7%b8", "%ef%b9%a8", "%ef%bc%8f", "%ef%bc%bc",
+            // The code points whose NFKC form is only ., %, @ or ;: U+037E, U+2024 to U+2026, U+FE14, U+FE19, U+FE30,
+            // U+FE52, U+FE54, U+FE6A, U+FE6B, U+FF05, U+FF0E, U+FF1B and U+FF20. U+2025 becomes "..".
+            "%cd%be", "%e2%80%a4", "%e2%80%a5", "%e2%80%a6", "%ef%b8%94", "%ef%b8%99", "%ef%b8%b0", "%ef%b9%92",
+            "%ef%b9%94", "%ef%b9%aa", "%ef%b9%ab", "%ef%bc%85", "%ef%bc%8e", "%ef%bc%9b", "%ef%bc%a0");
 
     public static final String NOT_ALLOWED = "The extension path or query is not allowed";
 

@@ -120,7 +120,7 @@ class TestExtensionIdentitySignerShould {
     }
 
     @Test
-    void warn_when_an_extension_has_routes_and_the_hub_url_is_not_set() {
+    void warn_when_an_extension_has_routes_and_the_hub_url_is_the_default() {
         ExtensionTestKeys.KeyFiles keys = ExtensionTestKeys.rsa(tempDir, "hub");
         useKeys(keys.privateKey(), keys.publicKey());
         assertThat(TestExtensionManifestLoaderShould.captureWarnings(ExtensionIdentitySigner.class, this::signer), empty());
@@ -130,7 +130,12 @@ class TestExtensionIdentitySignerShould {
         when(registry.enabled()).thenReturn(List.of(new RegisteredExtension(manifest, 0, Optional.empty(),
                 new ExtensionLimits(Duration.ofSeconds(1), Duration.ofSeconds(1), 1, 1, 1))));
         assertThat(TestExtensionManifestLoaderShould.captureWarnings(ExtensionIdentitySigner.class, this::signer),
-                contains(containsString("calm.hub.base-url is not set")));
+                contains(containsString("calm.hub.base-url is the default")));
+
+        // As application-oidc.properties sets it when CALM_HUB_BASE_URL is not set.
+        properties.put("calm.hub.base-url", "http://localhost:8080");
+        assertThat(TestExtensionManifestLoaderShould.captureWarnings(ExtensionIdentitySigner.class, this::signer),
+                contains(containsString("calm.hub.base-url is the default")));
 
         properties.put("calm.hub.base-url", "https://hub.example.com");
         assertThat(TestExtensionManifestLoaderShould.captureWarnings(ExtensionIdentitySigner.class, this::signer), empty());

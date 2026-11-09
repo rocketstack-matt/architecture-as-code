@@ -6,6 +6,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.security.TestSecurity;
+import io.restassured.response.Response;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import jakarta.inject.Inject;
@@ -36,6 +37,7 @@ import static org.finos.calm.mcp.tools.McpTestClient.text;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.verify;
@@ -115,6 +117,25 @@ class TestExtensionToolsMcpShould {
         JsonObject result = wrapped.getJsonObject("properties").getJsonObject("result");
         assertThat(result.containsKey("$ref"), is(false));
         assertThat(result.getJsonArray("allOf"), is(new JsonArray().add(new JsonObject().put("$ref", "#/$defs/names"))));
+    }
+
+    // A page on another site can POST text/plain with no preflight, but it cannot read or send an Mcp-Session-Id.
+    @Test
+    @TestSecurity(user = "alice")
+    void refuse_a_text_plain_tool_call_with_no_session() {
+        when(mockUserAccessStore.getGrantsForUser("alice"))
+                .thenReturn(List.of(new UserAccess("alice", UserAccess.Permission.read, "finos")));
+        backend.reply(FixtureBackend.Reply.json(200, "{\"services\":[\"payments\"]}"));
+        JsonObject call = new JsonObject().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call")
+                .put("params", new JsonObject().put("name", "ext_mcp-test_list-services")
+                        .put("arguments", new JsonObject().put("namespace", "finos")));
+
+        Response response = given().contentType("text/plain").accept("application/json, text/event-stream")
+                .body(call.encode()).post("/mcp");
+
+        assertThat(response.asString(), response.asString(), not(containsString("\"result\"")));
+        assertThat(response.asString(), containsString("\"error\""));
+        assertThat(backend.received(), nullValue());
     }
 
     @Test
@@ -263,13 +284,13 @@ class TestExtensionToolsMcpShould {
     @TestSecurity(user = "alice")
     void refuse_encoded_and_dot_segment_parameter_values_as_the_rest_proxy_does() {
         for (String value : new String[]{"%61dmin", "%2e%2e", "%2F", "a/../b", "architectures/1", "..", "a..b", "a\\b",
-                "alice@x", "50%", "a\u0000b", "a\tb", "a\u007fb", "a\u2215b", "a\uff3cb"}) {
+                "alice@x", "50%", "a\u0000b", "a\tb", "a\u007fb", "a\u2215b", "a\uff3cb", "a\u2025b", "a\uff20b"}) {
             JsonObject result = callTool("ext_mcp-test_get-service", new JsonObject().put("service", value));
 
             assertThat(value, result.getBoolean("isError"), is(true));
             assertThat(value, text(result), containsString("Input property 'service' must not be empty or ., or contain"));
             given().urlEncodingEnabled(false)
-                    .when().get("/api/calm/extensions/mcp-test/api/services/" + ExtensionTools.encode(value))
+                    .when().get("/api/calm/extensions/mcp-test/api/services/" + ExtensionTools.encodePathValue(value))
                     .then().statusCode(400).body("error", is("The extension path or query is not allowed"));
         }
         assertThat(backend.received(), nullValue());

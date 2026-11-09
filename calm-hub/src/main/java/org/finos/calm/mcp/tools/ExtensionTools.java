@@ -5,10 +5,12 @@ import io.quarkiverse.mcp.server.ToolManager;
 import io.quarkiverse.mcp.server.ToolResponse;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.quarkus.vertx.http.runtime.CurrentVertxRequest;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 import io.vertx.json.schema.Draft;
 import io.vertx.json.schema.JsonSchema;
 import io.vertx.json.schema.JsonSchemaOptions;
@@ -92,13 +94,14 @@ public class ExtensionTools {
     // HTTP/1.1), so that an MCP call cannot send a path and query that the same REST call cannot.
     static final int MAX_REQUEST_LINE_LENGTH = 4096;
     private static final String HTTP_VERSION = "HTTP/1.1";
-    // Hub refuses these parts of a path, also a look-alike of / or \ (ExtensionPaths.FORBIDDEN). The same rule as
-    // @finos/calm-shared buildExtensionRequest. The test resource extensions-test/path-values.json ties them together.
-    private static final Pattern REFUSED_PATH_VALUE = Pattern.compile(
-            "\\.\\.|[/\\\\%@\\x00-\\x1f\\x7f\\u2044\\u2215\\u2216\\u29f5\\u29f8\\ufe68\\uff0f\\uff3c]");
+    // Hub refuses these parts of a path, also a look-alike of /, \, ., %, @ or ; (ExtensionPaths.FORBIDDEN). The same
+    // rule as @finos/calm-shared buildExtensionRequest. The test resource extensions-test/path-values.json ties them together.
+    private static final Pattern REFUSED_PATH_VALUE = Pattern.compile("\\.\\.|[/\\\\%@\\x00-\\x1f\\x7f"
+            + "\\u037e\\u2024-\\u2026\\u2044\\u2215\\u2216\\u29f5\\u29f8\\ufe14\\ufe19\\ufe30\\ufe52\\ufe54\\ufe68\\ufe6a\\ufe6b"
+            + "\\uff05\\uff0e\\uff0f\\uff1b\\uff20\\uff3c]");
     private static final Pattern CONTROL_CHARACTER = Pattern.compile("[\\x00-\\x1f\\x7f]");
-    private static final String PATH_VALUE_RULE = "must not be empty or ., or contain .., /, \\, %, @, a look-alike of / "
-            + "or \\, a control character or a lone surrogate";
+    private static final String PATH_VALUE_RULE = "must not be empty or ., or contain .., /, \\, %, @, a look-alike of /, "
+            + "\\, ., %, @ or ;, a control character or a lone surrogate";
     private static final String QUERY_VALUE_RULE = "must not contain a control character or a lone surrogate";
     private static final String META_SCHEMA_BASE = "https://json-schema.org/draft/2020-12/";
     private static final String META_SCHEMA = META_SCHEMA_BASE + "schema";
@@ -170,6 +173,13 @@ public class ExtensionTools {
 
     @Inject
     SecurityIdentity identity;
+
+    @ConfigProperty(name = "calm.audit.capture-source-ip", defaultValue = "false")
+    boolean captureSourceIp;
+
+    // The MCP HTTP transport sets the current request when it starts the request context of a call.
+    @Inject
+    CurrentVertxRequest currentRequest;
 
     SchemaRepository metaSchemas = META_SCHEMAS;
 
@@ -704,7 +714,8 @@ public class ExtensionTools {
             if (input.toBuffer().length() > MAX_ARGUMENTS_BYTES) {
                 return ToolResponse.error("Error: The arguments are larger than " + MAX_ARGUMENTS_BYTES + " bytes of JSON.");
             }
-            request = request(tool, input);
+            // The mapping errors come before the scope check: they need no scope, and they cost little.
+            request = request(tool, input, sourceIp());
         } catch (IllegalArgumentException e) {
             return ToolResponse.error("Error: " + e.getMessage());
         } catch (StackOverflowError e) {
@@ -722,6 +733,15 @@ public class ExtensionTools {
         } catch (ExtensionProxyException e) {
             return ToolResponse.error("Error: " + e.getMessage());
         }
+    }
+
+    // The audit log has the X-Forwarded-For header of the MCP request, as for a REST call.
+    private String sourceIp() {
+        if (!captureSourceIp || currentRequest == null) {
+            return null;
+        }
+        RoutingContext current = currentRequest.getCurrent();
+        return current == null ? null : current.request().getHeader("X-Forwarded-For");
     }
 
     private static String validate(ExtensionTool tool, JsonObject input) {
@@ -754,6 +774,11 @@ public class ExtensionTools {
      * the path. The rest go to the query for GET and DELETE, and to the JSON body for other methods.
      */
     static ExtensionProxyRequest request(ExtensionTool tool, JsonObject input) {
+        return request(tool, input, null);
+    }
+
+    /** {@code sourceIp} is for the audit log, and can be null. */
+    static ExtensionProxyRequest request(ExtensionTool tool, JsonObject input, String sourceIp) {
         ExtensionManifest.Route route = tool.route();
         Map<String, Object> rest = new LinkedHashMap<>(input.getMap());
         Matcher matcher = PATH_PARAM.matcher(route.path());
@@ -775,7 +800,7 @@ public class ExtensionTools {
                         + ", because it fills the path " + route.path());
             }
             rest.remove(name);
-            matcher.appendReplacement(path, Matcher.quoteReplacement(encode(text)));
+            matcher.appendReplacement(path, Matcher.quoteReplacement(encodePathValue(text)));
         }
         matcher.appendTail(path);
         String method = route.method();
@@ -791,7 +816,7 @@ public class ExtensionTools {
                     throw new IllegalArgumentException("Input property '" + name + "' " + QUERY_VALUE_RULE
                             + ", because it goes in the query");
                 }
-                parameters.add(encode(name) + "=" + encode(v));
+                parameters.add(encodeQueryText(name) + "=" + encodeQueryText(v));
             }));
             query = parameters.isEmpty() ? null : String.join("&", parameters);
         }
@@ -802,11 +827,12 @@ public class ExtensionTools {
                     + "would be longer than " + MAX_REQUEST_LINE_LENGTH + " characters.");
         }
         if (queryMethod) {
-            return new ExtensionProxyRequest(tool.extensionId(), method, path.toString(), query, null, null, null, null);
+            return new ExtensionProxyRequest(tool.extensionId(), method, path.toString(), query, null, null, null, null,
+                    null, sourceIp, null);
         }
         byte[] body = new JsonObject(rest).encode().getBytes(StandardCharsets.UTF_8);
         return new ExtensionProxyRequest(tool.extensionId(), method, path.toString(), null, "application/json", null,
-                null, new ByteArrayInputStream(body));
+                null, null, null, sourceIp, new ByteArrayInputStream(body));
     }
 
     /**
@@ -910,14 +936,28 @@ public class ExtensionTools {
         return List.of(Json.encode(value));
     }
 
-    /** Percent-encodes all but the RFC 3986 unreserved characters, so a value cannot add a path segment. */
-    static String encode(String value) {
+    /**
+     * Encodes a path value as encodeURIComponent in the shared client does, so that both clients send, and Hub signs,
+     * the same path for one input. It leaves the RFC 3986 unreserved characters and {@code !*'()} as they are, so a
+     * value cannot add a path segment.
+     */
+    static String encodePathValue(String value) {
+        return encode(value, "-._~!*'()", false);
+    }
+
+    /** Encodes a query name or value as URLSearchParams in the shared client does: a space becomes {@code +}. */
+    static String encodeQueryText(String value) {
+        return encode(value, "*-._", true);
+    }
+
+    private static String encode(String value, String unencoded, boolean plusForSpace) {
         StringBuilder sb = new StringBuilder();
         for (byte b : value.getBytes(StandardCharsets.UTF_8)) {
             int c = b & 0xff;
-            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                    || c == '-' || c == '.' || c == '_' || c == '~') {
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || unencoded.indexOf(c) >= 0) {
                 sb.append((char) c);
+            } else if (c == ' ' && plusForSpace) {
+                sb.append('+');
             } else {
                 sb.append('%').append(Character.toUpperCase(Character.forDigit(c >> 4, 16)))
                         .append(Character.toUpperCase(Character.forDigit(c & 0xf, 16)));
