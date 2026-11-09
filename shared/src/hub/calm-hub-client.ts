@@ -266,23 +266,23 @@ export class CalmHubClient {
     /**
      * Calls a route of an extension through the Hub proxy. On an error reply, the thrown
      * HubClientError carries the reply body as Hub sent it.
-     * @param extensionId Extension id.
+     * @param extension The extension, as listExtensions returns it. Its routes keep a filled path from calling another route.
      * @param route The route that the command names.
      * @param input The command input object.
      * @param options The client timeout. When it ends a write, CALM Hub and the extension can still complete the write.
      * @returns The reply status, content type and body.
      */
     async callExtension(
-        extensionId: string,
+        extension: Pick<HubExtension, 'id' | 'routes'>,
         route: HubExtensionRoute,
         input: Record<string, unknown>,
         options: HubExtensionCallOptions = {}
     ): Promise<HubExtensionResponse> {
         let request: HubExtensionRequest;
         try {
-            request = buildExtensionRequest(extensionId, route, input);
+            request = buildExtensionRequest(extension.id, route, input, extension.routes);
         } catch (err) {
-            throw new HubClientError(0, (err as Error).message, `${route.method.toUpperCase()} ${extensionProxyPath(extensionId, route.path)}`);
+            throw new HubClientError(0, (err as Error).message, `${route.method.toUpperCase()} ${extensionProxyPath(extension.id, route.path)}`);
         }
         const endpoint = `${request.method} ${request.path}`;
         try {
@@ -309,7 +309,7 @@ export class CalmHubClient {
                 }
                 throw new HubClientError(status, replyMessage(body, err.message), endpoint, body);
             }
-            if (axios.isAxiosError(err) && (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') && request.method !== 'GET') {
+            if (axios.isAxiosError(err) && WRITE_UNKNOWN_CODES.has(err.code ?? '') && request.method !== 'GET') {
                 throw new HubClientError(0, `${err.message}. CALM Hub and the extension can still complete the call, `
                     + 'so check whether the write happened before you send it again', endpoint);
             }
@@ -651,9 +651,14 @@ function parseReply(data: unknown, contentType: string | undefined): unknown {
     }
 }
 
+// The client stopped waiting, or the connection dropped, after it sent the request.
+const WRITE_UNKNOWN_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET']);
+
 const EMPTY_REPLY_MESSAGES: Record<number, string> = {
     401: 'Authentication is required, or the credentials are not valid',
     403: 'Access is denied',
+    // Vert.x refuses a request line that is too long with an empty 414. MCP checks the same limit.
+    414: 'The path and query are too long for CALM Hub',
 };
 
 // Hub sends { error }. An extension can pass through an RFC 9457 problem+json body with a title and a detail.

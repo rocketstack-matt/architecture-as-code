@@ -2418,7 +2418,7 @@ describe('hub-commands', () => {
                 await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'add-service', input: 'in.json' });
 
                 expect(fs.readFile).toHaveBeenCalledWith('in.json', 'utf-8');
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', addService, { namespace: 'finos', name: 'payments' }, { timeoutMs: undefined });
+                expect(mockClient.callExtension).toHaveBeenCalledWith(extension, addService, { namespace: 'finos', name: 'payments' }, { timeoutMs: undefined });
                 expect(hubOutput.printJsonSuccess).toHaveBeenCalledWith({ ok: true });
             });
 
@@ -2429,7 +2429,7 @@ describe('hub-commands', () => {
 
                 await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services', input: '-' });
 
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], { namespace: 'finos' }, { timeoutMs: undefined });
+                expect(mockClient.callExtension).toHaveBeenCalledWith(extension, extension.routes[0], { namespace: 'finos' }, { timeoutMs: undefined });
                 stdin.mockRestore();
             });
 
@@ -2438,7 +2438,7 @@ describe('hub-commands', () => {
 
                 await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services' });
 
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], {}, { timeoutMs: undefined });
+                expect(mockClient.callExtension).toHaveBeenCalledWith(extension, extension.routes[0], {}, { timeoutMs: undefined });
             });
 
             it('sets --arg values over the input, with the types that the input schema declares', async () => {
@@ -2450,7 +2450,7 @@ describe('hub-commands', () => {
                     args: ['namespace=finos', 'replicas=3', 'enabled=true', 'tags=["a"]', 'note=null', 'owner={"team":"x"}', 'extra=1'],
                 });
 
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', addService, {
+                expect(mockClient.callExtension).toHaveBeenCalledWith(extension, addService, {
                     namespace: 'finos', name: 'payments', replicas: 3, enabled: true, tags: ['a'], note: 'null', owner: { team: 'x' }, extra: '1',
                 }, { timeoutMs: undefined });
             });
@@ -2458,6 +2458,7 @@ describe('hub-commands', () => {
             it.each([
                 ['replicas', '9007199254740993'], ['replicas', '0x10'], ['replicas', '1e3'], ['replicas', '1.0'], ['replicas', '1.5'],
                 ['replicas', '-0'], ['replicas', '+5'], ['ratio', '0x10'], ['ratio', '1e3'], ['ratio', '9007199254740993'], ['ratio', '.5'],
+                ['ratio', 'NaN'], ['ratio', 'Infinity'], ['ratio', '-Infinity'],
             ])('keeps --arg %s=%s as a string, so that its value does not change', async (key, value) => {
                 const { mockClient } = await getSharedMocks();
 
@@ -2503,7 +2504,7 @@ describe('hub-commands', () => {
 
                 await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services', timeout });
 
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], {}, { timeoutMs });
+                expect(mockClient.callExtension).toHaveBeenCalledWith(extension, extension.routes[0], {}, { timeoutMs });
             });
 
             it.each(['0', '-1', 'soon', '', 'Infinity', '2147483.001', '2147484', '0x10', '1e3'])('exits without a call when --timeout is %j', async (timeout) => {
@@ -2525,7 +2526,7 @@ describe('hub-commands', () => {
                     args: ['namespace=finos', 'replicas=many', 'enabled=yes', 'tags=[oops', 'name=a=b', 'replicas2= '],
                 });
 
-                expect(mockClient.callExtension).toHaveBeenCalledWith('example', addService, {
+                expect(mockClient.callExtension).toHaveBeenCalledWith(extension, addService, {
                     namespace: 'finos', replicas: 'many', enabled: 'yes', tags: '[oops', name: 'a=b', replicas2: ' ',
                 }, { timeoutMs: undefined });
             });

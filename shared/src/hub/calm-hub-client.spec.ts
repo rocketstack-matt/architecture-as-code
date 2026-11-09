@@ -1,6 +1,6 @@
 import { AuthPlugin } from '../auth/auth-plugin';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import AxiosMockAdapter from 'axios-mock-adapter';
 import { CalmHubClient, HubClientError } from './calm-hub-client';
 import { DocumentMetadata } from './document-id-utils';
@@ -259,6 +259,7 @@ describe('CalmHubClient', () => {
     describe('callExtension', () => {
         const getRoute = { id: 'list', method: 'GET', path: '/namespaces/{namespace}/services', scope: 'read' };
         const postRoute = { id: 'add', method: 'POST', path: '/namespaces/{namespace}/services', scope: 'write' };
+        const example = { id: 'example', routes: [getRoute, postRoute] };
         const json = { 'content-type': 'application/json' };
 
         it('sends a GET with the path filled and the rest in the query', async () => {
@@ -268,7 +269,7 @@ describe('CalmHubClient', () => {
                 return [200, '{"services":["a"]}', json];
             });
 
-            await expect(client.callExtension('example', getRoute, { namespace: 'finos', limit: 5, tag: ['a', 'b'] }))
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos', limit: 5, tag: ['a', 'b'] }))
                 .resolves.toEqual({ status: 200, contentType: 'application/json', data: { services: ['a'] } });
         });
 
@@ -278,7 +279,7 @@ describe('CalmHubClient', () => {
                 return [204, ''];
             });
 
-            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }))
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos' }))
                 .resolves.toEqual({ status: 204, contentType: undefined, data: '' });
         });
 
@@ -288,7 +289,7 @@ describe('CalmHubClient', () => {
                 return [201, '{"name":"payments"}', { 'content-type': 'application/problem+json' }];
             });
 
-            const result = await client.callExtension('example', postRoute, { namespace: 'finos', name: 'payments' });
+            const result = await client.callExtension(example, postRoute, { namespace: 'finos', name: 'payments' });
 
             expect(result.data).toEqual({ name: 'payments' });
         });
@@ -300,14 +301,14 @@ describe('CalmHubClient', () => {
                 return [204, ''];
             });
 
-            await expect(client.callExtension('example', postRoute, { namespace: 'finos' }))
+            await expect(client.callExtension(example, postRoute, { namespace: 'finos' }))
                 .resolves.toMatchObject({ status: 204 });
         });
 
         it('returns a text reply as text, even when it looks like JSON', async () => {
             mock.onGet().reply(200, '42', { 'content-type': 'text/plain' });
 
-            const result = await client.callExtension('example', getRoute, { namespace: 'finos' });
+            const result = await client.callExtension(example, getRoute, { namespace: 'finos' });
 
             expect(result.data).toBe('42');
         });
@@ -315,7 +316,7 @@ describe('CalmHubClient', () => {
         it('returns malformed JSON as text', async () => {
             mock.onGet().reply(200, '{oops', json);
 
-            const result = await client.callExtension('example', getRoute, { namespace: 'finos' });
+            const result = await client.callExtension(example, getRoute, { namespace: 'finos' });
 
             expect(result.data).toBe('{oops');
         });
@@ -324,7 +325,7 @@ describe('CalmHubClient', () => {
             const body = { error: 'Input is not valid', details: [{ path: '/name', message: 'required' }] };
             mock.onPost().reply(400, JSON.stringify(body), json);
 
-            await expect(client.callExtension('example', postRoute, { namespace: 'finos' })).rejects.toMatchObject({
+            await expect(client.callExtension(example, postRoute, { namespace: 'finos' })).rejects.toMatchObject({
                 status: 400,
                 error: 'Input is not valid',
                 request: 'POST /api/calm/extensions/example/api/namespaces/finos/services',
@@ -335,14 +336,14 @@ describe('CalmHubClient', () => {
         it('uses a text error body as the message', async () => {
             mock.onGet().reply(502, 'Bad gateway', { 'content-type': 'text/plain' });
 
-            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }))
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos' }))
                 .rejects.toMatchObject({ status: 502, error: 'Bad gateway', body: 'Bad gateway' });
         });
 
         it('uses the transport message when the error body has no error field', async () => {
             mock.onGet().reply(404, '{"missing":true}', json);
 
-            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }))
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos' }))
                 .rejects.toMatchObject({ status: 404, error: 'Request failed with status code 404', body: { missing: true } });
         });
 
@@ -350,25 +351,26 @@ describe('CalmHubClient', () => {
             const body = { type: 'about:blank', title: 'Conflict', detail: 'The service exists', status: 409 };
             mock.onPost().reply(409, JSON.stringify(body), { 'content-type': 'application/problem+json' });
 
-            await expect(client.callExtension('example', postRoute, { namespace: 'finos' }))
+            await expect(client.callExtension(example, postRoute, { namespace: 'finos' }))
                 .rejects.toMatchObject({ status: 409, error: 'Conflict: The service exists', body });
         });
 
         it('shows the title of a problem+json error body that has no detail', async () => {
             mock.onPost().reply(400, '{"title":"Bad input"}', { 'content-type': 'application/problem+json' });
 
-            await expect(client.callExtension('example', postRoute, { namespace: 'finos' }))
+            await expect(client.callExtension(example, postRoute, { namespace: 'finos' }))
                 .rejects.toMatchObject({ status: 400, error: 'Bad input' });
         });
 
         it.each([
             [401, 'Authentication is required, or the credentials are not valid'],
             [403, 'Access is denied'],
+            [414, 'The path and query are too long for CALM Hub'],
             [404, 'Request failed with status code 404'],
         ])('gives an empty %d reply a message and no body', async (status, message) => {
             mock.onGet().reply(status, '');
 
-            const error = await client.callExtension('example', getRoute, { namespace: 'finos' }).catch((e) => e);
+            const error = await client.callExtension(example, getRoute, { namespace: 'finos' }).catch((e) => e);
 
             expect(error).toBeInstanceOf(HubClientError);
             expect(error).toMatchObject({ status, error: message });
@@ -381,7 +383,7 @@ describe('CalmHubClient', () => {
                 return [204, ''];
             });
 
-            await client.callExtension('example', getRoute, { namespace: 'finos' });
+            await client.callExtension(example, getRoute, { namespace: 'finos' });
         });
 
         it('uses the timeout that the caller gives', async () => {
@@ -390,43 +392,68 @@ describe('CalmHubClient', () => {
                 return [204, ''];
             });
 
-            await client.callExtension('example', getRoute, { namespace: 'finos' }, { timeoutMs: 90000 });
+            await client.callExtension(example, getRoute, { namespace: 'finos' }, { timeoutMs: 90000 });
         });
 
         it('says that a write can still complete after a client timeout', async () => {
             mock.onPost().timeout();
 
-            await expect(client.callExtension('example', postRoute, { namespace: 'finos' }, { timeoutMs: 5 }))
+            await expect(client.callExtension(example, postRoute, { namespace: 'finos' }, { timeoutMs: 5 }))
                 .rejects.toMatchObject({ status: 0, error: expect.stringContaining('check whether the write happened before you send it again') });
+        });
+
+        it('says that a write can still complete after the connection drops', async () => {
+            mock.onPost().reply(() => { throw new AxiosError('socket hang up', 'ECONNRESET'); });
+
+            await expect(client.callExtension(example, postRoute, { namespace: 'finos' }))
+                .rejects.toMatchObject({ status: 0, error: 'socket hang up. CALM Hub and the extension can still complete the call, '
+                    + 'so check whether the write happened before you send it again' });
+        });
+
+        it('gives only the transport message when the connection drops on a read', async () => {
+            mock.onGet().reply(() => { throw new AxiosError('socket hang up', 'ECONNRESET'); });
+
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos' }))
+                .rejects.toMatchObject({ status: 0, error: 'socket hang up' });
         });
 
         it('gives only the timeout for a read', async () => {
             mock.onGet().timeout();
 
-            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }, { timeoutMs: 5 }))
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos' }, { timeoutMs: 5 }))
                 .rejects.toMatchObject({ status: 0, error: 'timeout of 5ms exceeded' });
         });
 
         it('throws HubClientError with status 0 on a network error', async () => {
             mock.onGet().networkError();
 
-            await expect(client.callExtension('example', getRoute, { namespace: 'finos' }))
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos' }))
                 .rejects.toMatchObject({ status: 0, error: 'Network Error' });
         });
 
+        it('throws before any call when the filled path matches another route of the extension', async () => {
+            const getService = { id: 'get-service', method: 'GET', path: '/services/{name}', scope: 'read' };
+            const getAdmin = { id: 'get-admin', method: 'GET', path: '/services/admin', scope: 'admin' };
+
+            await expect(client.callExtension({ id: 'example', routes: [getService, getAdmin] }, getService, { name: 'admin' }))
+                .rejects.toMatchObject({ status: 0, error: 'The input fills the path /services/{name} so that it matches route '
+                    + '\'get-admin\', not route \'get-service\' of this command', request: 'GET /api/calm/extensions/example/api/services/{name}' });
+            expect(mock.history.get).toHaveLength(0);
+        });
+
         it('throws before any call when a path parameter is missing', async () => {
-            await expect(client.callExtension('example', getRoute, {})).rejects.toThrow('Input property \'namespace\' is required');
+            await expect(client.callExtension(example, getRoute, {})).rejects.toThrow('Input property \'namespace\' is required');
             expect(mock.history.get).toHaveLength(0);
         });
 
         it('throws before any call when a query value has a control character', async () => {
-            await expect(client.callExtension('example', getRoute, { namespace: 'finos', q: 'a\nb' }))
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos', q: 'a\nb' }))
                 .rejects.toMatchObject({ status: 0, error: expect.stringContaining('Input property \'q\' must not contain a control character') });
             expect(mock.history.get).toHaveLength(0);
         });
 
         it('throws before any call when a path parameter has a slash', async () => {
-            await expect(client.callExtension('example', getRoute, { namespace: 'finos/payments' }))
+            await expect(client.callExtension(example, getRoute, { namespace: 'finos/payments' }))
                 .rejects.toMatchObject({ status: 0, error: expect.stringContaining('must not be empty or ., or contain .., /') });
             expect(mock.history.get).toHaveLength(0);
         });

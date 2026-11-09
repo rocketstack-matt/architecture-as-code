@@ -47,10 +47,17 @@ export function extensionProxyPath(extensionId: string, routePath: string): stri
  * Maps a command input to a request on the route (ADR 0012). Input properties that match a
  * `{param}` fill the path. The rest go to the query for GET and DELETE, and to the JSON body otherwise.
  * The extension validates the input (the REST proxy does not), so this checks only what it needs to build the request.
+ * @param routes All the routes of the extension, so that a filled path cannot call another route.
  * @throws Error when a path parameter is missing, is not a string, number or boolean, or has a part that Hub refuses
- * in a path, or when a query name or value has a character that Hub refuses in a query.
+ * in a path, when the filled path matches another route, or when a query name or value has a character that Hub
+ * refuses in a query.
  */
-export function buildExtensionRequest(extensionId: string, route: HubExtensionRoute, input: Record<string, unknown>): HubExtensionRequest {
+export function buildExtensionRequest(
+    extensionId: string,
+    route: HubExtensionRoute,
+    input: Record<string, unknown>,
+    routes: HubExtensionRoute[] = [],
+): HubExtensionRequest {
     const rest: Record<string, unknown> = { ...input };
     const path = route.path.replace(PATH_PARAM, (_match, name: string) => {
         const value = input[name];
@@ -68,6 +75,7 @@ export function buildExtensionRequest(extensionId: string, route: HubExtensionRo
         return encodeURIComponent(text);
     });
     const method = route.method.toUpperCase();
+    checkMatchedRoute(route, method, path, routes);
     const request: HubExtensionRequest = { method, path: extensionProxyPath(extensionId, path), query: [] };
     if (method === 'GET' || method === 'DELETE') {
         request.query = Object.entries(rest).flatMap(([key, value]) => toQueryValues(value).map((v): [string, string] => {
@@ -82,16 +90,45 @@ export function buildExtensionRequest(extensionId: string, route: HubExtensionRo
     return request;
 }
 
-const PATH_VALUE_RULE = 'must not be empty or ., or contain .., /, \\, %, @, a look-alike of / or \\, a control character or a lone surrogate';
+/**
+ * The route with the most literal segments wins in the proxy, so a value that equals a literal of another route,
+ * such as `admin` for `/services/{name}` next to `/services/admin`, would call that route. MCP refuses it too.
+ */
+function checkMatchedRoute(route: HubExtensionRoute, method: string, path: string, routes: HubExtensionRoute[]): void {
+    const parameters = pathParameterCount(route.path);
+    const other = routes.find(r => r.id !== route.id && r.method.toUpperCase() === method
+        && pathParameterCount(r.path) < parameters && matchesTemplate(r.path, path));
+    if (other) {
+        throw new Error(`The input fills the path ${route.path} so that it matches route '${other.id}', not route '${route.id}' of this command`);
+    }
+}
+
+function pathParameterCount(template: string): number {
+    return template.match(PATH_PARAM)?.length ?? 0;
+}
+
+// As ExtensionRouteMatcher in Hub: a {name} segment matches one segment that is not empty.
+function matchesTemplate(template: string, path: string): boolean {
+    const templateSegments = template.split('/');
+    const pathSegments = path.split('/');
+    return templateSegments.length === pathSegments.length && templateSegments.every((segment, i) =>
+        /^\{.+\}$/.test(segment) ? pathSegments[i] !== '' : segment === pathSegments[i]);
+}
+
+const PATH_VALUE_RULE = 'must not be empty or ., or contain .., /, \\, %, @, a look-alike of /, \\, ., %, @ or ;, '
+    + 'a control character or a lone surrogate';
 const QUERY_VALUE_RULE = 'must not contain a control character or a lone surrogate';
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+// The lookAlikes of path-values.json: look-alikes of / and \, and each code point whose NFKC form is only /, \, ., %, @ or ;.
+const LOOK_ALIKE = /[;․-…⁄∕∖⧵⧸︔︙︰﹒﹔﹨﹪﹫％．／；＠＼]/;
 
-// Hub refuses these parts of a path (ADR 0011), so a value with one would get a generic 400. A look-alike of / or \
-// is refused because a backend that normalises Unicode can read it as one. encodeURIComponent throws on a lone surrogate.
+// Hub refuses these parts of a path (ADR 0011), so a value with one would get a generic 400. A look-alike is refused
+// because a backend that normalises Unicode can read it as the character, for example U+2025 as "..".
+// encodeURIComponent throws on a lone surrogate.
 function isPathValue(value: string): boolean {
-    return value !== '' && value !== '.' && !LONE_SURROGATE.test(value)
+    return value !== '' && value !== '.' && !LONE_SURROGATE.test(value) && !LOOK_ALIKE.test(value)
         // eslint-disable-next-line no-control-regex
-        && !/\.\.|[/\\%@\u0000-\u001f\u007f⁄∕∖⧵⧸﹨／＼]/.test(value);
+        && !/\.\.|[/\\%@\u0000-\u001f\u007f]/.test(value);
 }
 
 // Hub refuses an encoded control character in a query. URLSearchParams would send a lone surrogate as U+FFFD.
