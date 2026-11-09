@@ -488,7 +488,7 @@
             </activation>
             <properties>
                 <!-- The MongoDB image of the integration suite (EndToEndResource), for example -Dcalm.it.mongo-image=mongo:8. -->
-                <calm.it.mongo-image>mongo:4.4.3</calm.it.mongo-image>
+                <calm.it.mongo-image>mongo:5.0</calm.it.mongo-image>
             </properties>
             <dependencies>
                 <dependency>

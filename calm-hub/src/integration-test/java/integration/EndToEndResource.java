@@ -37,7 +37,7 @@ public class EndToEndResource implements QuarkusTestResourceLifecycleManager {
         if(mongoDBContainer == null) {
             // The default is the oldest MongoDB that Hub supports. Deploy uses mongo:latest, so also run with
             // -Dcalm.it.mongo-image=mongo:8.
-            mongoDBContainer = new MongoDBContainer(System.getProperty("calm.it.mongo-image", "mongo:4.4.3"))
+            mongoDBContainer = new MongoDBContainer(System.getProperty("calm.it.mongo-image", "mongo:5.0"))
                     .withEnv("GLIBC_TUNABLES", "glibc.pthread.rseq=1");
         }
 
