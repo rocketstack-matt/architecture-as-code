@@ -81,7 +81,7 @@ class TestNitriteDecoratorStorePersistenceShould {
     @ParameterizedTest
     @ValueSource(strings = {"{\"_id\": \"x\"}", "{\"data\": {\"_id\": \"x\"}}", "{\"data\": {\"_id\": null}}",
             "{\"data\": {\"list\": [{\"_id\": {}}]}}", "{\"data\": {\"a._id\": \"x\"}}"})
-    void refuse_an_id_key_whose_value_is_not_a_whole_number(String json) {
+    void refuse_an_id_key_whose_value_is_not_a_whole_number(String json) throws Exception {
         try (Nitrite db = open(dataDirectory.resolve("decorators.db"))) {
             DecoratorKeyRefusedException e = assertThrows(DecoratorKeyRefusedException.class,
                     () -> storeFor(db).createDecorator(NAMESPACE, json));
@@ -93,7 +93,7 @@ class TestNitriteDecoratorStorePersistenceShould {
     @ParameterizedTest
     @ValueSource(strings = {"{\"\": 1}", "{\"data\": {\"\": 1}}", "{\"data\": {\".a\": 1}}", "{\"data\": {\"a..b\": 1}}",
             "{\"data\": {\".\": 1}}"})
-    void refuse_a_key_with_an_empty_part(String json) {
+    void refuse_a_key_with_an_empty_part(String json) throws Exception {
         try (Nitrite db = open(dataDirectory.resolve("decorators.db"))) {
             DecoratorKeyRefusedException e = assertThrows(DecoratorKeyRefusedException.class,
                     () -> storeFor(db).createDecorator(NAMESPACE, json));
