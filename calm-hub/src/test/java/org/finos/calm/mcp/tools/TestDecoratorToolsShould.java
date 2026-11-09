@@ -729,7 +729,7 @@ class TestDecoratorToolsShould {
 
     @Test
     void reject_oversized_json_for_create_decorator() {
-        String hugeJson = "{\"x\":\"" + "a".repeat(100_001) + "\"}";
+        String hugeJson = "{\"x\":\"" + "a".repeat(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + 1) + "\"}";
 
         ToolResponse response = decoratorTools.createDecorator("workshop", hugeJson);
 
@@ -740,7 +740,7 @@ class TestDecoratorToolsShould {
 
     @Test
     void reject_oversized_json_for_update_decorator() {
-        String hugeJson = "{\"x\":\"" + "a".repeat(100_001) + "\"}";
+        String hugeJson = "{\"x\":\"" + "a".repeat(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + 1) + "\"}";
 
         ToolResponse response = decoratorTools.updateDecorator("workshop", 1, hugeJson);
 

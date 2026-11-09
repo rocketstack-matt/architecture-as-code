@@ -80,7 +80,7 @@ class TestMongoDecoratorStoreShould {
 
     @BeforeEach
     void setUp() throws NamespaceNotFoundException {
-        doCallRealMethod().when(namespaceStore).requireNamespace(anyString());
+        lenient().doCallRealMethod().when(namespaceStore).requireNamespace(anyString());
         when(database.getCollection("decorators")).thenReturn(decoratorCollection);
         lenient().when(findIterable.projection(any(Bson.class))).thenReturn(findIterable);
         decoratorStore = new MongoDecoratorStore(database, namespaceStore, counterStore);
