@@ -215,7 +215,9 @@ per-extension toolbar button or tab: it does not scale to many extensions.
   provider's `ActionRuns` (`extensions/actionRuns.ts`), not in the button, so a remount cannot enable a write in flight or lose
   its result. An action slot key leaves out the context, so a change of selection does not remount it. A change of
   context clears the result. The button uses `aria-disabled`, not `disabled`, so focus can go back to it after the
-  dialog.
+  dialog. While the dialog is modal the page is inert and `focus()` outside it does nothing: the dialog calls
+  `close()` before its callback, and the button takes focus in an effect after the dialog unmounts. jsdom has no
+  modal dialogs, so a test that checks focus must model inertness (see `ExtensionSlot.test.tsx`).
 - Node details: `ExtensionDetailPanels`.
 - Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
   closed section renders nothing, so it sends no request.

@@ -20,6 +20,13 @@ export function ConfirmActionDialog({ title, target, onConfirm, onCancel }: Conf
         else dialog.setAttribute('open', '');
     }, []);
 
+    // close() first: while the dialog is modal the page is inert, so the caller cannot move focus out of it.
+    const closeThen = (next: () => void) => {
+        const dialog = ref.current;
+        if (dialog?.open && typeof dialog.close === 'function') dialog.close();
+        next();
+    };
+
     const rows = [
         ['Namespace', target.namespace],
         ['Resource', target.resource],
@@ -34,7 +41,7 @@ export function ConfirmActionDialog({ title, target, onConfirm, onCancel }: Conf
             aria-labelledby={headingId}
             onCancel={(event) => {
                 event.preventDefault();
-                onCancel();
+                closeThen(onCancel);
             }}
         >
             <div className="modal-box">
@@ -53,16 +60,16 @@ export function ConfirmActionDialog({ title, target, onConfirm, onCancel }: Conf
                     </dl>
                 )}
                 <div className="modal-action">
-                    <button type="button" className="btn btn-primary" onClick={onConfirm}>
+                    <button type="button" className="btn btn-primary" onClick={() => closeThen(onConfirm)}>
                         Run
                     </button>
-                    <button type="button" className="btn btn-ghost" onClick={onCancel}>
+                    <button type="button" className="btn btn-ghost" onClick={() => closeThen(onCancel)}>
                         Cancel
                     </button>
                 </div>
             </div>
             <div className="modal-backdrop">
-                <button type="button" onClick={onCancel}>
+                <button type="button" onClick={() => closeThen(onCancel)}>
                     close
                 </button>
             </div>

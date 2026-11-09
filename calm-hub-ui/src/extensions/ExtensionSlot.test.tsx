@@ -205,20 +205,63 @@ describe('ExtensionSlot actions', () => {
         expect(screen.getByRole('status')).toHaveTextContent('Summary: done.');
     });
 
-    it('gives focus back to the action button when the dialog closes', async () => {
-        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
-        render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />);
-        const button = screen.getByRole('button', { name: 'Summary' });
-        fireEvent.click(button);
-        screen.getByRole('button', { name: 'Cancel' }).focus();
-        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-        expect(button).toHaveFocus();
+    /**
+     * jsdom has no modal dialogs. This models what a browser does: while a dialog is modal, focus() on an element
+     * outside it does nothing; close() or removal ends the modal state.
+     */
+    function modelModalDialogs() {
+        let modal: HTMLDialogElement | null = null;
+        const focus = HTMLElement.prototype.focus;
+        Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+            configurable: true,
+            value(this: HTMLDialogElement) {
+                this.setAttribute('open', '');
+                modal = this;
+            },
+        });
+        Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+            configurable: true,
+            value(this: HTMLDialogElement) {
+                this.removeAttribute('open');
+                if (modal === this) modal = null;
+            },
+        });
+        vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
+            if (modal?.isConnected && !modal.contains(this)) return;
+            focus.call(this, options);
+        });
+        return () => {
+            delete (HTMLDialogElement.prototype as { showModal?: unknown }).showModal;
+            delete (HTMLDialogElement.prototype as { close?: unknown }).close;
+        };
+    }
 
-        fireEvent.click(button);
-        screen.getByRole('button', { name: 'Run' }).focus();
-        fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-        expect(button).toHaveFocus();
-        expect(await screen.findByRole('status')).toBeInTheDocument();
+    it('gives focus back to the action button after Cancel, Escape and Run, while the page is inert', async () => {
+        const restore = modelModalDialogs();
+        try {
+            vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
+            render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />);
+            const button = screen.getByRole('button', { name: 'Summary' });
+
+            fireEvent.click(button);
+            screen.getByRole('button', { name: 'Cancel' }).focus();
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+            expect(button).toHaveFocus();
+
+            fireEvent.click(button);
+            screen.getByRole('button', { name: 'Run' }).focus();
+            fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+            expect(button).toHaveFocus();
+
+            fireEvent.click(button);
+            screen.getByRole('button', { name: 'Run' }).focus();
+            fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+            expect(button).toHaveFocus();
+            expect(await screen.findByRole('status')).toBeInTheDocument();
+        } finally {
+            restore();
+        }
     });
 
     it('says when an action is done, until the context changes', async () => {

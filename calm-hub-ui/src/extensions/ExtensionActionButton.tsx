@@ -48,10 +48,17 @@ export function ExtensionActionButton({ service, extension, contribution, route,
         }
     };
 
-    const closeDialog = () => {
-        setPending(undefined);
-        // The dialog unmounts, so the browser does not give focus back to the button.
+    // Focus moves after the dialog is gone: while it is modal, the page is inert and focus() on the button does nothing.
+    const returnFocus = useRef(false);
+    useEffect(() => {
+        if (pending || !returnFocus.current) return;
+        returnFocus.current = false;
         button.current?.focus();
+    }, [pending]);
+
+    const closeDialog = () => {
+        returnFocus.current = true;
+        setPending(undefined);
     };
 
     const shown = outcome?.for === key ? outcome : undefined;
