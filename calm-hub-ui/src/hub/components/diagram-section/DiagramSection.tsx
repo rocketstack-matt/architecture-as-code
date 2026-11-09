@@ -229,6 +229,10 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
 
     // "View all" opens the Decorators tab and unmounts itself, so the tab takes focus.
     const [focusPanel, setFocusPanel] = useState(false);
+    // The panel reads it on mount only, so it is cleared once the tab shows: a later visit does not take focus.
+    useEffect(() => {
+        if (focusPanel && activeTab.id === DECORATORS_TAB_ID) setFocusPanel(false);
+    }, [focusPanel, activeTab.id]);
     const setActiveTab = (tab: DiagramTab) => {
         setFocusPanel(false);
         setSearchParams({ tab: tab.id }, { replace: true, state: location.state });

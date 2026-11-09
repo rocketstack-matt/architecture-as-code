@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { DiagramSection } from './DiagramSection.js';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
@@ -561,6 +561,32 @@ describe('DiagramSection', () => {
             await user.click(screen.getByRole('tab', { name: 'Diagram' }));
             await user.click(screen.getByRole('tab', { name: 'Decorators' }));
             expect(screen.getByRole('region', { name: 'Decorators' })).not.toHaveFocus();
+        });
+
+        it('does not move focus again when the Decorators tab is reached some other way after View all', async () => {
+            function QueryLinks() {
+                const [, setSearchParams] = useSearchParams();
+                return (
+                    <>
+                        <button onClick={() => setSearchParams({ tab: 'diagram' })}>link-diagram</button>
+                        <button onClick={() => setSearchParams({ tab: 'decorators' })}>link-decorators</button>
+                    </>
+                );
+            }
+            const user = userEvent.setup();
+            render(
+                <MemoryRouter>
+                    <DiagramSection data={architectureData} />
+                    <QueryLinks />
+                </MemoryRouter>
+            );
+
+            await user.click(screen.getByText('simulate-open-view'));
+            expect(await screen.findByRole('region', { name: 'Decorators' })).toHaveFocus();
+
+            await user.click(screen.getByText('link-diagram'));
+            await user.click(screen.getByText('link-decorators'));
+            expect(await screen.findByRole('region', { name: 'Decorators' })).not.toHaveFocus();
         });
 
         it('filters on both the type and the $schema of a view that matches on both', async () => {
