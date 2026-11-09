@@ -77,6 +77,17 @@ describe('ExtensionsTabPanel with an action that needs a selected element', () =
         expect(button).toHaveAccessibleDescription('Some actions need a selected node. Open this tab from a link that names a node.');
     });
 
+    it('lists the action disabled when the path rule refuses the selected id', () => {
+        render(
+            <ExtensionsContext.Provider value={[scanner]}>
+                <ExtensionsTabPanel context={{ namespace: 'demo', selectedElement: 'a/b' }} storage={createMemoryStorage()} />
+            </ExtensionsContext.Provider>
+        );
+        const button = screen.getByRole('button', { name: 'Run 1' });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAccessibleDescription('Some actions cannot run for the selected node.');
+    });
+
     it('enables the action when an element is selected', () => {
         renderPanel([scanner]);
         expect(screen.getByRole('button', { name: 'Run 1' })).toBeEnabled();

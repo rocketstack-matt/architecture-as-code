@@ -135,7 +135,7 @@ A button in the extension's section of the **Extensions** tab.
 - Hub does not cancel a confirmed call when the user changes the selection or leaves the page. The
   button stays disabled until the call ends, also when its section closes and opens again.
 - The action shows only when the context gives a value for each placeholder in the route path.
-  An action that needs only `{selectedElement}` shows disabled until a link names a node.
+  An action that needs only `{selectedElement}` shows disabled until a link names a node. It also shows disabled when Hub refuses the node id in a path, for example an id with `/`, `@` or `%`.
 - An action does not accept user input, and Hub does not show its reply. A call that succeeds
   shows "<title>: done.", and a failed call shows "Extension request failed." The message stays
   when the section closes and opens again, and goes when the context changes.

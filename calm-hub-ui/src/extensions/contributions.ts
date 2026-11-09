@@ -17,9 +17,8 @@ export function actionContributions(extension: ExtensionSummary, context: Extens
     return (extension.contributes.action ?? []).filter((contribution) => canFill(extension, contribution, context));
 }
 
-/** The actions that can run only when an element is selected, and none is. */
+/** The actions that wait for a selected element: none is selected, or the path rule refuses the selected id. */
 export function selectionActions(extension: ExtensionSummary, context: ExtensionContext): ExtensionContribution[] {
-    if (context.selectedElement !== undefined) return [];
     const selected = { ...context, selectedElement: 'selected-element' };
     return (extension.contributes.action ?? []).filter(
         (contribution) => !canFill(extension, contribution, context) && canFill(extension, contribution, selected)

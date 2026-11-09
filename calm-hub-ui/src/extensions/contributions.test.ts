@@ -34,7 +34,7 @@ describe('extension contributions', () => {
         expect([waiting.actions.length, waiting.needsSelection.map((c) => c.id)]).toEqual([0, ['run']]);
         const [selected] = resourceExtensions([scoped], { namespace: 'ns', selectedElement: 'node' });
         expect([selected.actions.map((c) => c.id), selected.needsSelection.length]).toEqual([['run'], 0]);
-        expect(selectionActions(scoped, { selectedElement: 'a/b' })).toEqual([]);
+        expect(selectionActions(scoped, { selectedElement: 'a/b' }).map((c) => c.id)).toEqual(['run']);
     });
 
     it('does not keep an action that a selection cannot fill', () => {

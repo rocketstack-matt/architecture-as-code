@@ -77,7 +77,9 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
                                 )}
                                 {needsSelection.length > 0 && (
                                     <p id={`${baseId}-${index}`} className="text-xs text-base-content/60">
-                                        Some actions need a selected node. Open this tab from a link that names a node.
+                                        {context.selectedElement === undefined
+                                            ? 'Some actions need a selected node. Open this tab from a link that names a node.'
+                                            : 'Some actions cannot run for the selected node.'}
                                     </p>
                                 )}
                                 {tabs.map((contribution) => (
