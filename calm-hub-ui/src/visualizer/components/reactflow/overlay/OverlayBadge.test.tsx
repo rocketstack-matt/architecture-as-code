@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ReactFlowProvider, useStoreApi } from 'reactflow';
 import type { ReactNode } from 'react';
@@ -74,6 +74,12 @@ describe('overlayOutline', () => {
 });
 
 describe('OverlayBadge details', () => {
+    const { innerWidth, innerHeight } = window;
+    afterEach(() => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: innerWidth });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: innerHeight });
+    });
+
     const view = fakeView('release-tracker', 'release-risk', 'Release tracker');
     const entry = (id: string, value: string, status: OverlayStatus) => ({
         decorator: fakeDecorator(id, {}),
@@ -195,7 +201,7 @@ describe('OverlayBadge details', () => {
         expect(badge).not.toHaveFocus();
     });
 
-    it('opens above a badge near the bottom of a phone screen, inside the viewport', () => {
+    it('opens above a badge near the bottom of a small screen, inside the viewport', () => {
         Object.defineProperty(window, 'innerHeight', { configurable: true, value: 667 });
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 });
         renderBadge();
