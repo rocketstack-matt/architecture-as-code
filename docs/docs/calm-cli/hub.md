@@ -463,7 +463,7 @@ CALM Hub checks the route, the path and the scope. It does not check the input a
 {"status":400,"error":"name is required","request":"POST /api/calm/extensions/example-services/api/namespaces/finos/services","body":{"error":"name is required"}}
 ```
 
-CALM Hub sends a generic `502` with the error `The extension failed` when it cannot connect to the extension, when the reply is larger than the reply limit, when the extension replies with a 3xx, 401, 407 or 5xx status, or when the reply has a content type that CALM Hub does not pass on. The extension's own body does not reach the CLI. A slow extension gets `504` with the error `The extension did not reply in time`.
+CALM Hub sends a generic `502` with the error `The extension failed` when the extension refuses the connection, when the reply is larger than the reply limit, when the extension replies with a 3xx, 401, 407 or 5xx status, or when the reply has a content type that CALM Hub does not pass on. The extension's own body does not reach the CLI. CALM Hub sends `504` with the error `The extension did not reply in time` when the connection or the reply takes longer than its timeout.
 
 ## Output Formats
 
