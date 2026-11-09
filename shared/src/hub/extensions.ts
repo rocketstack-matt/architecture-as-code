@@ -119,8 +119,9 @@ const PATH_VALUE_RULE = 'must not be empty or ., or contain .., /, \\, %, @, a l
     + 'a control character or a lone surrogate';
 const QUERY_VALUE_RULE = 'must not contain a control character or a lone surrogate';
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-// The lookAlikes of path-values.json: look-alikes of / and \, and each code point whose NFKC form is only /, \, ., %, @ or ;.
-const LOOK_ALIKE = /[;․-…⁄∕∖⧵⧸︔︙︰﹒﹔﹨﹪﹫％．／；＠＼]/;
+// The lookAlikes of path-values.json: each code point whose NFKC form contains / or \, or is only ., %, @ or ;, and
+// the visual look-alikes of / and \ that NFKC does not change.
+const LOOK_ALIKE = /[;․-…⁄℀℁℅℆∕∖⧵⧸︔︙︰﹒﹔﹨﹪﹫％．／；＠＼]/;
 
 // Hub refuses these parts of a path (ADR 0011), so a value with one would get a generic 400. A look-alike is refused
 // because a backend that normalises Unicode can read it as the character, for example U+2025 as "..".

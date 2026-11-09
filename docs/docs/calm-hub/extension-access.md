@@ -34,14 +34,17 @@ MCP or any other client, with the same rules as for its own resources (see
   `400`.
 - CALM Hub refuses an encoded slash (`%2F`, also double-encoded) in a route path with `400`, and does
   not call the backend. It also refuses an encoded look-alike of `/`, `\`, `.`, `%`, `@` or `;`, such as
-  `%EF%BC%8F` (U+FF0F) or `%E2%80%A5` (U+2025), because a backend that normalises Unicode (NFKC)
-  before it routes can read it as a slash or as `..`.
+  `%EF%BC%8F` (U+FF0F) or `%E2%80%A5` (U+2025), and each code point whose NFKC form contains `/` or
+  `\`, such as `%E2%84%80` (U+2100, `a/c`). A backend that normalises Unicode (NFKC) before it
+  routes can read these as a slash or as `..`.
 - CALM Hub refuses a matrix parameter (`;name=value`) in a route path with `400`, and does not drop it.
 - CALM Hub gives `415` to a `POST` with no `application/json` or other `+json` `Content-Type`, also
   when it has no body, and to a body of another type for the other methods. It does this before it
   signs the assertion. Thus a cross-site form or fetch cannot call a route as the user. An MCP tool
   call does not get this check, because CALM Hub sends JSON for it. But a tool call needs the
-  `Mcp-Session-Id` of an initialised session, which a cross-site page cannot read.
+  `Mcp-Session-Id` of an initialised session, which a cross-site page cannot read. This is not true
+  when `quarkus.mcp.server.http.streamable.auto-init=true`, or in dev mode, where
+  `quarkus.mcp.server.dev-mode.dummy-init` is `true` by default: then a call with no session runs too.
 - `GET /api/calm/extensions` and the blocks schema also need a signed-in user.
   `GET /api/calm/auth/jwks` is public.
 

@@ -77,17 +77,19 @@ describe('buildExtensionRequest', () => {
             .toThrow(`Input property 'namespace' ${PATH_RULE}, because it fills the path /namespaces/{namespace}`);
     });
 
-    it('lists each code point whose NFKC form is only characters that Hub refuses in a path', () => {
+    it('lists each code point whose NFKC form contains / or \\, or is only ., %, @ or ;', () => {
         const refused = new Set('/\\.%@;');
+        const onlyRefused = new Set('.%@;');
         const nfkc: string[] = [];
         for (let code = 0; code <= 0x10ffff; code++) {
             if (code >= 0xd800 && code <= 0xdfff) continue;
             const c = String.fromCodePoint(code);
+            if (refused.has(c)) continue;
             const normal = c.normalize('NFKC');
-            if (!refused.has(c) && normal !== '' && [...normal].every(n => refused.has(n))) nfkc.push(c);
+            if (/[/\\]/.test(normal) || (normal !== '' && [...normal].every(n => onlyRefused.has(n)))) nfkc.push(c);
         }
 
-        expect(nfkc).toContain('\u2025');
+        expect(nfkc).toEqual(expect.arrayContaining(['\u2025', '\u2100', '\uff0f']));
         expect(PATH_VALUES.lookAlikes).toEqual(expect.arrayContaining(nfkc));
     });
 

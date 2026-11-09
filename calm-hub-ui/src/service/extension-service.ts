@@ -26,7 +26,7 @@ const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[
 function isPathValue(value: string): boolean {
     return value !== '' && value !== '.' && !LONE_SURROGATE.test(value)
         // eslint-disable-next-line no-control-regex
-        && !/\.\.|[/\\%@\u0000-\u001f\u007f\u037e\u2024-\u2026\u2044\u2215\u2216\u29f5\u29f8\ufe14\ufe19\ufe30\ufe52\ufe54\ufe68\ufe6a\ufe6b\uff05\uff0e\uff0f\uff1b\uff20\uff3c]/.test(value);
+        && !/\.\.|[/\\%@\u0000-\u001f\u007f\u037e\u2024-\u2026\u2044\u2100\u2101\u2105\u2106\u2215\u2216\u29f5\u29f8\ufe14\ufe19\ufe30\ufe52\ufe54\ufe68\ufe6a\ufe6b\uff05\uff0e\uff0f\uff1b\uff20\uff3c]/.test(value);
 }
 
 // Hub refuses an encoded control character in a query, and axios throws on a lone surrogate.

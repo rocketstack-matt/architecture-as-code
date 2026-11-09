@@ -47,7 +47,7 @@ contribution, but the call fails.
 The UI sends the context as query parameters. A route path can also use these names as
 placeholders, for example `/namespaces/{namespace}/{resourceType}/{resourceId}`. A placeholder
 value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@`, a look-alike of `/`, `\`, `.`, `%`,
-`@` or `;`, a control character or a lone surrogate, because CALM Hub refuses these in a path. A context value must
+`@` or `;`, a code point whose NFKC form contains `/` or `\` (such as U+2100, `a/c`), a control character or a lone surrogate, because CALM Hub refuses these in a path. A context value must
 not contain a control character or a lone surrogate, because the UI sends it in the query. The UI
 hides an action whose path gets such a value. Thus use `resource` only as a query parameter.
 
