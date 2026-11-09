@@ -30,14 +30,18 @@ MCP or any other client, with the same rules as for its own resources (see
   call the backend.
 - On a read-only Hub, only `GET` and `readOnly` routes run. Any other call to a declared route gets
   `405`. A `POST`, `PUT`, `PATCH` or `DELETE` with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`, `//`,
-  `@`, `;` or an encoded look-alike of `/` or `\` in the path also gets `405`, not `400`.
+  `@`, `;` or an encoded look-alike of `/`, `\`, `.`, `%`, `@` or `;` in the path also gets `405`, not
+  `400`.
 - CALM Hub refuses an encoded slash (`%2F`, also double-encoded) in a route path with `400`, and does
-  not call the backend. It also refuses an encoded look-alike of `/` or `\`, such as `%EF%BC%8F`
-  (U+FF0F), because a backend that normalises Unicode before it routes can read it as a slash.
+  not call the backend. It also refuses an encoded look-alike of `/`, `\`, `.`, `%`, `@` or `;`, such as
+  `%EF%BC%8F` (U+FF0F) or `%E2%80%A5` (U+2025), because a backend that normalises Unicode (NFKC)
+  before it routes can read it as a slash or as `..`.
 - CALM Hub refuses a matrix parameter (`;name=value`) in a route path with `400`, and does not drop it.
 - CALM Hub gives `415` to a `POST` with no `application/json` or other `+json` `Content-Type`, also
   when it has no body, and to a body of another type for the other methods. It does this before it
-  signs the assertion. Thus a cross-site form or fetch cannot call a route as the user.
+  signs the assertion. Thus a cross-site form or fetch cannot call a route as the user. An MCP tool
+  call does not get this check, because CALM Hub sends JSON for it. But a tool call needs the
+  `Mcp-Session-Id` of an initialised session, which a cross-site page cannot read.
 - `GET /api/calm/extensions` and the blocks schema also need a signed-in user.
   `GET /api/calm/auth/jwks` is public.
 
