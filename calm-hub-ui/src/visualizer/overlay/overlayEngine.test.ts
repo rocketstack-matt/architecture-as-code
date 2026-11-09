@@ -166,6 +166,28 @@ describe('containment relationships', () => {
         expect(containersOfContainment(undefined).size).toBe(0);
     });
 
+    it('skips malformed entries and tolerates a relationships value that is not a list', () => {
+        const malformed = [
+            null,
+            'not-an-object',
+            42,
+            {},
+            { 'unique-id': 'no-type' },
+            { 'unique-id': 'null-type', 'relationship-type': null },
+            { 'unique-id': 'string-type', 'relationship-type': 'deployed-in' },
+            { 'unique-id': 'null-deploy', 'relationship-type': { 'deployed-in': null } },
+            { 'unique-id': 'numeric-container', 'relationship-type': { 'deployed-in': { container: 7 } } },
+            { 'unique-id': 7, 'relationship-type': { 'deployed-in': { container: 'cluster' } } },
+            { 'relationship-type': { 'composed-of': { container: 'system' } } },
+            ...relationships,
+        ];
+        expect([...containersOfContainment(malformed)]).toEqual([
+            ['api-in-cluster', 'cluster'],
+            ['system-has-ledger', 'trade-system'],
+        ]);
+        for (const value of [null, {}, 'relationships', 3]) expect(containersOfContainment(value).size).toBe(0);
+    });
+
     it('counts a containment relationship for its container, which draws it', () => {
         const map = evaluations(
             [d('a', 'residency', 'not-met', '2026-11-04T15:00:00.000Z', ['api-in-cluster'])],

@@ -32,7 +32,7 @@ import { ResourceNotFound } from './components/resource-not-found/ResourceNotFou
 import { extensionContext } from './components/diagram-section/tabs/diagramTabs.js';
 import { parseCALMHubPath } from '../visualizer/components/reactflow/utils/calmHelpers.js';
 import type { Decorator, SelectedItem } from '../visualizer/contracts/contracts.js';
-import type { CalmNodeSchema, CalmRelationshipSchema } from '@finos/calm-models/types';
+import type { CalmNodeSchema } from '@finos/calm-models/types';
 import { authStore } from '../service/utils/auth-store.js';
 import './Hub.css';
 
@@ -315,6 +315,14 @@ export default function Hub() {
 
     const isDiagramView = data?.calmType === 'Architectures' || data?.calmType === 'Patterns';
 
+    const decoratorsState = useMemo(
+        (): DecoratorsState => ({
+            decorators,
+            drawnAs: containersOfContainment((data?.data as { relationships?: unknown } | undefined)?.relationships),
+        }),
+        [data, decorators]
+    );
+
     // Mobile node bottom-sheet prev/next steppers (Frame G). The ordered node list
     // is already in Hub — it's exactly what the Drawer renders (`data.data.nodes`)
     // — so steppers need no new prop threading and never touch the desktop drawer.
@@ -323,14 +331,6 @@ export default function Hub() {
     // has no place in the node list, so the neighbours resolve to undefined).
     // Steppers only feed the mobile NodeSheet; desktop renders <Sidebar> and never
     // consumes onPrev/onNext, so skip the derivation entirely off mobile.
-    const decoratorsState = useMemo((): DecoratorsState => {
-        const relationships = (data?.data as { relationships?: unknown } | undefined)?.relationships;
-        return {
-            decorators,
-            drawnAs: containersOfContainment(Array.isArray(relationships) ? (relationships as CalmRelationshipSchema[]) : []),
-        };
-    }, [data, decorators]);
-
     const diagramNodes = useMemo<CalmNodeSchema[]>(() => {
         if (!isMobile) return [];
         const nodes = (data?.data as { nodes?: unknown } | undefined)?.nodes;

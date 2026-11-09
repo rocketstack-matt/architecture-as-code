@@ -85,14 +85,19 @@ const elementsOf = (decorator: Decorator): Set<string> =>
 
 /**
  * The container each containment relationship (`deployed-in` or `composed-of`) is drawn as, by relationship unique-id.
- * The diagram draws such a relationship as its container holding the contained nodes, not as an edge.
+ * The diagram draws such a relationship as its container holding the contained nodes, not as an edge. A malformed
+ * entry is skipped, because Hub builds this for the whole view.
  */
-export function containersOfContainment(relationships: CalmRelationshipSchema[] = []): Map<string, string> {
+export function containersOfContainment(relationships: unknown): Map<string, string> {
     const containers = new Map<string, string>();
-    for (const rel of relationships) {
+    if (!Array.isArray(relationships)) return containers;
+    for (const rel of relationships as (Partial<CalmRelationshipSchema> | null)[]) {
+        if (!rel || typeof rel !== 'object') continue;
         const type = rel['relationship-type'];
-        const container = type?.['deployed-in']?.container ?? type?.['composed-of']?.container;
-        if (rel['unique-id'] && container) containers.set(rel['unique-id'], container);
+        if (!type || typeof type !== 'object') continue;
+        const container = type['deployed-in']?.container ?? type['composed-of']?.container;
+        const id = rel['unique-id'];
+        if (typeof id === 'string' && id && typeof container === 'string' && container) containers.set(id, container);
     }
     return containers;
 }
