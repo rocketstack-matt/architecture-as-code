@@ -12,6 +12,7 @@ import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.services.DecoratorSchemaValidator;
 import org.finos.calm.services.DecoratorWriteService;
 import org.finos.calm.store.DecoratorStore;
+import org.finos.calm.testutil.LogCapture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,10 +27,14 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Level;
 import java.util.stream.IntStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
@@ -422,10 +427,13 @@ class TestDecoratorToolsShould {
 
     @Test
     void return_error_when_creating_a_reserved_type_as_another_principal() {
-        ToolResponse response = decoratorTools.createDecorator("workshop", "{\"type\":\"control-evaluation\"}");
+        ToolResponse[] response = new ToolResponse[1];
+        List<String> warnings = LogCapture.messages(DecoratorTools.class, Level.WARNING,
+                () -> response[0] = decoratorTools.createDecorator("workshop", "{\"type\":\"control-evaluation\"}"));
 
-        assertThat(response.isError(), is(true));
-        assertThat(text(response), containsString("'control-evaluation' is reserved"));
+        assertThat(warnings, contains(allOf(containsString("control-evaluation"), containsString("null"), containsString("workshop"))));
+        assertThat(response[0].isError(), is(true));
+        assertThat(text(response[0]), containsString("'control-evaluation' is reserved"));
         verifyNoInteractions(decoratorStore);
     }
 
@@ -447,10 +455,13 @@ class TestDecoratorToolsShould {
         when(decoratorStore.getDecoratorById("workshop", 1))
                 .thenReturn(Optional.of(new Decorator.DecoratorBuilder().setType("control-evaluation").build()));
 
-        ToolResponse response = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"threat-model\"}");
+        ToolResponse[] response = new ToolResponse[1];
+        List<String> warnings = LogCapture.messages(DecoratorTools.class, Level.WARNING,
+                () -> response[0] = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"threat-model\"}"));
 
-        assertThat(response.isError(), is(true));
-        assertThat(text(response), containsString("is reserved"));
+        assertThat(warnings, contains(allOf(containsString("control-evaluation"), containsString("1"), containsString("workshop"))));
+        assertThat(response[0].isError(), is(true));
+        assertThat(text(response[0]), containsString("is reserved"));
         verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
     }
 
@@ -505,8 +516,12 @@ class TestDecoratorToolsShould {
         when(decoratorStore.getDecoratorById("workshop", 4))
                 .thenReturn(Optional.of(new Decorator.DecoratorBuilder().setUniqueId("eval-4").setType("control-evaluation").build()));
 
-        String result = text(decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"control-evaluation\"}"));
+        String[] output = new String[1];
+        List<String> logs = LogCapture.messages(DecoratorTools.class, Level.INFO,
+                () -> output[0] = text(decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"control-evaluation\"}")));
+        String result = output[0];
 
+        assertThat(logs, hasItem(allOf(containsString("updated"), containsString("current decorator"), containsString("4"))));
         assertThat(result, containsString("superseded by new decorator 4"));
         assertThat(result, containsString("eval-4"));
     }

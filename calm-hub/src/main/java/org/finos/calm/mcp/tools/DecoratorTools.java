@@ -147,7 +147,7 @@ public class DecoratorTools {
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {
-            return reservedTypeError(e);
+            return reservedTypeError(namespace, null, e);
         } catch (DecoratorSchemaValidationException e) {
             return schemaError(e);
         }
@@ -171,7 +171,7 @@ public class DecoratorTools {
 
         try {
             int currentId = decoratorWriteService.updateDecorator(DecoratorWriteService.principalName(identity), namespace, decoratorId, decoratorJson);
-            logger.info("Decorator [{}] updated in namespace [{}]", decoratorId, namespace);
+            logger.info("Decorator [{}] updated in namespace [{}], current decorator [{}]", decoratorId, namespace, currentId);
             String outcome = currentId == decoratorId
                     ? "Decorator " + decoratorId + " updated successfully."
                     : "Decorator " + decoratorId + " superseded by new decorator " + currentId + " (reserved types are append-only).";
@@ -200,7 +200,7 @@ public class DecoratorTools {
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {
-            return reservedTypeError(e);
+            return reservedTypeError(namespace, decoratorId, e);
         } catch (DecoratorSchemaValidationException e) {
             return schemaError(e);
         }
@@ -243,8 +243,9 @@ public class DecoratorTools {
                 + (dec.getUpdateDateTime() == null ? "" : prefix + "updateDateTime: " + dec.getUpdateDateTime());
     }
 
-    private static ToolResponse reservedTypeError(ReservedDecoratorTypeException e) {
-        logger.warn("Refused a write of reserved decorator type");
+    // The decorator ID is null on create.
+    private static ToolResponse reservedTypeError(String namespace, Integer decoratorId, ReservedDecoratorTypeException e) {
+        logger.warn("Refused a write of reserved decorator type [{}] to decorator [{}] in namespace [{}]", e.getType(), decoratorId, namespace);
         return ToolResponse.error("Error: Decorator type '" + e.getType() + "' is reserved and the caller may not write it.");
     }
 

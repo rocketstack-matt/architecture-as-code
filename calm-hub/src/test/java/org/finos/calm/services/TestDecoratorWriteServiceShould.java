@@ -12,6 +12,7 @@ import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.store.DecoratorStore;
+import org.finos.calm.testutil.LogCapture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,13 +23,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.security.Principal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.logging.Handler;
 import java.util.logging.Level;
-import java.util.logging.LogRecord;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -91,34 +89,7 @@ class TestDecoratorWriteServiceShould {
     }
 
     private static List<String> infoLogs(Runnable action) {
-        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(DecoratorWriteService.class.getName());
-        List<String> messages = new ArrayList<>();
-        Handler handler = new Handler() {
-            @Override
-            public void publish(LogRecord logRecord) {
-                if (logRecord.getLevel().intValue() >= Level.INFO.intValue()) {
-                    messages.add(logRecord.getMessage());
-                }
-            }
-
-            @Override
-            public void flush() {
-            }
-
-            @Override
-            public void close() {
-            }
-        };
-        Level level = logger.getLevel();
-        logger.setLevel(Level.INFO);
-        logger.addHandler(handler);
-        try {
-            action.run();
-        } finally {
-            logger.removeHandler(handler);
-            logger.setLevel(level);
-        }
-        return messages;
+        return LogCapture.messages(DecoratorWriteService.class, Level.INFO, action);
     }
 
     @Test
