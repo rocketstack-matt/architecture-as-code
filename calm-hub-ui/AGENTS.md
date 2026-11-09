@@ -195,7 +195,7 @@ the sign-in prompt. `ExtensionsProvider` (`extensions/ExtensionsContext.tsx`) ow
 Get it with `useExtensionService()`, not `new ExtensionService()` or a module singleton: the registry, the
 decorator views and the slots then share one registry request, and a test can inject a service. The service
 drops registry entries whose `hubApi` the UI does not support, for both paths. After a failed load the provider
-tries again with a backoff (5 s, doubled, up to 60 s), but not after a `401`. `useExtensionsStatus()` gives
+tries again with a backoff (5 s, doubled, up to 60 s; a new service starts it again), but not after a `401`. `useExtensionsStatus()` gives
 `loading`, `loaded`, `failed` or `signed-out`. Use it where an empty list must not mean "no extension", for
 example `ExtensionScreenPage` on a deep link.
 

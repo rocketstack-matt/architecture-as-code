@@ -139,6 +139,30 @@ describe('ExtensionsProvider', () => {
         expect(screen.getByTestId('status')).toHaveTextContent('loading');
     });
 
+    it('starts the backoff again for a new service', async () => {
+        vi.useFakeTimers();
+        const failing = (service: ExtensionService) => vi.spyOn(service, 'fetchExtensions').mockRejectedValue(new Error('502'));
+        const first = new ExtensionService();
+        failing(first);
+        const second = new ExtensionService();
+        const fetchSecond = failing(second);
+        const page = (service: ExtensionService) => (
+            <ExtensionsProvider service={service}>
+                <Consumer />
+            </ExtensionsProvider>
+        );
+        const { rerender } = render(page(first));
+        await act(async () => {});
+        await act(async () => vi.advanceTimersByTime(REGISTRY_RETRY_MS));
+        await act(async () => vi.advanceTimersByTime(REGISTRY_RETRY_MS * 2));
+
+        rerender(page(second));
+        await act(async () => {});
+        expect(fetchSecond).toHaveBeenCalledTimes(1);
+        await act(async () => vi.advanceTimersByTime(REGISTRY_RETRY_MS));
+        expect(fetchSecond).toHaveBeenCalledTimes(2);
+    });
+
     it('goes back to loading, without the old list, when the service changes', async () => {
         const first = new ExtensionService();
         vi.spyOn(first, 'fetchExtensions').mockResolvedValue([entry('Old')]);

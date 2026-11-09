@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ExtensionSummary } from '../model/extensions.js';
 import { ExtensionRegistryError, ExtensionService } from '../service/extension-service.js';
 import { ActionRuns, ActionRunsContext } from './actionRuns.js';
@@ -24,7 +24,9 @@ export function ExtensionsProvider({ children, service }: { children: ReactNode;
     // One service for the app, so the registry, the decorator views and the slots share one registry request.
     const svc = useMemo(() => service ?? new ExtensionService(), [service]);
     const [state, setState] = useState<RegistryState>({ service: svc, extensions: [], status: 'loading' });
-    const [attempt, setAttempt] = useState(0);
+    const [retryTick, setRetryTick] = useState(0);
+    // The failures in a row for one service. A success or a new service starts the backoff again.
+    const failures = useRef({ service: svc, count: 0 });
     const [runs] = useState(() => new ActionRuns());
     // A new service has its own registry: show loading, not the list of the old one.
     const current = state.service === svc ? state : { service: svc, extensions: [], status: 'loading' as const };
@@ -32,9 +34,12 @@ export function ExtensionsProvider({ children, service }: { children: ReactNode;
     useEffect(() => {
         let cancelled = false;
         let retry: ReturnType<typeof setTimeout> | undefined;
+        if (failures.current.service !== svc) failures.current = { service: svc, count: 0 };
         svc.fetchExtensions()
             .then((extensions) => {
-                if (!cancelled) setState({ service: svc, extensions, status: 'loaded' });
+                if (cancelled) return;
+                failures.current.count = 0;
+                setState({ service: svc, extensions, status: 'loaded' });
             })
             .catch((error: unknown) => {
                 if (cancelled) return;
@@ -42,14 +47,16 @@ export function ExtensionsProvider({ children, service }: { children: ReactNode;
                 setState({ service: svc, extensions: [], status: signedOut ? 'signed-out' : 'failed' });
                 // A sign-in reloads the page. A retry while signed out would only open the prompt again.
                 if (!signedOut) {
-                    retry = setTimeout(() => setAttempt((n) => n + 1), Math.min(REGISTRY_RETRY_MS * 2 ** attempt, REGISTRY_RETRY_MAX_MS));
+                    const delay = Math.min(REGISTRY_RETRY_MS * 2 ** failures.current.count, REGISTRY_RETRY_MAX_MS);
+                    failures.current.count += 1;
+                    retry = setTimeout(() => setRetryTick((n) => n + 1), delay);
                 }
             });
         return () => {
             cancelled = true;
             clearTimeout(retry);
         };
-    }, [svc, attempt]);
+    }, [svc, retryTick]);
 
     return (
         <ExtensionServiceContext.Provider value={svc}>
