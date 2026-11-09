@@ -211,7 +211,7 @@ public class DecoratorResource {
             return Response.created(location).entity(Map.of("id", id)).build();
         } catch (JsonParseException e) {
             logger.error("Invalid JSON when creating decorator in namespace [{}]", namespace, e);
-            return CalmResourceErrorResponses.invalidDecoratorJsonResponse(e.getMessage());
+            return CalmResourceErrorResponses.invalidDecoratorJsonResponse();
         } catch (DecoratorKeyRefusedException e) {
             logger.warn("Refused a decorator key that the store cannot keep in namespace [{}]", namespace);
             return CalmResourceErrorResponses.decoratorKeyRefusedResponse(e);
@@ -276,7 +276,7 @@ public class DecoratorResource {
             return Response.created(location).entity(Map.of("id", currentId)).build();
         } catch (JsonParseException e) {
             logger.error("Invalid JSON when updating decorator [{}] in namespace [{}]", id, namespace, e);
-            return CalmResourceErrorResponses.invalidDecoratorJsonResponse(e.getMessage());
+            return CalmResourceErrorResponses.invalidDecoratorJsonResponse();
         } catch (DecoratorKeyRefusedException e) {
             logger.warn("Refused a decorator key that the store cannot keep for decorator [{}] in namespace [{}]", id, namespace);
             return CalmResourceErrorResponses.decoratorKeyRefusedResponse(e);

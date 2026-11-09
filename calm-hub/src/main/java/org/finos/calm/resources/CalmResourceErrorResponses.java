@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Map;
 
 public class CalmResourceErrorResponses {
+    static final String INVALID_DECORATOR_JSON = "Invalid decorator JSON. The body must be a JSON object. $schema, unique-id and type "
+            + "must be strings, and target, target-type and applies-to must be arrays of strings";
+
     public static Response invalidNamespaceResponse(String namespace) {
         return Response.status(Response.Status.NOT_FOUND)
                 .entity("Invalid namespace provided: " + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(namespace))
@@ -37,8 +40,12 @@ public class CalmResourceErrorResponses {
         return Response.status(Response.Status.NOT_FOUND).entity("Decorator with ID " + id + " does not exist in namespace: " + namespace).build();
     }
 
-    public static Response invalidDecoratorJsonResponse(String message) {
-        return Response.status(Response.Status.BAD_REQUEST).entity("Invalid decorator JSON: " + message).build();
+    /**
+     * Returns a 400 response for a decorator body that does not parse, or a field that Hub reads with the wrong type.
+     * Like {@link #invalidJsonResponse}, it never echoes the request.
+     */
+    public static Response invalidDecoratorJsonResponse() {
+        return Response.status(Response.Status.BAD_REQUEST).entity(INVALID_DECORATOR_JSON).build();
     }
 
     public static Response decoratorKeyRefusedResponse(DecoratorKeyRefusedException exception) {

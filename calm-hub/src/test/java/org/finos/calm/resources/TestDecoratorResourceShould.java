@@ -628,6 +628,22 @@ public class TestDecoratorResourceShould {
     }
 
     @Test
+    void never_echo_the_text_of_a_parse_error() throws Exception {
+        when(decoratorStore.createDecorator(anyString(), anyString()))
+                .thenThrow(new JsonParseException("Unrecognized token '<script>alert(1)</script>'"));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(VALID_DECORATOR_JSON)
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body(equalTo(CalmResourceErrorResponses.INVALID_DECORATOR_JSON))
+                .body(not(containsString("script")));
+    }
+
+    @Test
     void return_404_when_namespace_does_not_exist_for_create_decorator() throws Exception {
         when(decoratorStore.createDecorator(anyString(), anyString()))
                 .thenThrow(new NamespaceNotFoundException());
@@ -851,7 +867,7 @@ public class TestDecoratorResourceShould {
                 .post("/api/calm/namespaces/finos/decorators")
                 .then()
                 .statusCode(400)
-                .body(containsString("'type' must be a string"));
+                .body(equalTo(CalmResourceErrorResponses.INVALID_DECORATOR_JSON));
 
         verify(decoratorStore, never()).createDecorator(anyString(), anyString());
     }
@@ -865,7 +881,7 @@ public class TestDecoratorResourceShould {
                 .post("/api/calm/namespaces/finos/decorators")
                 .then()
                 .statusCode(400)
-                .body(containsString("'unique-id' must be a string"));
+                .body(equalTo(CalmResourceErrorResponses.INVALID_DECORATOR_JSON));
 
         verify(decoratorStore, never()).createDecorator(anyString(), anyString());
     }
@@ -879,7 +895,7 @@ public class TestDecoratorResourceShould {
                 .put("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(400)
-                .body(containsString("'target' must be an array of strings"));
+                .body(equalTo(CalmResourceErrorResponses.INVALID_DECORATOR_JSON));
 
         verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
     }
