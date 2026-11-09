@@ -13,7 +13,13 @@ import java.util.Optional;
  * Interface for decorator storage operations.
  */
 public interface DecoratorStore {
-    
+
+    /**
+     * Refuse a write before it reads anything, in a store that cannot write.
+     */
+    default void requireWritable() {
+    }
+
     /**
      * Retrieve current decorator IDs for a given namespace with optional filtering. Superseded decorators are left out.
      *

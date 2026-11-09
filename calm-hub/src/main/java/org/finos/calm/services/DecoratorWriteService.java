@@ -118,6 +118,8 @@ public class DecoratorWriteService {
      */
     public void deleteDecorator(String namespace, int id)
             throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
+        // In GitHub mode the history lookup finds nothing, so without this a delete gives 404 and not 501.
+        decoratorStore.requireWritable();
         int currentId = decoratorStore.getDecoratorHistory(namespace, id).getFirst().getId();
         decoratorStore.deleteCurrentDecoratorHistory(namespace, currentId);
     }

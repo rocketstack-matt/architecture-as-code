@@ -34,6 +34,11 @@ public class GitHubDecoratorStore extends AbstractGitHubStore implements Decorat
     }
 
     @Override
+    public void requireWritable() {
+        throw new GitHubWriteNotSupportedException(WRITE_UNSUPPORTED);
+    }
+
+    @Override
     public List<Integer> getDecoratorsForNamespace(String namespace, String target, String type) throws NamespaceNotFoundException {
         verifyNamespace(namespace);
         return Collections.emptyList();

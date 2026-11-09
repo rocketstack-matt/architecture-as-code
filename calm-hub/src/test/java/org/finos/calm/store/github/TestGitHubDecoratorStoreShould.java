@@ -2,6 +2,7 @@ package org.finos.calm.store.github;
 
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
+import org.finos.calm.domain.exception.GitHubWriteNotSupportedException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.github.registry.ResourceRegistry;
 import org.finos.calm.store.github.registry.RegistrySnapshot;
@@ -93,6 +94,11 @@ class TestGitHubDecoratorStoreShould {
 
         assertThrows(NamespaceNotFoundException.class,
                 () -> store.getDecoratorById("nonexistent", 1));
+    }
+
+    @Test
+    void refuse_writes_before_any_lookup() {
+        assertThrows(GitHubWriteNotSupportedException.class, () -> store.requireWritable());
     }
 
     @Test
