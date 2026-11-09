@@ -226,7 +226,8 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 
 `UiConfigProvider` (`components/ui-config/`) loads `GET /api/calm/ui/config` one time.
 `useUiConfig()` returns only the sections the operator configured, or `{}` if the request
-fails. The `EnvironmentPill` shows in the `Navbar` and on the `IntroScreen`, which has no navbar.
+fails. The `EnvironmentPill` shows in the `Navbar` and on the `IntroScreen`, which has no navbar. A tap shows a truncated
+name in full, because a touch screen has no hover for its `title`.
 Identity and items show at the bottom of the navbar drawer (`MenuInfo`). The drawer identity is
 the server's principal, not the OIDC token profile that `UserMenu` shows.
 
