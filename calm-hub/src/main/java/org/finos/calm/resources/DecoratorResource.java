@@ -15,6 +15,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.finos.calm.domain.ValueWrapper;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
@@ -41,8 +42,8 @@ import static org.finos.calm.resources.ResourceValidationConstants.*;
 public class DecoratorResource {
 
     private static final String BAD_DECORATOR = "The JSON does not parse, a field that Hub reads has the wrong type, the body sends a "
-            + "Hub-owned field, or the decorator does not match a $schema that Hub knows. A $schema mismatch lists at most "
-            + "20 errors, and moreErrors counts the rest";
+            + "Hub-owned field, the decorator does not match a $schema that Hub knows, or the store cannot keep a key of the "
+            + "decorator. A $schema mismatch lists at most 20 errors, and moreErrors counts the rest";
 
     private final DecoratorStore decoratorStore;
     private final DecoratorWriteService decoratorWriteService;
@@ -206,6 +207,9 @@ public class DecoratorResource {
         } catch (JsonParseException e) {
             logger.error("Invalid JSON when creating decorator in namespace [{}]", namespace, e);
             return CalmResourceErrorResponses.invalidDecoratorJsonResponse(e.getMessage());
+        } catch (DecoratorKeyRefusedException e) {
+            logger.warn("Refused a decorator key that the store cannot keep in namespace [{}]", namespace);
+            return CalmResourceErrorResponses.decoratorKeyRefusedResponse(e);
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when creating decorator", namespace, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
@@ -264,6 +268,9 @@ public class DecoratorResource {
         } catch (JsonParseException e) {
             logger.error("Invalid JSON when updating decorator [{}] in namespace [{}]", id, namespace, e);
             return CalmResourceErrorResponses.invalidDecoratorJsonResponse(e.getMessage());
+        } catch (DecoratorKeyRefusedException e) {
+            logger.warn("Refused a decorator key that the store cannot keep for decorator [{}] in namespace [{}]", id, namespace);
+            return CalmResourceErrorResponses.decoratorKeyRefusedResponse(e);
         } catch (DecoratorNotFoundException e) {
             logger.error("Decorator [{}] not found in namespace [{}] when updating", id, namespace, e);
             return CalmResourceErrorResponses.decoratorNotFoundResponse(namespace, id);

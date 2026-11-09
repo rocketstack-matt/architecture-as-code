@@ -6,10 +6,14 @@ import jakarta.inject.Inject;
 import org.dizitart.no2.Nitrite;
 import org.dizitart.no2.collection.Document;
 import org.dizitart.no2.collection.NitriteCollection;
+import org.dizitart.no2.exceptions.InvalidIdException;
+import org.dizitart.no2.exceptions.InvalidOperationException;
+import org.dizitart.no2.exceptions.ValidationException;
 import org.dizitart.no2.filters.Filter;
 import org.finos.calm.config.StandaloneQualifier;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
@@ -397,9 +401,19 @@ public class NitriteDecoratorStore implements DecoratorStore {
         return toNitriteDocument(DecoratorJson.parseObject(json));
     }
 
+    // Document.put refuses an _id that is not a long, an empty key and an empty part of a dotted key.
     private static Document toNitriteDocument(Map<?, ?> map) {
         Document doc = Document.createDocument();
-        map.forEach((key, value) -> doc.put(key.toString(), toNitriteValue(value)));
+        map.forEach((key, value) -> {
+            Object nitriteValue = toNitriteValue(value);
+            try {
+                doc.put(key.toString(), nitriteValue);
+            } catch (InvalidIdException e) {
+                throw DecoratorKeyRefusedException.idWithAnotherValue();
+            } catch (InvalidOperationException | ValidationException e) {
+                throw DecoratorKeyRefusedException.emptyKeyPart();
+            }
+        });
         return doc;
     }
 

@@ -2,6 +2,7 @@ package org.finos.calm.resources;
 
 import jakarta.ws.rs.core.Response;
 import org.finos.calm.domain.ResourceType;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 
 import java.util.LinkedHashMap;
@@ -37,6 +38,10 @@ public class CalmResourceErrorResponses {
 
     public static Response invalidDecoratorJsonResponse(String message) {
         return Response.status(Response.Status.BAD_REQUEST).entity("Invalid decorator JSON: " + message).build();
+    }
+
+    public static Response decoratorKeyRefusedResponse(DecoratorKeyRefusedException exception) {
+        return Response.status(Response.Status.BAD_REQUEST).entity(exception.getMessage()).build();
     }
 
     public static Response decoratorSupersededResponse(String namespace, int id) {

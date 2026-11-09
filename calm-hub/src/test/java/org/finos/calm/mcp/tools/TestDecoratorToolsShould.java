@@ -6,6 +6,7 @@ import org.finos.calm.config.DecoratorConfig;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.DecoratorSchemaError;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
@@ -403,6 +404,27 @@ class TestDecoratorToolsShould {
         assertThat(result, containsString("updated-decorator"));
         assertThat(result, containsString("threat-model"));
         assertThat(result, containsString("updated-data"));
+    }
+
+    @Test
+    void return_error_when_the_store_cannot_keep_a_key_on_create() throws Exception {
+        when(decoratorStore.createDecorator(eq("workshop"), anyString())).thenThrow(DecoratorKeyRefusedException.nulCharacter());
+
+        ToolResponse response = decoratorTools.createDecorator("workshop", "{\"type\":\"test\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), is("Error: " + DecoratorKeyRefusedException.nulCharacter().getMessage() + "."));
+    }
+
+    @Test
+    void return_error_when_the_store_cannot_keep_a_key_on_update() throws Exception {
+        org.mockito.Mockito.doThrow(DecoratorKeyRefusedException.idWithAnotherValue())
+                .when(decoratorStore).updateDecorator(eq("workshop"), eq(1), anyString());
+
+        ToolResponse response = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"test\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), is("Error: " + DecoratorKeyRefusedException.idWithAnotherValue().getMessage() + "."));
     }
 
     // --- write rules ---

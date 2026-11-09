@@ -7,6 +7,7 @@ import io.restassured.http.ContentType;
 import org.bson.json.JsonParseException;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
@@ -747,6 +748,35 @@ public class TestDecoratorResourceShould {
                 .then()
                 .statusCode(404)
                 .body(containsString("Invalid namespace provided: invalid-namespace"));
+    }
+
+    @Test
+    void return_400_with_a_plain_message_when_the_store_cannot_keep_a_key_on_create() throws Exception {
+        when(decoratorStore.createDecorator(anyString(), anyString())).thenThrow(DecoratorKeyRefusedException.nulCharacter());
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": \"deployment\", \"data\": {}}")
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body(equalTo(DecoratorKeyRefusedException.nulCharacter().getMessage()));
+    }
+
+    @Test
+    void return_400_with_a_plain_message_when_the_store_cannot_keep_a_key_on_update() throws Exception {
+        doThrow(DecoratorKeyRefusedException.emptyKeyPart())
+                .when(decoratorStore).updateDecorator(anyString(), anyInt(), anyString());
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": \"deployment\", \"data\": {}}")
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(400)
+                .body(equalTo(DecoratorKeyRefusedException.emptyKeyPart().getMessage()));
     }
 
     @Test

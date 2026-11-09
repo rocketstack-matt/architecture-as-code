@@ -15,6 +15,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.Decimal128;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
@@ -319,9 +320,15 @@ public class MongoDecoratorStore implements DecoratorStore {
     }
 
     // Not Document.parse, which decodes extended JSON: {"$numberInt": "1"} must stay the object that was validated.
+    // A BSON key is a C string, so the driver cannot encode one with a NUL.
     static Document toBsonDocument(Map<?, ?> map) {
         Document document = new Document();
-        map.forEach((key, value) -> document.append(key.toString(), toBsonValue(value)));
+        map.forEach((key, value) -> {
+            if (key.toString().indexOf('\0') >= 0) {
+                throw DecoratorKeyRefusedException.nulCharacter();
+            }
+            document.append(key.toString(), toBsonValue(value));
+        });
         return document;
     }
 
