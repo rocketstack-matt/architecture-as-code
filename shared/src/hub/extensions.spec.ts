@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { buildExtensionRequest, extensionProxyPath, HubExtensionRoute, numberText } from './extensions';
 
 // One list for the clients and Hub: TestExtensionToolsShould checks it against ExtensionPaths.
-const PATH_VALUES: { refused: string[], accepted: string[], notEncodable: string[] } = JSON.parse(fs.readFileSync(
+const PATH_VALUES: { refused: string[], accepted: string[] } = JSON.parse(fs.readFileSync(
     path.join(__dirname, '../../../calm-hub/src/test/resources/extensions-test/path-values.json'), 'utf-8'));
 const PATH_RULE = 'must not be empty or ., or contain .., /, \\, %, @, a look-alike of / or \\, a control character or a lone surrogate';
 
@@ -64,7 +64,8 @@ describe('buildExtensionRequest', () => {
         expect(request.path).toBe('/api/calm/extensions/ext/api/namespaces/.admin%3Fx%3D1%20%C3%A9');
     });
 
-    it.each([...PATH_VALUES.refused, ...PATH_VALUES.notEncodable])('fails when a path parameter has a part that Hub refuses: %j', (value) => {
+    // Some JSON parsers refuse a lone surrogate, so the shared list has none.
+    it.each([...PATH_VALUES.refused, '\ud800', 'a\udc00b'])('fails when a path parameter has a part that Hub refuses: %j', (value) => {
         expect(() => buildExtensionRequest('ext', route('GET', '/namespaces/{namespace}'), { namespace: value }))
             .toThrow(`Input property 'namespace' ${PATH_RULE}, because it fills the path /namespaces/{namespace}`);
     });

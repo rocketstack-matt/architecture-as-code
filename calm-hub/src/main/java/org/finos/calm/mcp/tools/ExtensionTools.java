@@ -29,12 +29,14 @@ import org.finos.calm.extensions.ExtensionProxyRequest;
 import org.finos.calm.extensions.ExtensionProxyResponse;
 import org.finos.calm.extensions.ExtensionProxyService;
 import org.finos.calm.extensions.ExtensionRegistry;
+import org.finos.calm.extensions.ExtensionRouteMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -85,11 +87,19 @@ public class ExtensionTools {
     static final int MAX_SCHEMA_DEPTH = 64;
     // The input check takes time in proportion to the argument size times the pattern size, so Hub limits both.
     static final int MAX_ARGUMENTS_BYTES = 1024 * 1024;
-    // The Vert.x limit on the request line of a REST call, which an MCP call must not get past.
-    static final int MAX_PATH_AND_QUERY_LENGTH = 4096;
+    // The Vert.x limit on the request line of a REST call (method, /api/calm/extensions/<id>/api, path, query and
+    // HTTP/1.1), so that an MCP call cannot send a path and query that the same REST call cannot.
+    static final int MAX_REQUEST_LINE_LENGTH = 4096;
+    private static final String HTTP_VERSION = "HTTP/1.1";
     static final int MAX_VALIDATION_ERRORS = 20;
-    // Hub refuses these parts of a path (ADR 0011). The same rule as @finos/calm-shared buildExtensionRequest.
-    private static final Pattern REFUSED_PATH_VALUE = Pattern.compile("\\.\\.|[/\\\\%@\\x00-\\x1f\\x7f]");
+    // Hub refuses these parts of a path, also a look-alike of / or \ (ExtensionPaths.FORBIDDEN). The same rule as
+    // @finos/calm-shared buildExtensionRequest. The test resource extensions-test/path-values.json ties them together.
+    private static final Pattern REFUSED_PATH_VALUE = Pattern.compile(
+            "\\.\\.|[/\\\\%@\\x00-\\x1f\\x7f\\u2044\\u2215\\u2216\\u29f5\\u29f8\\ufe68\\uff0f\\uff3c]");
+    private static final Pattern CONTROL_CHARACTER = Pattern.compile("[\\x00-\\x1f\\x7f]");
+    private static final String PATH_VALUE_RULE = "must not be empty or ., or contain .., /, \\, %, @, a look-alike of / "
+            + "or \\, a control character or a lone surrogate";
+    private static final String QUERY_VALUE_RULE = "must not contain a control character or a lone surrogate";
     private static final String META_SCHEMA_BASE = "https://json-schema.org/draft/2020-12/";
     private static final String META_SCHEMA = META_SCHEMA_BASE + "schema";
     // Bundled in vertx-json-schema under this classpath folder.
@@ -102,9 +112,10 @@ public class ExtensionTools {
             .setOutputFormat(OutputFormat.Basic);
     static final SchemaRepository META_SCHEMAS = metaSchemas(META_SCHEMA_PATH);
 
-    /** One command with what its handler needs. */
+    /** One command with what its handler needs. {@code routes} are all the routes of the extension. */
     record ExtensionTool(String name, String extensionId, String extensionName, String commandName,
-                         ExtensionManifest.Command command, ExtensionManifest.Route route, InputSchema inputValidator) {
+                         ExtensionManifest.Command command, ExtensionManifest.Route route, InputSchema inputValidator,
+                         List<ExtensionManifest.Route> routes) {
 
         boolean readOnly() {
             return "GET".equals(route.method()) || route.readOnly();
@@ -249,7 +260,7 @@ public class ExtensionTools {
                     }
                     tools.add(new ExtensionTool(ExtensionManifestLoader.toolName(manifest.id(), name), manifest.id(),
                             manifest.name(), name, command, route,
-                            InputSchema.of(manifest.id(), name, published(command.input()))));
+                            InputSchema.of(manifest.id(), name, published(command.input())), manifest.routes()));
                 } catch (RuntimeException e) {
                     logger.warn("Extension {} command '{}' has no MCP tool: {}", manifest.id(), name, e.getMessage());
                 } catch (Error e) {
@@ -750,31 +761,45 @@ public class ExtensionTools {
         while (matcher.find()) {
             String name = matcher.group(1);
             Object value = input.getValue(name);
+            if (value == null) {
+                throw new IllegalArgumentException("Input property '" + name + "' is required, because it fills the path "
+                        + route.path());
+            }
             if (!(value instanceof String || value instanceof Number || value instanceof Boolean)) {
                 throw new IllegalArgumentException("Input property '" + name + "' must be a string, number or boolean, "
                         + "because it fills the path " + route.path());
             }
-            String text = String.valueOf(value);
-            if (text.isEmpty() || text.equals(".") || REFUSED_PATH_VALUE.matcher(text).find()) {
-                throw new IllegalArgumentException("Input property '" + name + "' must not be empty or ., or contain .., /, "
-                        + "\\, %, @ or a control character, because it fills the path " + route.path());
+            String text = scalarText(value);
+            if (text.isEmpty() || text.equals(".") || REFUSED_PATH_VALUE.matcher(text).find() || !wellFormed(text)) {
+                throw new IllegalArgumentException("Input property '" + name + "' " + PATH_VALUE_RULE
+                        + ", because it fills the path " + route.path());
             }
             rest.remove(name);
             matcher.appendReplacement(path, Matcher.quoteReplacement(encode(text)));
         }
         matcher.appendTail(path);
-
         String method = route.method();
+        checkMatchedRoute(tool, method, path.toString());
+
         boolean queryMethod = "GET".equals(method) || "DELETE".equals(method);
         String query = null;
         if (queryMethod) {
             List<String> parameters = new ArrayList<>();
-            rest.forEach((name, value) -> queryValues(value).forEach(v -> parameters.add(encode(name) + "=" + encode(v))));
+            rest.forEach((name, value) -> queryValues(value).forEach(v -> {
+                // Hub refuses an encoded control character in a query, with a message that does not name the property.
+                if (!isQueryText(name) || !isQueryText(v)) {
+                    throw new IllegalArgumentException("Input property '" + name + "' " + QUERY_VALUE_RULE
+                            + ", because it goes in the query");
+                }
+                parameters.add(encode(name) + "=" + encode(v));
+            }));
             query = parameters.isEmpty() ? null : String.join("&", parameters);
         }
-        if (path.length() + (query == null ? 0 : query.length() + 1) > MAX_PATH_AND_QUERY_LENGTH) {
-            throw new IllegalArgumentException("The path and query are longer than " + MAX_PATH_AND_QUERY_LENGTH
-                    + " characters.");
+        int requestLine = method.length() + 1 + proxyPathLength(tool.extensionId()) + path.length()
+                + (query == null ? 0 : query.length() + 1) + 1 + HTTP_VERSION.length();
+        if (requestLine > MAX_REQUEST_LINE_LENGTH) {
+            throw new IllegalArgumentException("The path and query are too long: the request line of the same REST call "
+                    + "would be longer than " + MAX_REQUEST_LINE_LENGTH + " characters.");
         }
         if (queryMethod) {
             return new ExtensionProxyRequest(tool.extensionId(), method, path.toString(), query, null, null, null, null);
@@ -820,6 +845,57 @@ public class ExtensionTools {
         }
     }
 
+    /**
+     * The proxy matches the route with the most literal segments, so a value that equals a literal of
+     * another route, such as {@code admin} for {@code /services/{service}} next to {@code /services/admin},
+     * would call that route. A tool calls only the route of its command.
+     */
+    private static void checkMatchedRoute(ExtensionTool tool, String method, String path) {
+        ExtensionManifest.Route route = tool.route();
+        int parameters = pathParameterCount(route.path());
+        for (ExtensionManifest.Route other : tool.routes()) {
+            if (!other.id().equals(route.id()) && other.method().equals(method)
+                    && pathParameterCount(other.path()) < parameters
+                    && ExtensionRouteMatcher.parameters(other.path(), path).isPresent()) {
+                throw new IllegalArgumentException("The input fills the path " + route.path() + " so that it matches route '"
+                        + other.id() + "', not route '" + route.id() + "' of this command.");
+            }
+        }
+    }
+
+    private static int pathParameterCount(String path) {
+        return (int) PATH_PARAM.matcher(path).results().count();
+    }
+
+    // The length of /api/calm/extensions/<id>/api. An extension id needs no encoding.
+    private static int proxyPathLength(String extensionId) {
+        return "/api/calm/extensions/".length() + extensionId.length() + "/api".length();
+    }
+
+    private static boolean isQueryText(String value) {
+        return wellFormed(value) && !CONTROL_CHARACTER.matcher(value).find();
+    }
+
+    // UTF-8 has no form for a lone surrogate: getBytes would send it as ?.
+    private static boolean wellFormed(String value) {
+        return StandardCharsets.UTF_8.newEncoder().canEncode(value);
+    }
+
+    /**
+     * A number in plain notation with no trailing zeros, as the shared client writes it, so that both fill a
+     * path or query with the same text: {@code 1.0} gives {@code 1}, and {@code 1e21} gives
+     * {@code 1000000000000000000000}.
+     */
+    static String scalarText(Object value) {
+        if (value instanceof Double || value instanceof Float) {
+            return new BigDecimal(value.toString()).stripTrailingZeros().toPlainString();
+        }
+        if (value instanceof BigDecimal decimal) {
+            return decimal.stripTrailingZeros().toPlainString();
+        }
+        return String.valueOf(value);
+    }
+
     private static List<String> queryValues(Object value) {
         if (value instanceof JsonArray array) {
             return array.stream().flatMap(item -> queryValues(item).stream()).toList();
@@ -828,7 +904,7 @@ public class ExtensionTools {
             return list.stream().flatMap(item -> queryValues(item).stream()).toList();
         }
         if (value instanceof String || value instanceof Number || value instanceof Boolean) {
-            return List.of(String.valueOf(value));
+            return List.of(scalarText(value));
         }
         // An object or null is sent as JSON.
         return List.of(Json.encode(value));
