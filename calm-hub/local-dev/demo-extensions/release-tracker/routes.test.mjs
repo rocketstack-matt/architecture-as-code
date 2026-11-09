@@ -26,3 +26,10 @@ test('the designer tab is not found without both path segments', () => {
     assert.equal(get('/tab/architectures'), null);
     assert.equal(get('/tab/architectures/1/extra'), null);
 });
+
+test('every GET route that a UI contribution names is readOnly', () => {
+    const routes = new Map(manifest.routes.map((r) => [r.id, r]));
+    const gets = Object.values(manifest.contributes).flat().map((c) => routes.get(c.route)).filter((r) => r?.method === 'GET');
+    assert.ok(gets.length >= 4);
+    for (const route of gets) assert.equal(route.readOnly, true, route.id);
+});

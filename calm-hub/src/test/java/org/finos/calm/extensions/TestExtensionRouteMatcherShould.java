@@ -62,5 +62,17 @@ class TestExtensionRouteMatcherShould {
                 () -> ExtensionRouteMatcher.match(MANIFEST, "DELETE", "/namespaces/a/services"));
 
         assertThat(e.status(), is(405));
+        assertThat(e.headers(), equalTo(Map.of("Allow", "GET, HEAD, POST")));
+    }
+
+    @Test
+    void list_head_with_get_and_only_the_accepted_routes_in_allow() {
+        ExtensionProxyException e = assertThrows(ExtensionProxyException.class,
+                () -> ExtensionRouteMatcher.match(MANIFEST, "DELETE", "/namespaces/a/services",
+                        route -> "GET".equals(route.method())));
+
+        assertThat(e.headers(), equalTo(Map.of("Allow", "GET, HEAD")));
+        assertThat(ExtensionRouteMatcher.allowedMethods(MANIFEST, "/namespaces/a/services",
+                route -> !"GET".equals(route.method())), is("POST"));
     }
 }

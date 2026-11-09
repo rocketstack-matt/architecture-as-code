@@ -70,6 +70,29 @@ class TestExtensionProxyResourceReadOnlyShould {
 
     @Test
     @TestSecurity(user = "alice")
+    void leave_a_post_with_no_slash_after_api_to_the_proxy() {
+        // Not the read-only 405. JAX-RS gives the 404: the proxy resource needs a slash after "api".
+        given().contentType("application/json").body("{}")
+                .when().post(BASE)
+                .then().statusCode(404);
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void list_only_the_methods_that_a_read_only_hub_accepts_on_a_method_mismatch() {
+        given().when().delete(BASE + "/namespaces/finos/services")
+                .then().statusCode(405)
+                .header("Allow", "GET, HEAD")
+                .body("error", equalTo("The extension route does not allow this method"));
+        given().when().delete(BASE + "/search")
+                .then().statusCode(405)
+                .header("Allow", "POST");
+
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
     void apply_the_same_path_rule_as_a_hub_that_is_not_read_only() {
         given().when().get(BASE + "/services/architectures")
                 .then().statusCode(200);
@@ -89,6 +112,7 @@ class TestExtensionProxyResourceReadOnlyShould {
         given().contentType("application/json").body("{}")
                 .when().post(BASE + "/namespaces/finos/services")
                 .then().statusCode(405)
+                .header("Allow", "GET, HEAD")
                 .body("error", equalTo("This CALM Hub instance is read-only"));
         given().contentType("application/json").body("{}")
                 .when().post("/api/calm/namespaces")

@@ -41,8 +41,10 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -56,7 +58,7 @@ public class ExtensionProxyService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExtensionProxyService.class);
     private static final Set<String> REPLY_TYPES = Set.of("application/json", "text/event-stream", "text/plain");
-    private static final List<String> REPLY_HEADERS = List.of("Content-Type", "ETag");
+    private static final List<String> REPLY_HEADERS = List.of("Content-Type", "ETag", "Retry-After", "Vary");
     /** The scopes for which Hub checks the namespace, so the only ones that get the {@code ns} claim. */
     private static final Set<String> NAMESPACE_SCOPES = Set.of("read", "write", "admin");
     private static final Set<String> DOMAIN_SCOPES = Set.of("domain_read", "domain_write", "domain_admin");
@@ -69,6 +71,7 @@ public class ExtensionProxyService {
     private final AuditService auditService;
     private final String authMode;
     private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
+    private final Map<String, Semaphore> concurrentCalls = new ConcurrentHashMap<>();
 
     @Inject
     public ExtensionProxyService(ExtensionRegistry registry, ExtensionIdentitySigner signer,
@@ -108,36 +111,45 @@ public class ExtensionProxyService {
         RegisteredExtension extension = access.extension();
         ExtensionManifest.Route route = access.route();
         String method = access.method();
-        String namespace = access.namespace();
-        String domain = access.domain();
-        boolean audited = !route.readOnly();
-
-        String query = ExtensionPaths.canonicalQuery(request.rawQuery());
-        String pathAndQuery = query.isEmpty() ? access.path() : access.path() + "?" + query;
-        URI target = ExtensionPaths.resolve(access.backend(), pathAndQuery);
         ExtensionLimits limits = extension.limits();
-        byte[] body = readBody(request.body(), limits.maxRequestBytes());
-        if (!acceptsContentType(method, body, request.contentType())) {
-            if (audited) {
-                audit(identity, method, extension, route, namespace, domain, null, AuditOutcome.FAILURE);
-            }
-            throw new ExtensionProxyException(415, "The request must be JSON");
-        }
-
-        String jti = UUID.randomUUID().toString();
-        String assertion = signer.sign(new ExtensionAssertion(identity.getPrincipal().getName(), extension.id(), jti,
-                authMode, extension.manifest().hubApi(), route.id(), route.scope(), namespace, method,
-                pathAndQuery), body);
-        HttpRequest outbound = outboundRequest(request, method, target, body, limits, assertion);
-        AuditOutcome outcome = AuditOutcome.UNKNOWN;
+        Semaphore calls = concurrentCalls.computeIfAbsent(extension.id(), id -> new Semaphore(limits.maxConcurrentCalls()));
+        boolean acquired = false;
+        // A refusal after the scope check is a FAILURE with no jti: Hub sent nothing to the backend.
+        AuditOutcome outcome = AuditOutcome.FAILURE;
+        String sentJti = null;
         try {
+            String query = ExtensionPaths.canonicalQuery(request.rawQuery());
+            String pathAndQuery = query.isEmpty() ? access.path() : access.path() + "?" + query;
+            URI target = ExtensionPaths.resolve(access.backend(), pathAndQuery);
+            byte[] body = readBody(request.body(), limits.maxRequestBytes());
+            if (!acceptsContentType(method, body, request.contentType())) {
+                throw new ExtensionProxyException(415, "The request must be JSON");
+            }
+            acquired = calls.tryAcquire();
+            if (!acquired) {
+                LOG.warn("Extension {} has {} calls in progress, so Hub refused one more", extension.id(),
+                        limits.maxConcurrentCalls());
+                throw new ExtensionProxyException(503, "The extension is busy. Try again later",
+                        Map.of("Retry-After", "1"));
+            }
+            String jti = UUID.randomUUID().toString();
+            String assertion = signer.sign(new ExtensionAssertion(identity.getPrincipal().getName(), extension.id(), jti,
+                    authMode, extension.manifest().hubApi(), route.id(), route.scope(), access.namespace(),
+                    access.domain(), method, pathAndQuery), body);
+            HttpRequest outbound = outboundRequest(request, method, target, body, limits, assertion);
+            outcome = AuditOutcome.UNKNOWN;
+            sentJti = jti;
             ExtensionProxyResponse reply = send(extension, route, outbound);
-            outcome = reply.status() < 300 ? AuditOutcome.SUCCESS
+            outcome = reply.status() < 400 ? AuditOutcome.SUCCESS
                     : reply.status() == 401 || reply.status() == 403 ? AuditOutcome.DENIED : AuditOutcome.FAILURE;
             return reply;
         } finally {
-            if (audited) {
-                audit(identity, method, extension, route, namespace, domain, jti, outcome);
+            if (acquired) {
+                calls.release();
+            }
+            if (!route.readOnly()) {
+                audit(identity, method, extension, route, access.namespace(), access.domain(), sentJti, outcome,
+                        request.sourceIp());
             }
         }
     }
@@ -153,11 +165,15 @@ public class ExtensionProxyService {
                 .orElseThrow(() -> new ExtensionProxyException(404, "The extension has no such route"));
         String method = request.method().toUpperCase(Locale.ROOT);
         String path = ExtensionPaths.checkPath(request.path());
-        ExtensionRouteMatcher.RouteMatch match = ExtensionRouteMatcher.match(extension.manifest(), method, path);
+        boolean readOnlyHub = registry.isReadOnly();
+        Predicate<ExtensionManifest.Route> accepted = r -> !readOnlyHub || "GET".equals(r.method()) || r.readOnly();
+        ExtensionRouteMatcher.RouteMatch match =
+                ExtensionRouteMatcher.match(extension.manifest(), method, path, accepted);
         ExtensionRouteMatcher.rejectEncodedLiterals(match, request.path());
         ExtensionManifest.Route route = match.route();
-        if (registry.isReadOnly() && !"GET".equals(method) && !route.readOnly()) {
-            throw new ExtensionProxyException(405, "This CALM Hub instance is read-only");
+        if (!accepted.test(route)) {
+            String allow = ExtensionRouteMatcher.allowedMethods(extension.manifest(), path, accepted);
+            throw new ExtensionProxyException(405, "This CALM Hub instance is read-only", Map.of("Allow", allow));
         }
         // Hub takes the namespace and the domain only from the matched path, never from the query or body.
         String namespace = match.parameters().get("namespace");
@@ -173,7 +189,8 @@ public class ExtensionProxyService {
         domain = DOMAIN_SCOPES.contains(route.scope()) ? domain : null;
         if (!authorised) {
             if (audited) {
-                audit(identity, method, extension, route, namespace, domain, null, AuditOutcome.DENIED);
+                audit(identity, method, extension, route, namespace, domain, null, AuditOutcome.DENIED,
+                        request.sourceIp());
             }
             boolean anonymous = identity == null || identity.isAnonymous();
             throw anonymous
@@ -207,7 +224,8 @@ public class ExtensionProxyService {
     }
 
     private void audit(SecurityIdentity identity, String method, RegisteredExtension extension,
-                       ExtensionManifest.Route route, String namespace, String domain, String jti, AuditOutcome outcome) {
+                       ExtensionManifest.Route route, String namespace, String domain, String jti, AuditOutcome outcome,
+                       String sourceIp) {
         auditService.record(new AuditLogEntry.AuditLogEntryBuilder()
                 .setTimestamp(LocalDateTime.now(ZoneOffset.UTC))
                 .setActor(identity == null || identity.isAnonymous() ? "anonymous" : identity.getPrincipal().getName())
@@ -224,6 +242,7 @@ public class ExtensionProxyService {
                 .setRoute(route.id())
                 .setJti(jti)
                 .setOutcome(outcome)
+                .setSourceIp(sourceIp)
                 .build());
     }
 
@@ -239,6 +258,8 @@ public class ExtensionProxyService {
             copyHeader(builder, "Content-Type", request.contentType());
             copyHeader(builder, "Accept", request.accept());
             copyHeader(builder, "Accept-Language", request.acceptLanguage());
+            copyHeader(builder, "If-Match", request.ifMatch());
+            copyHeader(builder, "If-None-Match", request.ifNoneMatch());
             return builder.build();
         } catch (IllegalArgumentException e) {
             throw new ExtensionProxyException(400, "The request has a header value that is not allowed");
@@ -279,8 +300,10 @@ public class ExtensionProxyService {
     private static ExtensionProxyResponse reply(RegisteredExtension extension, ExtensionManifest.Route route,
                                                 HttpResponse<byte[]> response) {
         int status = response.statusCode();
-        // A 401 or 407 would start a login in the caller; a redirect cannot be followed with no Location.
-        boolean passOn = (status >= 200 && status < 300) || (status >= 400 && status < 500 && status != 401 && status != 407);
+        // A 401 or 407 would start a login in the caller. Hub never passes on Location, because it names the
+        // private backend, so a redirect cannot be followed; a 304 needs none.
+        boolean passOn = (status >= 200 && status < 300) || status == 304
+                || (status >= 400 && status < 500 && status != 401 && status != 407);
         String contentType = response.headers().firstValue("Content-Type").orElse(null);
         boolean typeAllowed = contentType == null ? response.body().length == 0
                 : REPLY_TYPES.contains(mediaType(contentType)) || (status >= 400 && isJson(contentType));

@@ -97,7 +97,7 @@ public class AuditService {
         }
     }
 
-    /** Empty for other entity types, so that their line for any other entity type keeps its format. */
+    /** Empty for other entity types, so that their log line does not change. */
     private static String extensionFields(AuditLogEntry entry) {
         if (entry.getRoute() == null && entry.getJti() == null) {
             return "";

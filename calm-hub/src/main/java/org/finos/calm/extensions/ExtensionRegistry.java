@@ -35,8 +35,16 @@ import java.util.regex.Pattern;
 public class ExtensionRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExtensionRegistry.class);
+    private static final List<String> PER_ID_KEYS = List.of("enabled", "order", "backend-url", "allow-http",
+            "connect-timeout-seconds", "request-timeout-seconds", "max-request-bytes", "max-response-bytes",
+            "max-concurrent-calls");
     private static final Pattern PER_ID_SETTING = Pattern.compile(
-            "^calm\\.extensions\\.(?:\"([a-z][a-z0-9-]*)\"|([a-z][a-z0-9-]*))\\.(?:enabled|order|backend-url)$");
+            "^calm\\.extensions\\.(?:\"([a-z][a-z0-9-]*)\"|([a-z][a-z0-9-]*))\\.(?:" + String.join("|", PER_ID_KEYS) + ")$");
+    /** The same settings as environment variables, such as {@code CALM_EXTENSIONS__TEAM_SERVICES__ENABLED}. */
+    private static final Pattern PER_ID_ENV_SETTING = Pattern.compile(
+            "^CALM_EXTENSIONS_(?:_([A-Z][A-Z0-9_]*?)__|([A-Z][A-Z0-9_]*?)_)(?:"
+                    + String.join("|", PER_ID_KEYS.stream().map(k -> k.replace('-', '_').toUpperCase(Locale.ROOT)).toList())
+                    + ")$");
     private static final Set<String> URL_SCHEMES = Set.of("http", "https");
 
     private final ExtensionsConfig config;
@@ -112,16 +120,7 @@ public class ExtensionRegistry {
             errors.add("an enabled extension has routes, but calm.auth.enabled is false. Every caller would be a global "
                     + "admin. Turn auth on, or set calm.extensions.allow-without-auth=true for local development");
         }
-        Set<String> unknownIds = new HashSet<>();
-        for (String property : properties.getPropertyNames()) {
-            Matcher match = PER_ID_SETTING.matcher(property);
-            if (match.matches()) {
-                String id = match.group(1) == null ? match.group(2) : match.group(1);
-                if (!ids.contains(id) && unknownIds.add(id)) {
-                    LOG.warn("Extension settings name unknown extension id '{}'", id);
-                }
-            }
-        }
+        warnAboutUnknownIds(ids);
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Invalid calm.extensions configuration: " + String.join("; ", errors));
         }
@@ -130,6 +129,30 @@ public class ExtensionRegistry {
         if (!extensions.isEmpty()) {
             LOG.info("Enabled extensions: {}", extensions.stream().map(RegisteredExtension::id).toList());
         }
+    }
+
+    private void warnAboutUnknownIds(Set<String> ids) {
+        Set<String> unknownIds = new HashSet<>();
+        for (String property : properties.getPropertyNames()) {
+            settingId(property)
+                    .filter(id -> !ids.contains(id) && !ExtensionManifestLoader.RESERVED_IDS.contains(id))
+                    .filter(unknownIds::add)
+                    .ifPresent(id -> LOG.warn("Extension settings name unknown extension id '{}'", id));
+        }
+    }
+
+    /** The id that a per-id setting names. An id has no underscore, so an environment variable has one for each dash. */
+    static Optional<String> settingId(String property) {
+        Matcher match = PER_ID_SETTING.matcher(property);
+        if (match.matches()) {
+            return Optional.of(match.group(1) == null ? match.group(2) : match.group(1));
+        }
+        match = PER_ID_ENV_SETTING.matcher(property);
+        if (match.matches()) {
+            String id = match.group(1) == null ? match.group(2) : match.group(1);
+            return Optional.of(id.toLowerCase(Locale.ROOT).replace('_', '-'));
+        }
+        return Optional.empty();
     }
 
     /** True on a read-only Hub, where the proxy allows a non-GET method only on a {@code readOnly} route. */
@@ -208,7 +231,8 @@ public class ExtensionRegistry {
                 Duration.ofSeconds(positiveSetting(id, "connect-timeout-seconds", defaults.connectTimeoutSeconds(), errors)),
                 Duration.ofSeconds(positiveSetting(id, "request-timeout-seconds", defaults.requestTimeoutSeconds(), errors)),
                 positiveSetting(id, "max-request-bytes", defaults.maxRequestBytes(), errors),
-                positiveSetting(id, "max-response-bytes", defaults.maxResponseBytes(), errors));
+                positiveSetting(id, "max-response-bytes", defaults.maxResponseBytes(), errors),
+                positiveSetting(id, "max-concurrent-calls", defaults.maxConcurrentCalls(), errors));
     }
 
     private int positiveSetting(String id, String name, int fallback, List<String> errors) {

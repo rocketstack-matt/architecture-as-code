@@ -422,6 +422,8 @@ All four workflows:
 - `ExtensionsConfig` declares the per-id keys (`calm.extensions."<id>".enabled|order|backend-url|allow-http|...`) only
   so that SmallRye accepts them. The registry reads them by full name, because a map key with a dash
   does not bind from an environment variable
+- The unknown-id warning matches `ExtensionRegistry.PER_ID_KEYS` in property and environment-variable form. Add a
+  new per-id key there, in `ExtensionsConfig.Extension`, and in the settings table of `docs/docs/calm-hub/index.md`
 - A field change in `domain/extensions/ExtensionManifest` needs the same change in the schema: the
   schema rejects unknown fields
 - `ExtensionProxyService` holds every rule of a proxied call: route match, path checks, scope, read-only,
@@ -430,10 +432,11 @@ All four workflows:
 - `mcp/tools/ExtensionTools` registers the command tools after `ExtensionRegistry` loads (observer priority).
   `ToolManager` lists them after the `@Tool` methods, in registration order, so it registers them sorted.
   The MCP server does not check arguments against `inputSchema`, so the handler does
-- `ReadOnlyRequestFilter` exempts only `^/api/calm/extensions/[^/]+/api/`, in normal form. The proxy
+- `ReadOnlyRequestFilter` exempts only `^/api/calm/extensions/[^/]+/api(/|$)`, in normal form. The proxy
   then allows a non-GET method only on a `readOnly` route
 - `ExtensionIdentitySigner` signs with the JDK, not a JWT library. `ExtensionAssertionRejectingMechanism`
-  refuses a bearer token with `typ: calm-ext+jwt` in every auth mode
+  refuses a bearer token with `typ: calm-ext+jwt` in every auth mode, and sends the 401 challenge for it itself, so
+  that an OIDC provider that is down cannot make it a 500
 - Tests generate key pairs at run time (`ExtensionTestKeys`); `*.pem` is git-ignored. `FixtureBackend` is a
   loopback backend for proxy tests
 - Try it: see `local-dev/extensions/example-services/README.md`. `local-dev/demo-extensions/` holds two demos

@@ -53,7 +53,7 @@ public class ReadOnlyRequestFilter implements ContainerRequestFilter {
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "DELETE", "PATCH");
     private static final String ALLOW_HEADER = "Allow";
     private static final String ALLOWED_METHODS = "GET, HEAD, OPTIONS";
-    private static final Pattern EXTENSION_PROXY_PATH = Pattern.compile("^/?api/calm/extensions/[^/]+/api/");
+    private static final Pattern EXTENSION_PROXY_PATH = Pattern.compile("^/?api/calm/extensions/[^/]+/api(/|$)");
 
     // Resolved once at runtime startup via @PostConstruct (see init()).  We deliberately
     // avoid @ConfigProperty here: in native image, @ConfigProperty values on CDI beans

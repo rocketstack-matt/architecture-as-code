@@ -37,7 +37,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -48,6 +50,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -258,7 +261,11 @@ class TestExtensionProxyServiceShould {
         if (sendsNs) {
             assertThat(claims.get("ns").asText(), is("finos"));
         }
-        assertThat(claims.has("domain"), is(false));
+        boolean sendsDom = scope.startsWith("domain_");
+        assertThat(claims.has("dom"), is(sendsDom));
+        if (sendsDom) {
+            assertThat(claims.get("dom").asText(), is("payments"));
+        }
 
         ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
         verify(auditService).record(captor.capture());
@@ -331,6 +338,8 @@ class TestExtensionProxyServiceShould {
         assertThat(status(new ExtensionProxyRequest("missing", "GET", "/screen", null, null, null, null, null)), is(404));
         assertThat(status(request("GET", "/admin", null, null)), is(404));
         assertThat(status(request("DELETE", "/screen", null, null)), is(405));
+        assertThat(assertThrows(ExtensionProxyException.class, () -> service.call(alice,
+                request("DELETE", "/namespaces/finos/services", null, null))).headers(), equalTo(Map.of("Allow", "GET, HEAD, POST")));
         assertThat(status(request("GET", "/%2e%2e/admin", null, null)), is(400));
         assertThat(backend.received(), nullValue());
     }
@@ -489,9 +498,27 @@ class TestExtensionProxyServiceShould {
     void allow_only_get_and_read_only_routes_on_a_read_only_hub() {
         when(registry.isReadOnly()).thenReturn(true);
 
-        assertThat(status(request("POST", "/namespaces/finos/services", null, "{}")), is(405));
+        ExtensionProxyException refused = assertThrows(ExtensionProxyException.class,
+                () -> service.call(alice, request("POST", "/namespaces/finos/services", null, "{}")));
+        assertThat(refused.status(), is(405));
+        assertThat(refused.headers(), equalTo(Map.of("Allow", "GET, HEAD")));
         assertThat(service.call(alice, request("POST", "/search", null, "{}")).status(), is(200));
         assertThat(service.call(alice, request("GET", "/screen", null, null)).status(), is(200));
+    }
+
+    @Test
+    void list_only_the_accepted_methods_for_a_method_mismatch_on_a_read_only_hub() {
+        when(registry.isReadOnly()).thenReturn(true);
+
+        ExtensionProxyException mismatch = assertThrows(ExtensionProxyException.class,
+                () -> service.call(alice, request("DELETE", "/namespaces/finos/services", null, null)));
+        assertThat(mismatch.status(), is(405));
+        assertThat(mismatch.getMessage(), is("The extension route does not allow this method"));
+        assertThat(mismatch.headers(), equalTo(Map.of("Allow", "GET, HEAD")));
+        assertThat(assertThrows(ExtensionProxyException.class,
+                () -> service.call(alice, request("DELETE", "/search", null, null))).headers(),
+                equalTo(Map.of("Allow", "POST")));
+        assertThat(backend.received(), nullValue());
     }
 
     @Test
@@ -569,6 +596,118 @@ class TestExtensionProxyServiceShould {
         assert_audit(AuditOutcome.UNKNOWN, "add-service");
     }
 
+    @Test
+    void audit_a_413_a_bad_header_and_a_bad_query_on_a_write_route_with_no_jti() {
+        assertThat(status(request("POST", "/namespaces/finos/services", null, "x".repeat(1025))), is(413));
+        assertThat(status(conditional("POST", "/namespaces/finos/services", "\"v1\"\r\nX-Injected: 1", null)), is(400));
+        assertThat(status(request("POST", "/namespaces/finos/services", "q=%0a", "{}")), is(400));
+        assertThat(status(request("POST", "/search", null, "x".repeat(1025))), is(413));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService, times(3)).record(captor.capture());
+        for (AuditLogEntry entry : captor.getAllValues()) {
+            assertThat(entry.getOutcome(), is(AuditOutcome.FAILURE));
+            assertThat(entry.getRoute(), is("add-service"));
+            assertThat(entry.getNamespace(), is("finos"));
+            assertThat(entry.getJti(), nullValue());
+        }
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    void record_the_source_ip_in_each_audit_entry() {
+        service.call(alice, withSourceIp("POST", "/namespaces/finos/services", "{}"));
+        assertThat(status(withSourceIp("POST", "/namespaces/finos/services", null)), is(415));
+        when(permissions.canWrite(any(), any())).thenReturn(false);
+        assertThat(status(withSourceIp("POST", "/namespaces/finos/services", "{}")), is(403));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService, times(3)).record(captor.capture());
+        assertThat(captor.getAllValues().stream().map(AuditLogEntry::getSourceIp).toList(),
+                equalTo(List.of("10.0.0.1", "10.0.0.1", "10.0.0.1")));
+    }
+
+    @Test
+    void forward_the_conditional_headers() {
+        service.call(alice, conditional("POST", "/namespaces/finos/services", "\"v1\"", "*"));
+
+        assertThat(backend.received().header("If-Match"), is("\"v1\""));
+        assertThat(backend.received().header("If-None-Match"), is("*"));
+
+        backend.reset();
+        service.call(alice, request("GET", "/screen", null, null));
+        assertThat(backend.received().header("If-Match"), nullValue());
+        assertThat(backend.received().header("If-None-Match"), nullValue());
+    }
+
+    @Test
+    void refuse_a_conditional_header_with_a_line_break() {
+        assertThat(status(conditional("GET", "/screen", null, "\"v1\"\r\nX-Injected: 1")), is(400));
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    void pass_on_a_304_with_its_etag() {
+        backend.reply(new FixtureBackend.Reply(304, Map.of("ETag", "\"v1\""), new byte[0], 0));
+
+        ExtensionProxyResponse reply = service.call(alice, conditional("GET", "/screen", null, "\"v1\""));
+
+        assertThat(reply.status(), is(304));
+        assertThat(reply.headers().get("ETag"), is("\"v1\""));
+        assert_audit(AuditOutcome.SUCCESS, "screen");
+    }
+
+    @Test
+    void pass_on_retry_after_and_vary_but_not_location() {
+        backend.reply(new FixtureBackend.Reply(429, Map.of("Content-Type", "application/json", "Retry-After", "30",
+                "Vary", "Accept-Language", "Location", "http://backend.internal/queue"),
+                "{}".getBytes(StandardCharsets.UTF_8), 0));
+
+        ExtensionProxyResponse reply = service.call(alice, request("GET", "/screen", null, null));
+
+        assertThat(reply.status(), is(429));
+        assertThat(reply.headers(), equalTo(Map.of("Content-Type", "application/json", "Retry-After", "30",
+                "Vary", "Accept-Language", "Cache-Control", "private")));
+    }
+
+    @Test
+    void refuse_a_call_over_the_concurrent_call_limit_with_503() throws Exception {
+        register(backend.url("/base"), new ExtensionLimits(Duration.ofSeconds(2), Duration.ofSeconds(5), 1024, 1024, 1));
+        backend.reply(new FixtureBackend.Reply(200, Map.of("Content-Type", "application/json"),
+                "{}".getBytes(StandardCharsets.UTF_8), 1000));
+        CompletableFuture<ExtensionProxyResponse> slow = CompletableFuture.supplyAsync(
+                () -> service.call(alice, request("POST", "/search", null, "{}")));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (backend.received() == null && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+
+        ExtensionProxyException busy = assertThrows(ExtensionProxyException.class,
+                () -> service.call(alice, request("POST", "/namespaces/finos/services", null, "{}")));
+
+        assertThat(busy.status(), is(503));
+        assertThat(busy.headers(), equalTo(Map.of("Retry-After", "1")));
+        assertThat(slow.get(5, TimeUnit.SECONDS).status(), is(200));
+        backend.reply(FixtureBackend.Reply.json(200, "{}"));
+        assertThat(service.call(alice, request("POST", "/search", null, "{}")).status(), is(200));
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditService).record(captor.capture());
+        assertThat(captor.getValue().getOutcome(), is(AuditOutcome.FAILURE));
+        assertThat(captor.getValue().getRoute(), is("add-service"));
+        assertThat(captor.getValue().getJti(), nullValue());
+    }
+
+    @Test
+    void release_the_call_slot_when_hub_refuses_the_call_after_taking_it() {
+        register(backend.url("/base"), new ExtensionLimits(Duration.ofSeconds(2), Duration.ofSeconds(5), 1024, 1024, 1));
+
+        assertThat(status(conditional("GET", "/screen", "\"v1\"\r\nX: 1", null)), is(400));
+        backend.reply(FixtureBackend.Reply.json(500, "{}"));
+        assertThat(status(request("GET", "/screen", null, null)), is(502));
+        backend.reply(FixtureBackend.Reply.json(200, "{}"));
+        assertThat(service.call(alice, request("GET", "/screen", null, null)).status(), is(200));
+    }
+
     private void assert_audit(AuditOutcome outcome, String route) {
         ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
         verify(auditService).record(captor.capture());
@@ -642,7 +781,7 @@ class TestExtensionProxyServiceShould {
     }
 
     private static ExtensionLimits limits(int maxRequestBytes, int maxResponseBytes, Duration requestTimeout) {
-        return new ExtensionLimits(Duration.ofSeconds(2), requestTimeout, maxRequestBytes, maxResponseBytes);
+        return new ExtensionLimits(Duration.ofSeconds(2), requestTimeout, maxRequestBytes, maxResponseBytes, 32);
     }
 
     private void register(URI backendUrl, ExtensionLimits limits) {
@@ -657,6 +796,19 @@ class TestExtensionProxyServiceShould {
     private static ExtensionProxyRequest request(String method, String path, String query, String body) {
         return new ExtensionProxyRequest("team-services", method, path, query,
                 body == null ? null : "application/json", "application/json", "en-GB",
+                body == null ? null : new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static ExtensionProxyRequest conditional(String method, String path, String ifMatch, String ifNoneMatch) {
+        boolean post = "POST".equals(method);
+        return new ExtensionProxyRequest("team-services", method, path, null, post ? "application/json" : null,
+                "application/json", null, ifMatch, ifNoneMatch, null,
+                post ? new ByteArrayInputStream("{}".getBytes(StandardCharsets.UTF_8)) : null);
+    }
+
+    private static ExtensionProxyRequest withSourceIp(String method, String path, String body) {
+        return new ExtensionProxyRequest("team-services", method, path, null, body == null ? null : "application/json",
+                null, null, null, null, "10.0.0.1",
                 body == null ? null : new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
     }
 

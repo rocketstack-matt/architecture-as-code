@@ -68,6 +68,7 @@ that it signs, in the `X-Calm-Hub-Identity` header. The public keys are at
 | `htm`, `htp` | The method, and the path and query relative to the backend URL. CALM Hub sorts the query by name |
 | `hubApi`, `route`, `scope` | The manifest `hubApi`, the route `id`, and the route `scope` |
 | `ns` | The namespace that CALM Hub checked. Only for a `read`, `write` or `admin` route |
+| `dom` | The domain that CALM Hub checked. Only for a `domain_read`, `domain_write` or `domain_admin` route |
 | `bdh` | The base64url SHA-256 of the request body. Only when there is a body |
 
 ### Verify it
@@ -91,9 +92,26 @@ gives the reason for each check.
 ### What Hub checks
 
 For a `read`, `write` or `admin` route, CALM Hub checked the route scope for `ns`, and nothing
-more. For another scope, CALM Hub did not check a namespace, and does not send `ns`: do not trust a
-namespace from the path. It does not check the query, the body, or the UI context. If your extension
+more. For a `domain_*` route, it checked the scope for `dom`. For another scope, CALM Hub did not
+check a namespace or a domain, and does not send `ns` or `dom`: do not trust a namespace or a
+domain from the path. It does not check the query, the body, or the UI context. If your extension
 reads data with a service account, return only what `sub` may see in `ns`.
+
+With `calm.auth.allow-public-read=true`, each signed-in user can read every namespace. Thus on a
+`read` route, `ns` does not mean that `sub` has a grant on the namespace.
+
+### Write the routes
+
+- A `GET` route must change nothing, also when it is not `readOnly`. Use `POST`, `PUT`, `PATCH` or
+  `DELETE` for a change. The `Content-Type` rule does not apply to `GET`, so a cross-site link can
+  send a `GET` as the user, for example through a front proxy with a session cookie.
+- Route strictly, on the exact path that you received. Do not ignore a trailing slash or the case of
+  a literal, and do not decode `%2F` before you route. Otherwise your backend can run a route other
+  than the one that CALM Hub checked the scope for. The `route` claim names the route that CALM Hub
+  matched.
+- CALM Hub sends `If-Match` and `If-None-Match`, and returns `ETag`, so a conditional write works.
+  It does not return `Location`, because that would name your private backend URL. Return the
+  identifier in the body.
 
 ### When the extension calls CALM Hub
 
@@ -116,6 +134,7 @@ CALM Hub bounds only the cost that a caller controls:
 | Request body | 1 MiB, then `413` |
 | Reply body | 1 MiB, then `502` |
 | Connect and request timeouts | 5 and 10 seconds, then `504` |
+| Calls at the same time to one extension | 32, then `503` |
 | MCP arguments | 1 MiB of JSON, and patterns that match in linear time |
 
 The [MCP extension tools](mcp-and-api.md#extension-tools) page gives the MCP rules.

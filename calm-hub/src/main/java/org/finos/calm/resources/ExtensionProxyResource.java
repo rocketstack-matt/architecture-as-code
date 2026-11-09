@@ -16,6 +16,7 @@ import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
+import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.finos.calm.extensions.ExtensionProxyException;
@@ -33,7 +34,8 @@ import java.util.Map;
 @Tag(name = "Extensions", description = "Extensions that the operator enabled on this CALM Hub")
 @Path("/api/calm/extensions/{id}/api")
 @Authenticated
-@Produces({MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN})
+// Any Accept, such as text/event-stream: the service checks the reply type.
+@Produces(MediaType.WILDCARD)
 public class ExtensionProxyResource {
 
     /** An extension cannot serve a page or a script that runs in Hub's origin. */
@@ -44,11 +46,14 @@ public class ExtensionProxyResource {
 
     private final ExtensionProxyService service;
     private final SecurityIdentity identity;
+    private final boolean captureSourceIp;
 
     @Inject
-    public ExtensionProxyResource(ExtensionProxyService service, SecurityIdentity identity) {
+    public ExtensionProxyResource(ExtensionProxyService service, SecurityIdentity identity, Config properties) {
         this.service = service;
         this.identity = identity;
+        // Read at run time, as AuditRequestFilter does.
+        this.captureSourceIp = properties.getOptionalValue("calm.audit.capture-source-ip", Boolean.class).orElse(false);
     }
 
     @GET
@@ -95,7 +100,9 @@ public class ExtensionProxyResource {
         String path = "/" + uriInfo.getPathParameters(false).getFirst("path");
         ExtensionProxyRequest request = new ExtensionProxyRequest(id, method, path, uriInfo.getRequestUri().getRawQuery(),
                 headers.getHeaderString(HttpHeaders.CONTENT_TYPE), headers.getHeaderString(HttpHeaders.ACCEPT),
-                headers.getHeaderString(HttpHeaders.ACCEPT_LANGUAGE), body);
+                headers.getHeaderString(HttpHeaders.ACCEPT_LANGUAGE), headers.getHeaderString(HttpHeaders.IF_MATCH),
+                headers.getHeaderString(HttpHeaders.IF_NONE_MATCH),
+                captureSourceIp ? headers.getHeaderString("X-Forwarded-For") : null, body);
         try {
             ExtensionProxyResponse reply = service.call(identity, request);
             Response.ResponseBuilder builder = Response.status(reply.status())
@@ -103,8 +110,9 @@ public class ExtensionProxyResource {
             reply.headers().forEach(builder::header);
             return builder.header("Content-Security-Policy", CONTENT_SECURITY_POLICY).build();
         } catch (ExtensionProxyException e) {
-            return Response.status(e.status())
-                    .type(MediaType.APPLICATION_JSON)
+            Response.ResponseBuilder builder = Response.status(e.status());
+            e.headers().forEach(builder::header);
+            return builder.type(MediaType.APPLICATION_JSON)
                     .entity(Map.of("error", e.getMessage()))
                     .header("Cache-Control", "private")
                     .header("Content-Security-Policy", CONTENT_SECURITY_POLICY)

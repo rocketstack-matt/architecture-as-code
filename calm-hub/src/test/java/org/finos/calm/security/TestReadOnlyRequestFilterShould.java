@@ -160,7 +160,8 @@ public class TestReadOnlyRequestFilterShould {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/calm/extensions/team-services/api/search", "api/calm/extensions/team-services/api/x/y"})
+    @ValueSource(strings = {"/api/calm/extensions/team-services/api/search", "api/calm/extensions/team-services/api/x/y",
+            "/api/calm/extensions/team-services/api"})
     void leave_the_extension_proxy_to_enforce_read_only_mode(String path) {
         filter.readOnly = true;
         when(requestContext.getMethod()).thenReturn("POST");
@@ -180,6 +181,7 @@ public class TestReadOnlyRequestFilterShould {
             "/api/calm/extensions/x/api/%2e%2e/namespaces",
             "/api/calm/extensions/x/api//namespaces",
             "/api/calm/extensionsx/x/api/y",
+            "/api/calm/extensions/x/apix",
             "/api/calm/namespaces/api/calm/extensions/x/api/y"
     })
     void reject_a_write_that_only_looks_like_the_extension_proxy(String path) {

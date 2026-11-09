@@ -56,9 +56,50 @@ class TestExtensionRegistryShould {
     }
 
     @Test
+    void warn_about_any_per_id_setting_for_an_unknown_extension() {
+        properties.put("calm.extensions.\"typo\".allow-http", "true");
+        properties.put("calm.extensions.other.max-request-bytes", "10");
+        properties.put("calm.extensions.\"third\".max-concurrent-calls", "2");
+
+        List<String> warnings = captureWarnings(ExtensionRegistry.class, () -> registry(Optional.empty(), NO_BUILTINS));
+
+        assertThat(warnings, hasItem(containsString("unknown extension id 'typo'")));
+        assertThat(warnings, hasItem(containsString("unknown extension id 'other'")));
+        assertThat(warnings, hasItem(containsString("unknown extension id 'third'")));
+    }
+
+    @Test
+    void warn_about_an_environment_variable_for_an_unknown_extension() {
+        environment.put("CALM_EXTENSIONS__TEAM_SERVCES__BACKEND_URL", "https://services.internal");
+        environment.put("CALM_EXTENSIONS_OTHER_MAX_RESPONSE_BYTES", "10");
+
+        List<String> warnings = captureWarnings(ExtensionRegistry.class, () -> registry(Optional.empty(), NO_BUILTINS));
+
+        assertThat(warnings, hasItem(containsString("unknown extension id 'team-servces'")));
+        assertThat(warnings, hasItem(containsString("unknown extension id 'other'")));
+    }
+
+    @Test
+    void find_the_id_in_each_form_of_a_per_id_setting() {
+        assertThat(ExtensionRegistry.settingId("calm.extensions.\"team-services\".request-timeout-seconds"),
+                equalTo(Optional.of("team-services")));
+        assertThat(ExtensionRegistry.settingId("calm.extensions.team-services.enabled"), equalTo(Optional.of("team-services")));
+        assertThat(ExtensionRegistry.settingId("CALM_EXTENSIONS__TEAM_SERVICES__CONNECT_TIMEOUT_SECONDS"),
+                equalTo(Optional.of("team-services")));
+        assertThat(ExtensionRegistry.settingId("CALM_EXTENSIONS_TEAM_SERVICES_ALLOW_HTTP"), equalTo(Optional.of("team-services")));
+        assertThat(ExtensionRegistry.settingId("calm.extensions.dir"), equalTo(Optional.empty()));
+        assertThat(ExtensionRegistry.settingId("CALM_EXTENSIONS_IDENTITY_TTL_SECONDS"), equalTo(Optional.empty()));
+        assertThat(ExtensionRegistry.settingId("calm.extensions.\"team-services\".colour"), equalTo(Optional.empty()));
+    }
+
+    @Test
     void not_warn_about_known_extensions_or_shared_settings() {
         properties.put("calm.extensions.\"builtin-views\".enabled", "false");
         properties.put("calm.extensions.http.connect-timeout-seconds", "5");
+        properties.put("calm.extensions.http.max-concurrent-calls", "5");
+        properties.put("calm.extensions.identity.ttl-seconds", "30");
+        environment.put("CALM_EXTENSIONS__BUILTIN_VIEWS__MAX_REQUEST_BYTES", "10");
+        environment.put("CALM_EXTENSIONS_HTTP_MAX_REQUEST_BYTES", "10");
 
         List<String> warnings = captureWarnings(ExtensionRegistry.class, () -> registry(Optional.empty(), BUILTIN_BASE));
 
@@ -266,10 +307,15 @@ class TestExtensionRegistryShould {
         properties.put("calm.extensions.http.connect-timeout-seconds", "7");
         properties.put("calm.extensions.\"team-services\".request-timeout-seconds", "30");
         properties.put("calm.extensions.\"team-services\".max-response-bytes", "2048");
+        properties.put("calm.extensions.\"team-services\".max-concurrent-calls", "4");
 
         ExtensionLimits limits = registry(dir(), NO_BUILTINS).find("team-services").orElseThrow().limits();
 
-        assertThat(limits, equalTo(new ExtensionLimits(Duration.ofSeconds(7), Duration.ofSeconds(30), 1048576, 2048)));
+        assertThat(limits, equalTo(new ExtensionLimits(Duration.ofSeconds(7), Duration.ofSeconds(30), 1048576, 2048, 4)));
+
+        properties.remove("calm.extensions.\"team-services\".max-concurrent-calls");
+        assertThat(registry(dir(), NO_BUILTINS).find("team-services").orElseThrow().limits().maxConcurrentCalls(),
+                equalTo(32));
     }
 
     @Test
