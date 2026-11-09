@@ -169,6 +169,8 @@ class TestExtensionManifestLoaderShould {
                 invalid("a path with an @", m -> routes(m).put("path", "/@evil/x"), "/routes/0/path"),
                 invalid("a path with a double slash", m -> routes(m).put("path", "//screen"), "/routes/0/path"),
                 invalid("a path with an encoded character", m -> routes(m).put("path", "/a%2fb"), "/routes/0/path"),
+                invalid("a parameter inside a segment", m -> routes(m).put("path", "/files/{name}.json"), "/routes/0/path"),
+                invalid("a parameter after a literal in a segment", m -> routes(m).put("path", "/files/v{version}"), "/routes/0/path"),
                 invalid("an upper-case id", m -> m.put("id", "Team"), "/id"),
                 invalid("a version that is not semantic", m -> m.put("version", "1.0"), "/version"),
                 invalid("an unknown extension point", m -> m.getJsonObject("contributes").put("toolbar", new JsonArray()), "/contributes/toolbar: "),
@@ -384,6 +386,25 @@ class TestExtensionManifestLoaderShould {
         var manifests = loader.loadClasspath(getClass().getClassLoader(), ExtensionManifestLoader.BUILTIN_BASE);
         assertThat(manifests.stream().map(ExtensionManifest::id).toList(), contains("control-evaluation", "deployment"));
         assertThat(manifests.getFirst().contributes().decoratorViews().getFirst().overlay().hide(), contains("not-applicable"));
+    }
+
+    @Test
+    void warn_about_a_designer_tab_whose_path_the_ui_cannot_fill_and_still_load_it() {
+        JsonObject manifest = valid();
+        manifest.getJsonArray("routes")
+                .add(route("tab", "GET", "/namespaces/{namespace}/{resourceType}/{resourceId}/versions/{version}/{selectedElement}", "read"))
+                .add(route("by-resource", "GET", "/namespaces/{namespace}/resources/{resource}", "read"));
+        manifest.getJsonObject("contributes").put("designer-tab", new JsonArray()
+                .add(contribution("fillable", "tab"))
+                .add(contribution("unfillable", "by-resource")));
+
+        List<String> warnings = captureWarnings(ExtensionManifestLoader.class, () ->
+                assertThat(loader.parse(manifest.encode(), ID, "test").contributes().designerTab(), hasSize(2)));
+
+        assertThat(warnings, hasSize(1));
+        assertThat(warnings, hasItem("Extension manifest test: the UI hides designer-tab 'unfillable', because it cannot "
+                + "fill {resource} in the path of route 'by-resource'. It fills only [namespace, resourceType, resourceId, "
+                + "version, selectedElement]"));
     }
 
     static List<String> captureWarnings(Class<?> source, Runnable action) {

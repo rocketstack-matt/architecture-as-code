@@ -15,6 +15,17 @@ export function actionContributions(extension: ExtensionSummary, context: Extens
     });
 }
 
+/** The path parameters that a resource context can give. Keep in step with DESIGNER_TAB_PARAMS in ExtensionManifestLoader. */
+const TAB_PATH_PARAMETERS: ReadonlySet<string> = new Set(['namespace', 'resourceType', 'resourceId', 'version', 'selectedElement']);
+
+/** A designer tab whose path needs a parameter that no context gives, such as {resource}, is hidden, not an error. */
+export function tabContributions(extension: ExtensionSummary): ExtensionContribution[] {
+    return (extension.contributes['designer-tab'] ?? []).filter((contribution) => {
+        const route = extension.routes.find((entry) => entry.id === contribution.route);
+        return route !== undefined && [...route.path.matchAll(/\{([^}]+)\}/g)].every(([, name]) => TAB_PATH_PARAMETERS.has(name));
+    });
+}
+
 export interface ResourceExtension {
     extension: ExtensionSummary;
     actions: ExtensionContribution[];
@@ -27,7 +38,7 @@ export function resourceExtensions(extensions: readonly ExtensionSummary[], cont
         .map((extension) => ({
             extension,
             actions: actionContributions(extension, context),
-            tabs: extension.contributes['designer-tab'] ?? [],
+            tabs: tabContributions(extension),
         }))
         .filter(({ actions, tabs }) => actions.length > 0 || tabs.length > 0);
 }
