@@ -12,9 +12,9 @@ const decorator = (uniqueId: string, appliesTo: string[]): Decorator => ({
     data: { owner: uniqueId },
 });
 
-function renderSection(elementId: string, decorators: Decorator[]) {
+function renderSection(elementId: string, decorators: Decorator[], drawnAs: ReadonlyMap<string, string> = new Map()) {
     return render(
-        <DecoratorsContext.Provider value={decorators}>
+        <DecoratorsContext.Provider value={{ decorators, drawnAs }}>
             <DecoratorsSection elementId={elementId} />
         </DecoratorsContext.Provider>
     );
@@ -28,6 +28,20 @@ describe('DecoratorsSection', () => {
             'observability decorator d1',
             'observability decorator d3',
         ]);
+    });
+
+    it('lists, for a container, the decorators of the containment relationships that its badges count', () => {
+        const drawnAs = new Map([['api-in-cluster', 'cluster']]);
+        renderSection('cluster', [decorator('d1', ['api-in-cluster']), decorator('d2', ['cluster']), decorator('d3', ['other-rel'])], drawnAs);
+        expect(screen.getAllByRole('article').map((card) => card.getAttribute('aria-label'))).toEqual([
+            'observability decorator d1',
+            'observability decorator d2',
+        ]);
+    });
+
+    it('does not list the decorators of a containment relationship on a node that the container holds', () => {
+        const { container } = renderSection('trade-api', [decorator('d1', ['api-in-cluster'])], new Map([['api-in-cluster', 'cluster']]));
+        expect(container).toBeEmptyDOMElement();
     });
 
     it('renders nothing when no decorator applies to the element', () => {

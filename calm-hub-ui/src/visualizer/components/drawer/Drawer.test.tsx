@@ -25,8 +25,11 @@ function fakeFile(text: string): File {
 }
 
 vi.mock('../reactflow/MetadataPanel.js', () => ({
-    MetadataPanel: ({ evaluations }: { evaluations?: unknown[] }) => (
-        <div data-testid="metadata-panel">evaluations:{evaluations?.length ?? 0}</div>
+    MetadataPanel: ({ evaluations, evaluationOverlay }: { evaluations?: unknown[]; evaluationOverlay?: { map?: Record<string, string> } }) => (
+        <div data-testid="metadata-panel">
+            evaluations:{evaluations?.length ?? 0}
+            <span data-testid="evaluation-overlay-map">{JSON.stringify(evaluationOverlay?.map ?? null)}</span>
+        </div>
     ),
 }));
 
@@ -502,6 +505,16 @@ describe('Drawer — decorator overlays', () => {
 
         expect(screen.queryByTestId('metadata-panel')).not.toBeInTheDocument();
         expect(screen.getByTestId('evaluation-n1')).toHaveTextContent('(none)');
+    });
+
+    it('gives the metadata panel the built-in control-evaluation overlay, not an operator view with the same id', () => {
+        registered.views = [
+            { ...fakeView('ops', 'control-evaluation'), match: { type: 'control-evaluation' }, overlay: { status: '/status', map: { met: 'error' } } },
+            ...BUILTIN_DECORATOR_VIEWS,
+        ];
+        render(<Drawer data={architectureWithNode} decorators={[evaluation('met')]} />);
+
+        expect(screen.getByTestId('evaluation-overlay-map')).toHaveTextContent(JSON.stringify({ met: 'ok', 'not-met': 'error' }));
     });
 
     it('passes onOpenView to the overlay legend', async () => {

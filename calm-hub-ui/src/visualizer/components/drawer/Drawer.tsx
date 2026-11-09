@@ -120,10 +120,11 @@ export function Drawer({
         [overlays, hiddenViews, toggleView, setViewsShown, onOpenView],
     );
     // The evaluation history for the panel under the diagram, which lists every evaluation, not only the newest.
-    const evaluations = useMemo(() => {
-        const view = views.find(isControlEvaluationView);
-        return view ? overlayDecorators.filter((d) => matchesView(view, d)) as ControlEvaluationDecorator[] : [];
-    }, [views, overlayDecorators]);
+    const evaluationView = useMemo(() => views.find(isControlEvaluationView), [views]);
+    const evaluations = useMemo(
+        () => (evaluationView ? overlayDecorators.filter((d) => matchesView(evaluationView, d)) as ControlEvaluationDecorator[] : []),
+        [evaluationView, overlayDecorators],
+    );
 
     const adrs = useMemo((): string[] => {
         const calmData = calmInstance as CalmArchitectureSchema & { adrs?: unknown };
@@ -286,6 +287,7 @@ export function Drawer({
                                 controls={controls}
                                 adrs={adrs}
                                 evaluations={evaluations}
+                                evaluationOverlay={evaluationView?.overlay}
                                 onNodeClick={handleControlNodeClick}
                                 isCollapsed={isMetadataCollapsed}
                                 onToggleCollapse={() => setIsMetadataCollapsed(!isMetadataCollapsed)}

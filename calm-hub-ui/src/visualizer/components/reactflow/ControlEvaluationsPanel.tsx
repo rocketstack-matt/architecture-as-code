@@ -3,8 +3,6 @@ import { newestFirst } from './utils/controlEvaluations.js';
 import { FindingText } from './FindingText.js';
 import { OVERLAY_STYLES } from './overlay/overlayStyle.js';
 import { overlayStatus, statusText } from '../../overlay/overlayEngine.js';
-import { useDecoratorViews } from '../../overlay/decoratorViews.js';
-import { isControlEvaluationView } from '../../context/DecoratorOverlayContext.js';
 import type { ControlEvaluationDecorator, DecoratorOverlay } from '../../contracts/contracts.js';
 
 interface Chip {
@@ -100,9 +98,9 @@ function EvaluationRow({ evaluation, overlay }: { evaluation: ControlEvaluationD
     );
 }
 
-export function ControlEvaluationsPanel({ evaluations }: { evaluations: ControlEvaluationDecorator[] }) {
+/** `overlay` is the built-in control-evaluation view's, from the views the diagram draws, so the chips match the badges. */
+export function ControlEvaluationsPanel({ evaluations, overlay }: { evaluations: ControlEvaluationDecorator[]; overlay?: DecoratorOverlay }) {
     const sorted = newestFirst(evaluations ?? []);
-    const overlay = useDecoratorViews().find(isControlEvaluationView)?.overlay;
 
     if (sorted.length === 0) {
         return (

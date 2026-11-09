@@ -11,6 +11,7 @@ export function MetadataPanel({
     controls,
     adrs,
     evaluations = [],
+    evaluationOverlay,
     onNodeClick,
     onControlClick,
     isCollapsed,
@@ -231,7 +232,7 @@ export function MetadataPanel({
 
             {/* Tab Content */}
             <div style={{ flex: 1, overflow: 'hidden', padding: '12px' }}>
-                {activeTab === 'evaluations' && hasEvaluations && <ControlEvaluationsPanel evaluations={evaluations} />}
+                {activeTab === 'evaluations' && hasEvaluations && <ControlEvaluationsPanel evaluations={evaluations} overlay={evaluationOverlay} />}
                 {activeTab === 'controls' && hasControls && (
                     <ControlsPanel controls={controls} onNodeClick={onNodeClick} onControlClick={onControlClick} />
                 )}

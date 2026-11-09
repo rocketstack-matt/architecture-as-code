@@ -1,12 +1,11 @@
 import { BUILTIN_DECORATOR_VIEWS } from '../../../test-support/decorator-views.js';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { ControlEvaluationsPanel } from './ControlEvaluationsPanel.js';
 import { THEME } from './theme.js';
-import type { ControlEvaluationDecorator, DecoratorView } from '../../contracts/contracts.js';
+import type { ControlEvaluationDecorator } from '../../contracts/contracts.js';
 
-const registered = vi.hoisted(() => ({ views: undefined as DecoratorView[] | undefined }));
-vi.mock('../../overlay/decoratorViews.js', () => ({ useDecoratorViews: () => registered.views ?? BUILTIN_DECORATOR_VIEWS }));
+const overlay = BUILTIN_DECORATOR_VIEWS.find((view) => view.id === 'control-evaluation')!.overlay!;
 
 const make = (id: string, status: 'met' | 'not-met' | 'not-applicable', at: string, extra = {}): ControlEvaluationDecorator => ({
     schema: 's', uniqueId: id, type: 'control-evaluation', target: ['t'], appliesTo: ['trade-api', 'trade-api-to-client-ledger'],
@@ -15,7 +14,7 @@ const make = (id: string, status: 'met' | 'not-met' | 'not-applicable', at: stri
 
 describe('ControlEvaluationsPanel', () => {
     it('lists evaluations newest first with their status, control, elements and change', () => {
-        render(<ControlEvaluationsPanel evaluations={[
+        render(<ControlEvaluationsPanel overlay={overlay} evaluations={[
             make('older', 'met', '2026-11-04T15:00:00Z', { actors: { approver: 'alice' } }),
             make('newer', 'not-met', '2026-11-04T15:05:00Z', { findings: [{ subject: 'trade-api-to-client-ledger', description: 'A human approved this change', cause: 'absent' }] }),
         ]} />);
@@ -30,7 +29,7 @@ describe('ControlEvaluationsPanel', () => {
     });
 
     it('shows not-applicable and unknown statuses as neutral chips with their labels', () => {
-        render(<ControlEvaluationsPanel evaluations={[
+        render(<ControlEvaluationsPanel overlay={overlay} evaluations={[
             make('na', 'not-applicable', '2026-11-04T15:05:00Z'),
             make('odd', 'waived' as 'met', '2026-11-04T15:00:00Z'),
         ]} />);
@@ -43,7 +42,7 @@ describe('ControlEvaluationsPanel', () => {
     });
 
     it('colours met and not-met chips with the status text colours', () => {
-        render(<ControlEvaluationsPanel evaluations={[
+        render(<ControlEvaluationsPanel overlay={overlay} evaluations={[
             make('newer', 'not-met', '2026-11-04T15:05:00Z'),
             make('older', 'met', '2026-11-04T15:00:00Z'),
         ]} />);
@@ -52,19 +51,13 @@ describe('ControlEvaluationsPanel', () => {
         expect(met.style.color).toBe(THEME.colors.successText);
     });
 
-    it('takes chip colours from the built-in view, not from an operator view with the same id', () => {
-        const operator: DecoratorView = {
-            id: 'control-evaluation', label: 'Ops', match: { type: 'control-evaluation' },
-            overlay: { status: '/status', map: { met: 'error' } }, source: { id: 'ops', name: 'Ops', builtIn: false },
-        };
-        registered.views = [operator];
+    it('takes chip colours from the overlay it is given, and is neutral without one', () => {
         const { unmount } = render(<ControlEvaluationsPanel evaluations={[make('one', 'met', '2026-11-04T15:00:00Z')]} />);
         expect(screen.getByTestId('control-evaluation-chip').style.color).toBe(THEME.colors.muted);
+        expect(screen.getByTestId('control-evaluation-chip').textContent).toBe('met');
         unmount();
-        registered.views = [operator, ...BUILTIN_DECORATOR_VIEWS];
-        render(<ControlEvaluationsPanel evaluations={[make('one', 'met', '2026-11-04T15:00:00Z')]} />);
-        expect(screen.getByTestId('control-evaluation-chip').style.color).toBe(THEME.colors.successText);
-        registered.views = undefined;
+        render(<ControlEvaluationsPanel evaluations={[make('one', 'met', '2026-11-04T15:00:00Z')]} overlay={{ ...overlay, map: { met: 'error' } }} />);
+        expect(screen.getByTestId('control-evaluation-chip').style.color).toBe(THEME.colors.errorText);
     });
 
     it('says when there are none', () => {

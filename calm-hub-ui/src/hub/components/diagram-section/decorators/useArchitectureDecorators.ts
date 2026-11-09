@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Data } from '../../../../model/calm.js';
 import type { CalmService } from '../../../../service/calm-service.js';
 import type { Decorator } from '../../../../visualizer/contracts/contracts.js';
 
+/** `unmapped`: Hub answered, but its mappings do not list the slug, so there is no target to look up. */
+export type DecoratorsErrorReason = 'unavailable' | 'unmapped';
+
 export type ArchitectureDecoratorsState =
     | { status: 'loading' }
-    | { status: 'error' }
+    | { status: 'error'; reason: DecoratorsErrorReason }
     | { status: 'loaded'; decorators: Decorator[] };
 
 export const DECORATOR_REFRESH_MS = 5000;
@@ -14,7 +17,10 @@ const DECORATOR_FAILURES_BEFORE_BACKOFF = 3;
 const DECORATOR_BACKOFF_MS = 30000;
 
 const LOADING: ArchitectureDecoratorsState = { status: 'loading' };
-const ERROR: ArchitectureDecoratorsState = { status: 'error' };
+const UNAVAILABLE: ArchitectureDecoratorsState = { status: 'error', reason: 'unavailable' };
+const UNMAPPED: ArchitectureDecoratorsState = { status: 'error', reason: 'unmapped' };
+
+class UnmappedArchitectureError extends Error {}
 const NONE: ArchitectureDecoratorsState = { status: 'loaded', decorators: [] };
 
 /**
@@ -22,12 +28,25 @@ const NONE: ArchitectureDecoratorsState = { status: 'loaded', decorators: [] };
  * diagram overlays, the Decorators tab and the details drawer, so they always show the same list.
  *
  * They change while the diagram is open (a merge gateway records each decision), so they are re-read every few
- * seconds. State changes only when the list does, so an unchanged refresh does not re-render the diagram. A failed
- * refresh keeps what was last shown; a hidden tab is not polled. The result is kept with the `data` it was fetched for,
- * so another resource or version never shows it.
+ * seconds while `active` (something on screen shows them). State changes only when the list does, so an unchanged refresh
+ * does not re-render the diagram. A failed refresh keeps what was last shown; a hidden browser tab is not polled, nor is
+ * an inactive one, which loads at once when it becomes active again unless it is backing off. The result is kept with
+ * the `data` it was fetched for, so another resource or version never shows it.
  */
-export function useArchitectureDecorators(service: CalmService, data: Data, isArchitecture: boolean): ArchitectureDecoratorsState {
+export function useArchitectureDecorators(
+    service: CalmService,
+    data: Data,
+    isArchitecture: boolean,
+    active = true,
+): ArchitectureDecoratorsState {
     const [loaded, setLoaded] = useState<{ source: Data; state: ArchitectureDecoratorsState } | null>(null);
+    // Kept out of the polling effect, so a change of tab keeps the resolved slug and the backoff.
+    const activeRef = useRef(active);
+    const loadNow = useRef<(() => void) | null>(null);
+    useEffect(() => {
+        activeRef.current = active;
+        if (active) loadNow.current?.();
+    }, [active]);
 
     useEffect(() => {
         if (!isArchitecture) return;
@@ -62,7 +81,8 @@ export function useArchitectureDecorators(service: CalmService, data: Data, isAr
             if (failures >= DECORATOR_FAILURES_BEFORE_BACKOFF) {
                 ticksToSkip = DECORATOR_BACKOFF_MS / DECORATOR_REFRESH_MS - 1;
             }
-            setLoaded((prev) => (prev?.source === data && prev.state.status === 'loaded' ? prev : { source: data, state: ERROR }));
+            const state = error instanceof UnmappedArchitectureError ? UNMAPPED : UNAVAILABLE;
+            setLoaded((prev) => (prev?.source === data && (prev.state.status === 'loaded' || prev.state === state) ? prev : { source: data, state }));
         };
         const resolveTarget = async () => {
             const lookup = (target ??= service.resolveArchitectureVersionTarget(name, id, version));
@@ -75,12 +95,12 @@ export function useArchitectureDecorators(service: CalmService, data: Data, isAr
             });
             if (!resolved) {
                 forget();
-                throw new Error(`Could not resolve architecture ${id}`);
+                throw new UnmappedArchitectureError(`Hub has no mapping for architecture ${id}`);
             }
             return resolved;
         };
         const load = () => {
-            if (document.visibilityState === 'hidden') return;
+            if (document.visibilityState === 'hidden' || !activeRef.current) return;
             const seq = ++requested;
             resolveTarget()
                 .then((resolved) => service.fetchDecoratorsForTarget(name, resolved))
@@ -94,15 +114,21 @@ export function useArchitectureDecorators(service: CalmService, data: Data, isAr
             }
             load();
         };
+        // A return to the tab or the view waits out a backoff, so each return does not send a request to a Hub that is down.
+        const resume = () => {
+            if (ticksToSkip === 0) load();
+        };
         const onVisibilityChange = () => {
-            if (document.visibilityState === 'visible') load();
+            if (document.visibilityState === 'visible') resume();
         };
 
         load();
+        loadNow.current = resume;
         const timer = setInterval(tick, DECORATOR_REFRESH_MS);
         document.addEventListener('visibilitychange', onVisibilityChange);
         return () => {
             cancelled = true;
+            loadNow.current = null;
             clearInterval(timer);
             document.removeEventListener('visibilitychange', onVisibilityChange);
         };

@@ -172,8 +172,11 @@ hidden tab falls back to `diagram`. An unknown tab id is also dropped from the U
 code, so that it can move to a package that the VS Code extension shares. The UI calls them
 "Decorators", never "Metadata", which is the CALM `metadata` field (`MetadataPanel` is the panel
 under the diagram). Hub gets the decorators from `DiagramSection` (`onDecoratorsChange`) and gives
-them to the details drawer through `DecoratorsContext`. The API does not require any decorator
-field, so guard each read. A missing type shows as "(no type)".
+them to the details drawer through `DecoratorsContext`, with the containment map that the overlays use, so a
+container lists each decorator that its badges count. The API does not require any decorator field, so guard each
+read. A missing type shows as "(no type)", and a decorator without a `uniqueId` is keyed by its list index. The card's
+JSON view uses the write field names (`writableDecorator`) and leaves out the Hub-owned times, so it can be copied into
+a `PUT`.
 
 ### Decorator overlays
 
@@ -181,8 +184,10 @@ One engine (`visualizer/overlay/`) draws decorators on the diagram from `decorat
 `overlay` (types in `visualizer/contracts/decorator-view-contracts.ts`). Status values map to the fixed scale
 `ok`, `warn`, `error`, `info`. The built-in views for `control-evaluation` and `deployment` come from classpath manifests through
 `GET /api/calm/extensions`. If the registry is unavailable, `useDecoratorViews()` returns the bundled copy in
-`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. `DiagramSection` polls all decorators of
-the version every 5 s (`useArchitectureDecorators`, one request) and gives the one list to the Decorators tab, the
+`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. Only the registry says that an operator turned a
+built-in off (`calm.extensions."<id>".enabled=false`), so the fallback draws both built-ins. `DiagramSection` polls all decorators of
+the version every 5 s while the diagram, the Decorators tab or the details drawer shows (`useArchitectureDecorators`, one request;
+after three failures in a row it backs off to 30 s, also when the view shows again) and gives the one list to the Decorators tab, the
 details drawer and `Drawer`. Do not add a second request. `Drawer` gives the overlays to the diagram through
 `DecoratorOverlayContext`. Nodes and
 edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
@@ -212,7 +217,8 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 - Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
   closed section renders nothing, so it sends no request.
 - Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
-  `view.id` alone: two extensions can use the same view id. `extensionMarkerColour()` gives the marker colour.
+  `view.id` alone: Hub refuses an id that two enabled extensions declare, but another extension can use it when the
+  first is off. `extensionMarkerColour()` gives the marker colour.
   When there is no stored choice, `useOverlayVisibility` switches on the built-in views and the first 3 extension
   views in registry order. It takes the registered views, not the views drawn, so a default is the same on each diagram.
 
@@ -220,7 +226,8 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 
 `UiConfigProvider` (`components/ui-config/`) loads `GET /api/calm/ui/config` one time.
 `useUiConfig()` returns only the sections the operator configured, or `{}` if the request
-fails. The `EnvironmentPill` shows in the `Navbar` and on the `IntroScreen`, which has no navbar.
+fails. The `EnvironmentPill` shows in the `Navbar` and on the `IntroScreen`, which has no navbar. A tap shows a truncated
+name in full, because a touch screen has no hover for its `title`.
 Identity and items show at the bottom of the navbar drawer (`MenuInfo`). The drawer identity is
 the server's principal, not the OIDC token profile that `UserMenu` shows.
 

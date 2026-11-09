@@ -56,13 +56,21 @@ describe('OverlayLegend', () => {
     it('offers View all only where the decorators can be listed', () => {
         const onOpenView = vi.fn();
         renderLegend({ onOpenView });
-        fireEvent.click(screen.getAllByRole('button', { name: 'View all' })[1]);
+        fireEvent.click(screen.getByRole('button', { name: 'View all Deployments · Built-in' }));
         expect(onOpenView).toHaveBeenCalledWith(deploymentView);
+    });
+
+    it('names each View all button after its view, so no two have the same name', () => {
+        renderLegend({ onOpenView: vi.fn() });
+        expect(screen.getAllByRole('button', { name: /^View all/ }).map((button) => button.getAttribute('aria-label'))).toEqual([
+            'View all Control evaluations · Built-in',
+            'View all Deployments · Built-in',
+        ]);
     });
 
     it('has no View all without a list to open', () => {
         renderLegend({});
-        expect(screen.queryByRole('button', { name: 'View all' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /^View all/ })).not.toBeInTheDocument();
     });
 });
 
@@ -123,7 +131,7 @@ describe('OverlayLegend with extensions', () => {
     });
 });
 
-describe('OverlayLegend on a narrow screen', () => {
+describe('OverlayLegend below 1024px', () => {
     let restoreViewport = () => {};
     afterEach(() => restoreViewport());
 

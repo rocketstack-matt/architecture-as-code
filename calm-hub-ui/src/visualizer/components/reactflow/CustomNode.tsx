@@ -398,12 +398,12 @@ function CustomNodeComponent({ id, data, presentationStore }: CustomNodeProps) {
           {evaluation && (
             <div style={{ borderTop: `1px solid ${THEME.colors.border}`, paddingTop: '8px', marginTop: '8px' }}>
               <div style={{ fontSize: '12px', color: THEME.colors.muted, marginBottom: '4px' }}>Latest control evaluations:</div>
-              {evaluation.latest.map((d) => {
+              {evaluation.latest.map((d, index) => {
                 const notMet = d.data.status === 'not-met';
                 const controlId = d.data.control['control-id'];
                 const finding = notMet ? d.data.findings?.[0] : undefined;
                 return (
-                  <div key={d.uniqueId} style={{ fontSize: '12px', marginBottom: '6px' }}>
+                  <div key={`${d.uniqueId}-${index}`} style={{ fontSize: '12px', marginBottom: '6px' }}>
                     <div>
                       <span aria-hidden="true" style={{ fontWeight: 600, color: notMet ? THEME.colors.errorText : THEME.colors.successText }}>
                         {notMet ? '✗' : '✓'}

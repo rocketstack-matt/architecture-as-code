@@ -166,6 +166,28 @@ describe('containment relationships', () => {
         expect(containersOfContainment(undefined).size).toBe(0);
     });
 
+    it('skips malformed entries and tolerates a relationships value that is not a list', () => {
+        const malformed = [
+            null,
+            'not-an-object',
+            42,
+            {},
+            { 'unique-id': 'no-type' },
+            { 'unique-id': 'null-type', 'relationship-type': null },
+            { 'unique-id': 'string-type', 'relationship-type': 'deployed-in' },
+            { 'unique-id': 'null-deploy', 'relationship-type': { 'deployed-in': null } },
+            { 'unique-id': 'numeric-container', 'relationship-type': { 'deployed-in': { container: 7 } } },
+            { 'unique-id': 7, 'relationship-type': { 'deployed-in': { container: 'cluster' } } },
+            { 'relationship-type': { 'composed-of': { container: 'system' } } },
+            ...relationships,
+        ];
+        expect([...containersOfContainment(malformed)]).toEqual([
+            ['api-in-cluster', 'cluster'],
+            ['system-has-ledger', 'trade-system'],
+        ]);
+        for (const value of [null, {}, 'relationships', 3]) expect(containersOfContainment(value).size).toBe(0);
+    });
+
     it('counts a containment relationship for its container, which draws it', () => {
         const map = evaluations(
             [d('a', 'residency', 'not-met', '2026-11-04T15:00:00.000Z', ['api-in-cluster'])],
@@ -216,6 +238,74 @@ describe('containment relationships', () => {
         );
         expect(ids(map.get('cluster'))).toEqual(['a']);
         expect(map.get('trade-api')?.status).toBe('error');
+    });
+});
+
+describe('decorators that Hub stores without a uniqueId', () => {
+    const noId = (decorator: Decorator) => ({ ...decorator, uniqueId: undefined }) as unknown as Decorator;
+
+    it('keeps a not-met result when a met one without an id is folded into the same container', () => {
+        const map = evaluations(
+            [
+                noId(d('a', 'residency', 'not-met', '2026-11-04T15:00:00.000Z', ['api-in-cluster'])),
+                noId(d('b', 'residency', 'met', '2026-11-04T15:01:00.000Z', ['db-in-cluster'])),
+            ],
+            new Map([['api-in-cluster', 'cluster'], ['db-in-cluster', 'cluster']]),
+        );
+        expect(map.get('cluster')?.status).toBe('error');
+        expect(map.get('cluster')?.entries.map((e) => e.value)).toEqual(['not-met', 'met']);
+    });
+
+    it('keeps each control of one element when none of them has an id', () => {
+        const map = evaluations([
+            noId(d('a', 'code-review', 'not-met', '2026-11-04T15:00:00.000Z', ['trade-api'])),
+            noId(d('b', 'residency', 'met', '2026-11-04T15:01:00.000Z', ['trade-api'])),
+        ]);
+        expect(map.get('trade-api')?.status).toBe('error');
+        expect(map.get('trade-api')?.entries).toHaveLength(2);
+    });
+
+    it('counts every decorator without an id when the view has no time', () => {
+        const view = fakeView('scanner', 'scan');
+        const untimed: OverlayDecoratorView = { ...view, overlay: { status: '/status', map: { high: 'error', low: 'ok' } } };
+        const map = overlayByElement(untimed, [
+            noId(fakeDecorator('x', { status: 'low' })),
+            { ...noId(fakeDecorator('y', { status: 'high' })), type: 'scan' },
+            { ...noId(fakeDecorator('z', { status: 'low' })), type: 'scan' },
+        ]);
+        expect(map.get('n1')?.entries.map((e) => e.value)).toEqual(['high', 'low']);
+    });
+
+    it('breaks a tie between two decorators without an id by their place in the list', () => {
+        const a = noId(d('a', 'code-review', 'met', '2026-11-04T15:00:00.000Z', ['trade-api']));
+        const b = noId(d('b', 'code-review', 'not-met', '2026-11-04T15:00:00.000Z', ['trade-api']));
+        expect(evaluations([a, b]).get('trade-api')?.value).toBe('not-met');
+        expect(evaluations([b, a]).get('trade-api')?.value).toBe('met');
+    });
+});
+
+describe('malformed decorators', () => {
+    it.each([
+        ['a number', 5],
+        ['an object', { api: true }],
+        ['a string', 'trade-api'],
+        ['null', null],
+    ])('skips a decorator whose appliesTo is %s, and still draws the others', (_name, appliesTo) => {
+        const broken = { ...d('x', 'code-review', 'not-met', '2026-11-04T15:00:00.000Z', []), appliesTo } as unknown as Decorator;
+        const map = evaluations([broken, d('a', 'residency', 'met', '2026-11-04T15:00:00.000Z', ['trade-api'])]);
+        expect([...map.keys()]).toEqual(['trade-api']);
+        expect(ids(map.get('trade-api'))).toEqual(['a']);
+    });
+
+    it('ignores ids in appliesTo that are not strings', () => {
+        const mixed = { ...d('a', 'residency', 'met', '2026-11-04T15:00:00.000Z', []), appliesTo: ['trade-api', 7, null] } as unknown as Decorator;
+        expect([...evaluations([mixed]).keys()]).toEqual(['trade-api']);
+    });
+
+    it('skips a decorator whose data is not an object', () => {
+        const noData = { ...d('x', 'code-review', 'met', '2026-11-04T15:00:00.000Z', ['trade-api']), data: null } as unknown as Decorator;
+        const map = evaluations([noData, d('a', 'residency', 'met', '2026-11-04T15:00:00.000Z', ['trade-api'])]);
+        expect(ids(map.get('trade-api'))).toEqual(['a']);
     });
 });
 

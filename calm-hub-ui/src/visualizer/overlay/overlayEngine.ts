@@ -20,7 +20,10 @@ const isOverlayStatus = (value: unknown): value is OverlayStatus =>
 
 export const hasOverlay = (view: DecoratorView): view is OverlayDecoratorView => !!view.overlay;
 
-/** Two extensions can use the same view id, so a view is keyed by its extension too. */
+/**
+ * Hub refuses a view id that two enabled extensions declare, but another extension can use it when the first is off.
+ * So a view is keyed by its extension too, and a stored choice does not pass to the other extension.
+ */
 export const viewKey = (view: DecoratorView): string => (view.source ? `${view.source.id}/${view.id}` : view.id);
 
 /** "Release risk · Release tracker"; a built-in view says "Built-in". */
@@ -63,29 +66,44 @@ const stringAt = (data: unknown, pointer?: string) => {
 interface Counted {
     entry: OverlayEntry | null;
     decorator: Decorator;
+    /** Hub does not require a uniqueId, so a decorator without one is told apart by its place in the list. */
+    id: string;
+    uniqueId: string;
+    index: number;
     key?: string;
     time: number;
 }
 
-/** Newest first by time (times that do not parse last), then the greater uniqueId, so input order never matters. */
+/**
+ * Newest first by time (times that do not parse last), then the greater uniqueId. A tie that remains, such as two
+ * decorators without a uniqueId, goes to the later one in the list.
+ */
 const newerFirst = (a: Counted, b: Counted) => {
     const ta = Number.isNaN(a.time) ? -Infinity : a.time;
     const tb = Number.isNaN(b.time) ? -Infinity : b.time;
     if (ta !== tb) return tb - ta;
-    const [ia, ib] = [a.decorator.uniqueId, b.decorator.uniqueId];
-    return ia === ib ? 0 : ia < ib ? 1 : -1;
+    if (a.uniqueId !== b.uniqueId) return a.uniqueId < b.uniqueId ? 1 : -1;
+    return b.index - a.index;
 };
+
+const elementsOf = (decorator: Decorator): Set<string> =>
+    new Set(Array.isArray(decorator.appliesTo) ? decorator.appliesTo.filter((id): id is string => typeof id === 'string') : []);
 
 /**
  * The container each containment relationship (`deployed-in` or `composed-of`) is drawn as, by relationship unique-id.
- * The diagram draws such a relationship as its container holding the contained nodes, not as an edge.
+ * The diagram draws such a relationship as its container holding the contained nodes, not as an edge. A malformed
+ * entry is skipped, because Hub builds this for the whole view.
  */
-export function containersOfContainment(relationships: CalmRelationshipSchema[] = []): Map<string, string> {
+export function containersOfContainment(relationships: unknown): Map<string, string> {
     const containers = new Map<string, string>();
-    for (const rel of relationships) {
+    if (!Array.isArray(relationships)) return containers;
+    for (const rel of relationships as (Partial<CalmRelationshipSchema> | null)[]) {
+        if (!rel || typeof rel !== 'object') continue;
         const type = rel['relationship-type'];
-        const container = type?.['deployed-in']?.container ?? type?.['composed-of']?.container;
-        if (rel['unique-id'] && container) containers.set(rel['unique-id'], container);
+        if (!type || typeof type !== 'object') continue;
+        const container = type['deployed-in']?.container ?? type['composed-of']?.container;
+        const id = rel['unique-id'];
+        if (typeof id === 'string' && id && typeof container === 'string' && container) containers.set(id, container);
     }
     return containers;
 }
@@ -109,7 +127,7 @@ export function overlayByElement(
 ): Map<string, ElementOverlay> {
     const { overlay } = view;
     const counted = new Map<string, Map<string, Counted>>();
-    for (const decorator of decorators) {
+    for (const [index, decorator] of decorators.entries()) {
         if (!matchesView(view, decorator)) continue;
         const status = overlayStatus(overlay, decorator);
         if (!status) continue;
@@ -117,8 +135,12 @@ export function overlayByElement(
         if (overlay.key !== undefined && !key) continue;
         const time = overlay.time === undefined ? NaN : Date.parse(stringAt(decorator.data, overlay.time) ?? '');
         if (overlay.time !== undefined && Number.isNaN(time)) continue;
+        const uniqueId = typeof decorator.uniqueId === 'string' ? decorator.uniqueId : '';
         const item: Counted = {
             decorator,
+            id: uniqueId ? `id:${uniqueId}` : `index:${index}`,
+            uniqueId,
+            index,
             key,
             time,
             entry: status.status === null
@@ -131,8 +153,8 @@ export function overlayByElement(
                     time: stringAt(decorator.data, overlay.time),
                 },
         };
-        const group = overlay.time === undefined ? `#${decorator.uniqueId}` : `=${key ?? ''}`;
-        for (const element of new Set(decorator.appliesTo ?? [])) {
+        const group = overlay.time === undefined ? `#${item.id}` : `=${key ?? ''}`;
+        for (const element of elementsOf(decorator)) {
             const byGroup = counted.get(element) ?? new Map<string, Counted>();
             counted.set(element, byGroup);
             const current = byGroup.get(group);
@@ -145,7 +167,7 @@ export function overlayByElement(
         const target = drawnAs.get(element) ?? element;
         const byId = drawn.get(target) ?? new Map<string, Counted>();
         drawn.set(target, byId);
-        for (const item of byGroup.values()) byId.set(item.decorator.uniqueId, item);
+        for (const item of byGroup.values()) byId.set(item.id, item);
     }
 
     const sortKey = (item: Counted) => item.key ?? item.entry?.label ?? '';

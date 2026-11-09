@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { DiagramSection } from './DiagramSection.js';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
@@ -88,6 +88,11 @@ vi.mock('../../../visualizer/components/drawer/Drawer.js', () => ({
             </button>
             <button onClick={() => onOpenView?.({ id: 'scan', label: 'Scans', match: { schema: 'https://example.org/scan.json' } })}>
                 simulate-open-schema-view
+            </button>
+            <button
+                onClick={() => onOpenView?.({ id: 'scan', label: 'Scans', match: { type: 'observability', schema: 'https://example.org/scan.json' } })}
+            >
+                simulate-open-type-and-schema-view
             </button>
         </div>
     ),
@@ -414,6 +419,14 @@ describe('DiagramSection', () => {
             appliesTo: ['api', 'db'],
             data: { dashboard: 'https://grafana.example.com/d/abc' },
         };
+        const scan = {
+            uniqueId: 'scan-1',
+            type: 'observability',
+            schema: 'https://example.org/scan.json',
+            target: ['/api/calm/namespaces/arch-namespace/architectures/42/versions/1-0-0'],
+            appliesTo: ['api'],
+            data: { result: 'clean' },
+        };
 
         function LocationProbe() {
             const location = useLocation();
@@ -505,7 +518,7 @@ describe('DiagramSection', () => {
             calmServiceMock.fetchDecoratorsForTarget.mockRejectedValue(new Error('boom'));
             renderArchitecture('/?tab=decorators');
 
-            expect(await screen.findByText('Could not load decorators.')).toBeInTheDocument();
+            expect(await screen.findByText(/^Could not load decorators\./)).toBeInTheDocument();
         });
 
         it('redirects the old Deployments tab to the Decorators tab filtered to deployment', async () => {
@@ -526,12 +539,81 @@ describe('DiagramSection', () => {
             expect(await screen.findByText(/dep-1/)).toBeInTheDocument();
         });
 
-        it('opens the unfiltered Decorators tab for a view that matches on $schema', async () => {
+        it('opens the Decorators tab filtered to the $schema of a view that matches on $schema', async () => {
+            calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, observability, scan]);
             const user = userEvent.setup();
             renderArchitecture();
 
             await user.click(screen.getByText('simulate-open-schema-view'));
-            expect(screen.getByTestId('location')).toHaveTextContent(/^\?tab=decorators$/);
+            expect(new URLSearchParams(screen.getByTestId('location').textContent ?? '').get('schema')).toBe('https://example.org/scan.json');
+            expect(await screen.findByRole('article', { name: 'observability decorator scan-1' })).toBeInTheDocument();
+            expect(screen.queryByRole('article', { name: 'observability decorator obs-1' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('article', { name: 'deployment decorator dep-1' })).not.toBeInTheDocument();
+        });
+
+        it('moves focus to the Decorators tab content after View all, but not after a tab click', async () => {
+            const user = userEvent.setup();
+            renderArchitecture();
+
+            await user.click(screen.getByText('simulate-open-view'));
+            expect(await screen.findByRole('region', { name: 'Decorators' })).toHaveFocus();
+
+            await user.click(screen.getByRole('tab', { name: 'Diagram' }));
+            await user.click(screen.getByRole('tab', { name: 'Decorators' }));
+            expect(screen.getByRole('region', { name: 'Decorators' })).not.toHaveFocus();
+        });
+
+        it('does not move focus again when the Decorators tab is reached some other way after View all', async () => {
+            function QueryLinks() {
+                const [, setSearchParams] = useSearchParams();
+                return (
+                    <>
+                        <button onClick={() => setSearchParams({ tab: 'diagram' })}>link-diagram</button>
+                        <button onClick={() => setSearchParams({ tab: 'decorators' })}>link-decorators</button>
+                    </>
+                );
+            }
+            const user = userEvent.setup();
+            render(
+                <MemoryRouter>
+                    <DiagramSection data={architectureData} />
+                    <QueryLinks />
+                </MemoryRouter>
+            );
+
+            await user.click(screen.getByText('simulate-open-view'));
+            expect(await screen.findByRole('region', { name: 'Decorators' })).toHaveFocus();
+
+            await user.click(screen.getByText('link-diagram'));
+            await user.click(screen.getByText('link-decorators'));
+            expect(await screen.findByRole('region', { name: 'Decorators' })).not.toHaveFocus();
+        });
+
+        it('filters on both the type and the $schema of a view that matches on both', async () => {
+            calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, observability, scan]);
+            const user = userEvent.setup();
+            renderArchitecture();
+
+            await user.click(screen.getByText('simulate-open-type-and-schema-view'));
+            const query = new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+            expect([query.get('type'), query.get('schema')]).toEqual(['observability', 'https://example.org/scan.json']);
+            expect(await screen.findByRole('article', { name: 'observability decorator scan-1' })).toBeInTheDocument();
+            expect(screen.queryByRole('article', { name: 'observability decorator obs-1' })).not.toBeInTheDocument();
+        });
+
+        it('keeps the $schema filter when the type changes, and drops it on "Show all schemas"', async () => {
+            calmServiceMock.fetchDecoratorsForTarget.mockResolvedValue([deployment, observability, scan]);
+            const user = userEvent.setup();
+            renderArchitecture('/?tab=decorators&schema=https%3A%2F%2Fexample.org%2Fscan.json');
+
+            await user.selectOptions(await screen.findByRole('combobox'), 'observability');
+            let query = new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+            expect([query.get('type'), query.get('schema')]).toEqual(['observability', 'https://example.org/scan.json']);
+
+            await user.click(screen.getByRole('button', { name: 'Show all schemas' }));
+            query = new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+            expect([query.get('type'), query.get('schema')]).toEqual(['observability', null]);
+            expect(await screen.findByRole('article', { name: 'observability decorator obs-1' })).toBeInTheDocument();
         });
 
         it('offers the tab in the mobile view menu, selected when active', async () => {
@@ -571,7 +653,8 @@ describe('DiagramSection', () => {
                 const onDecoratorsChange = vi.fn();
                 renderArchitecture('/', { onDecoratorsChange });
                 await waitFor(() => expect(screen.getByTestId('drawer-decorators')).toHaveTextContent('dep-1 obs-1'));
-                expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, observability]);
+                // The report is a passive effect, which can run after the commit that waitFor saw.
+                await waitFor(() => expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, observability]));
                 expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(1);
 
                 const newer = { ...deployment, uniqueId: 'dep-2' };
@@ -580,10 +663,37 @@ describe('DiagramSection', () => {
 
                 expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(2);
                 expect(screen.getByTestId('drawer-decorators')).toHaveTextContent('dep-1 dep-2');
-                expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, newer]);
+                await waitFor(() => expect(onDecoratorsChange).toHaveBeenLastCalledWith([deployment, newer]));
             } finally {
                 vi.useRealTimers();
             }
+        });
+
+        it.each([
+            ['the JSON tab', '/?tab=json', false, 0],
+            ['the JSON tab with the details drawer open', '/?tab=json', true, 2],
+            ['the Decorators tab', '/?tab=decorators', false, 2],
+            ['the diagram', '/', false, 2],
+        ])('polls the decorators on %s only if something there shows them', async (_name, entry, hasDetailsPanel, calls) => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            try {
+                renderArchitecture(entry, { hasDetailsPanel });
+                await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+                await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+                expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(calls);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('loads the decorators at once when the diagram opens from another tab', async () => {
+            const user = userEvent.setup();
+            renderArchitecture('/?tab=json');
+            expect(calmServiceMock.fetchDecoratorsForTarget).not.toHaveBeenCalled();
+
+            await user.click(screen.getByRole('tab', { name: 'Diagram' }));
+            await waitFor(() => expect(screen.getByTestId('drawer-decorators')).toHaveTextContent('dep-1 obs-1'));
+            expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(1);
         });
 
         it('keeps the list when a refresh fails', async () => {
@@ -598,7 +708,7 @@ describe('DiagramSection', () => {
 
                 expect(calmServiceMock.fetchDecoratorsForTarget).toHaveBeenCalledTimes(2);
                 expect(screen.getByRole('article', { name: 'deployment decorator dep-1' })).toBeInTheDocument();
-                expect(screen.queryByText('Could not load decorators.')).not.toBeInTheDocument();
+                expect(screen.queryByText(/^Could not load decorators\./)).not.toBeInTheDocument();
             } finally {
                 error.mockRestore();
                 vi.useRealTimers();

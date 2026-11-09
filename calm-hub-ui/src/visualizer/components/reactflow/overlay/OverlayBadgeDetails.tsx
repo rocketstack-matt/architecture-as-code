@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
+import { useStoreApi } from 'reactflow';
 import { THEME } from '../theme.js';
 import { statusText, viewTitle } from '../../../overlay/overlayEngine.js';
 import { OVERLAY_STYLES, STATUS_NAMES, viewMarkerColour } from './overlayStyle.js';
@@ -23,11 +24,15 @@ interface OverlayBadgeDetailsProps {
     onClose: (restoreFocus: boolean) => void;
 }
 
-/** What a badge means: its extension and view, and each decorator's status, scale, label and time. */
+/**
+ * What a badge means: its extension and view, and each decorator's status, scale, label and time. The details are placed
+ * where the badge was when it was clicked, so they close when the diagram pans or zooms.
+ */
 export function OverlayBadgeDetails({ shown, anchor, trigger, onClose }: OverlayBadgeDetailsProps) {
     const { view, overlay } = shown;
     const { onOpenView } = useDecoratorOverlays();
     const ref = useRef<HTMLDivElement>(null);
+    const store = useStoreApi();
 
     useEffect(() => {
         ref.current?.focus();
@@ -43,6 +48,15 @@ export function OverlayBadgeDetails({ shown, anchor, trigger, onClose }: Overlay
             document.removeEventListener('pointerdown', onPointer);
         };
     }, [onClose, trigger]);
+
+    useEffect(() => {
+        const [x, y, zoom] = store.getState().transform;
+        return store.subscribe(({ transform }) => {
+            if (transform[0] !== x || transform[1] !== y || transform[2] !== zoom) {
+                onClose(!!ref.current?.contains(document.activeElement));
+            }
+        });
+    }, [store, onClose]);
 
     const source = view.source;
     const extraEntries = overlay.entries.length - DETAILS_MAX_ENTRIES;
@@ -79,8 +93,8 @@ export function OverlayBadgeDetails({ shown, anchor, trigger, onClose }: Overlay
                 <dd style={{ margin: 0, fontWeight: 600 }}>{view.label}</dd>
             </dl>
             <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {overlay.entries.slice(0, DETAILS_MAX_ENTRIES).map((entry) => (
-                    <li key={entry.decorator.uniqueId} data-testid="overlay-badge-entry" style={{ borderTop: `1px solid ${THEME.colors.border}`, paddingTop: '6px' }}>
+                {overlay.entries.slice(0, DETAILS_MAX_ENTRIES).map((entry, index) => (
+                    <li key={`${entry.decorator.uniqueId}-${index}`} data-testid="overlay-badge-entry" style={{ borderTop: `1px solid ${THEME.colors.border}`, paddingTop: '6px' }}>
                         <div style={{ fontWeight: 600, color: OVERLAY_STYLES[entry.status].text }}>
                             {statusText(entry.value)} → {STATUS_NAMES[entry.status]}
                         </div>

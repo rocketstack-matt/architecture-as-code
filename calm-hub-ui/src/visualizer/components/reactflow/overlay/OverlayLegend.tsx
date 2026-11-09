@@ -73,8 +73,8 @@ const LEGEND_STYLE: CSSProperties = {
 
 /**
  * One row per decorator view on the diagram, with a toggle and how many elements show each status. An extension
- * with several views also gets a row that toggles all of them. On a phone the legend starts collapsed to one button,
- * so it does not cover the diagram.
+ * with several views also gets a row that toggles all of them. Below 1024px (`useIsMobile`), the legend starts collapsed
+ * to one button, so it does not cover the diagram.
  */
 export function OverlayLegend() {
     const { overlays, hiddenViews, toggleView, setViewsShown, onOpenView } = useDecoratorOverlays();
@@ -112,6 +112,7 @@ export function OverlayLegend() {
                     <button
                         type="button"
                         className="link"
+                        aria-label={`View all ${viewTitle(view)}`}
                         style={{ marginLeft: 'auto', color: THEME.colors.accentText }}
                         onClick={() => onOpenView(view)}
                     >
