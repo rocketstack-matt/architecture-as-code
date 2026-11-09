@@ -14,9 +14,11 @@ export interface ExtensionSlotProps {
     action?: boolean;
     /** The level of the slot title: one below the heading of the place that holds the slot. */
     headingLevel?: HeadingLevel;
+    /** For an action: where its button is, so each button keeps its own result. */
+    placement?: string;
 }
 
-function SlotContent({ extension, contribution, context = {}, action, headingLevel = 2 }: ExtensionSlotProps) {
+function SlotContent({ extension, contribution, context = {}, action, headingLevel = 2, placement = 'default' }: ExtensionSlotProps) {
     const service = useExtensionService();
     const route = extension.routes.find((entry) => entry.id === contribution.route);
     const [result, setResult] = useState<ExtensionScreen>();
@@ -39,7 +41,7 @@ function SlotContent({ extension, contribution, context = {}, action, headingLev
     }, [service, extension.id, extension.hubApi, route, action, namespace, resource, resourceType, resourceId, version, selectedElement]);
     if (action) {
         if (!route) return <p role="alert">Extension route unavailable.</p>;
-        return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} />;
+        return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} placement={placement} />;
     }
     // A slot keeps its heading in every state, so the outline does not change (on a screen page, it is the h1).
     const state = !route ? (

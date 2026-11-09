@@ -60,6 +60,7 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
                                                 contribution={contribution}
                                                 context={context}
                                                 action
+                                                placement="extensions-tab"
                                             />
                                         ))}
                                         {needsSelection.map((contribution) => (

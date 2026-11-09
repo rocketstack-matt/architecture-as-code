@@ -213,7 +213,8 @@ per-extension toolbar button or tab: it does not scale to many extensions.
   `window.confirm`. The dialog opens with `showModal()` and names the target context. Do not abort a confirmed
   write: the backend can still finish it, so a retry can write twice. The busy state and the last result live in the
   provider's `ActionRuns` (`extensions/actionRuns.ts`), not in the button, so a remount cannot enable a write in flight or lose
-  its result. An action slot key leaves out the context, so a change of selection does not remount it. A change of
+  its result. A call in flight disables each button of the action (key: extension and contribution); a result
+  shows only on the button that ran it (key: also the `placement` prop, which must be stable across a remount). An action slot key leaves out the context, so a change of selection does not remount it. A change of
   context clears the result. The button uses `aria-disabled`, not `disabled`, so focus can go back to it after the
   dialog. While the dialog is modal the page is inert and `focus()` outside it does nothing: the dialog calls
   `close()` before its callback, and the button takes focus in an effect after the dialog unmounts. jsdom has no

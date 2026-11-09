@@ -210,29 +210,30 @@ describe('ExtensionSlot actions', () => {
      * outside it does nothing; close() or removal ends the modal state.
      */
     function modelModalDialogs() {
-        let modal: HTMLDialogElement | null = null;
         const focus = HTMLElement.prototype.focus;
         Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
             configurable: true,
             value(this: HTMLDialogElement) {
                 this.setAttribute('open', '');
-                modal = this;
+                this.setAttribute('data-modal', '');
             },
         });
         Object.defineProperty(HTMLDialogElement.prototype, 'close', {
             configurable: true,
             value(this: HTMLDialogElement) {
                 this.removeAttribute('open');
-                if (modal === this) modal = null;
+                this.removeAttribute('data-modal');
             },
         });
         vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
-            if (modal?.isConnected && !modal.contains(this)) return;
+            const modal = document.querySelector('dialog[data-modal]');
+            if (modal && !modal.contains(this)) return;
             focus.call(this, options);
         });
         return () => {
             delete (HTMLDialogElement.prototype as { showModal?: unknown }).showModal;
             delete (HTMLDialogElement.prototype as { close?: unknown }).close;
+            vi.mocked(HTMLElement.prototype.focus).mockRestore();
         };
     }
 
@@ -262,6 +263,30 @@ describe('ExtensionSlot actions', () => {
         } finally {
             restore();
         }
+    });
+
+    it('shows a result only on the button that ran it, and disables each button of the action while it runs', async () => {
+        let complete: (value: unknown) => void = () => {};
+        vi.spyOn(ExtensionService.prototype, 'call').mockReturnValue(new Promise((resolve) => (complete = resolve)));
+        render(
+            <ExtensionsProvider service={providerService()}>
+                <div data-testid="tab">
+                    <ExtensionSlot action placement="tab" extension={extension} contribution={contribution} context={target} />
+                </div>
+                <div data-testid="other">
+                    <ExtensionSlot action placement="other" extension={extension} contribution={contribution} context={target} />
+                </div>
+            </ExtensionsProvider>
+        );
+        const tab = within(screen.getByTestId('tab'));
+        const other = within(screen.getByTestId('other'));
+        fireEvent.click(tab.getByRole('button', { name: 'Summary' }));
+        expect(other.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'true');
+
+        await act(async () => complete(undefined));
+        expect(tab.getByRole('status')).toHaveTextContent('Summary: done.');
+        expect(other.queryByRole('status')).not.toBeInTheDocument();
+        expect(other.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'false');
     });
 
     it('says when an action is done, until the context changes', async () => {
