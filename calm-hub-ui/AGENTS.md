@@ -217,7 +217,8 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 - Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
   closed section renders nothing, so it sends no request.
 - Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
-  `view.id` alone: two extensions can use the same view id. `extensionMarkerColour()` gives the marker colour.
+  `view.id` alone: Hub refuses an id that two enabled extensions declare, but another extension can use it when the
+  first is off. `extensionMarkerColour()` gives the marker colour.
   When there is no stored choice, `useOverlayVisibility` switches on the built-in views and the first 3 extension
   views in registry order. It takes the registered views, not the views drawn, so a default is the same on each diagram.
 

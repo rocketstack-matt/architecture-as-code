@@ -20,7 +20,10 @@ const isOverlayStatus = (value: unknown): value is OverlayStatus =>
 
 export const hasOverlay = (view: DecoratorView): view is OverlayDecoratorView => !!view.overlay;
 
-/** Two extensions can use the same view id, so a view is keyed by its extension too. */
+/**
+ * Hub refuses a view id that two enabled extensions declare, but another extension can use it when the first is off.
+ * So a view is keyed by its extension too, and a stored choice does not pass to the other extension.
+ */
 export const viewKey = (view: DecoratorView): string => (view.source ? `${view.source.id}/${view.id}` : view.id);
 
 /** "Release risk · Release tracker"; a built-in view says "Built-in". */
@@ -71,7 +74,10 @@ interface Counted {
     time: number;
 }
 
-/** Newest first by time (times that do not parse last), then the greater uniqueId, so input order never matters. */
+/**
+ * Newest first by time (times that do not parse last), then the greater uniqueId. A tie that remains, such as two
+ * decorators without a uniqueId, goes to the later one in the list.
+ */
 const newerFirst = (a: Counted, b: Counted) => {
     const ta = Number.isNaN(a.time) ? -Infinity : a.time;
     const tb = Number.isNaN(b.time) ? -Infinity : b.time;
