@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ExtensionsContext } from '../../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../ExtensionsContext.js';
 import type { ExtensionSummary } from '../../model/extensions.js';
 import { ExtensionService } from '../../service/extension-service.js';
 import { createMemoryStorage } from '../../test-support/memory-storage.js';
@@ -50,4 +50,12 @@ describe('ExtensionDetailPanels', () => {
         const { container } = renderPanels(fakeExtensions(2, ['screen']), createMemoryStorage());
         expect(container).toBeEmptyDOMElement();
     });
+});
+
+it('puts each extension and its panel title below the h4 of the Extensions section', async () => {
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+    renderPanels(fakeExtensions(1), createMemoryStorage());
+    expect(screen.getByRole('heading', { name: 'Extensions', level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Extension 1', level: 5 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'detail-panel 1', level: 6 })).toBeInTheDocument();
 });

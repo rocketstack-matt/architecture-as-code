@@ -134,11 +134,16 @@ A button in the extension's section of the **Extensions** tab.
 
 - The route can use any method. For a method other than `GET` and `DELETE`, the context also goes
   in the JSON body.
-- Hub asks the user to confirm when the route is not `readOnly`.
-- Hub does not cancel a confirmed call when the user changes the selection or leaves the page.
+- Hub asks the user to confirm when the route is not `readOnly`. The dialog shows the namespace,
+  resource, version and element that the call will send. These are the values at the time of the
+  click, also when the page changes before the user confirms.
+- Hub does not cancel a confirmed call when the user changes the selection or leaves the page. The
+  button stays disabled until the call ends, also when its section closes and opens again.
 - The action shows only when the context gives a value for each placeholder in the route path.
-- An action does not accept user input, and Hub does not show its reply. A failed call shows
-  "Extension request failed."
+  An action that needs only `{selectedElement}` shows disabled until a link names a node. It also shows disabled when Hub refuses the node id in a path, for example an id with `/`, `@` or `%`.
+- An action does not accept user input, and Hub does not show its reply. A call that succeeds
+  shows "<title>: done.", and a failed call shows "Extension request failed." The message stays
+  when the section closes and opens again, and goes when the context changes.
 - A read-only Hub leaves out an action whose route changes data and is not `readOnly`.
 
 ## decorator-views

@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ExtensionsContext } from '../../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../ExtensionsContext.js';
 import type { ExtensionSummary } from '../../model/extensions.js';
 import { ExtensionService } from '../../service/extension-service.js';
 import { createMemoryStorage } from '../../test-support/memory-storage.js';
@@ -58,4 +58,64 @@ describe('ExtensionsTabPanel', () => {
         renderPanel(fakeExtensions(3, ['screen', 'landing-card']));
         expect(screen.queryAllByTestId('extension-section')).toHaveLength(0);
     });
+});
+
+describe('ExtensionsTabPanel with an action that needs a selected element', () => {
+    const scanner = (() => {
+        const extension = fakeExtensions(1, ['action'])[0];
+        return { ...extension, routes: extension.routes.map((r) => (r.id === 'run' ? { ...r, path: '/scan/{selectedElement}' } : r)) };
+    })();
+
+    it('shows the action disabled with a hint when no element is selected', () => {
+        render(
+            <ExtensionsContext.Provider value={[scanner]}>
+                <ExtensionsTabPanel context={{ namespace: 'demo' }} storage={createMemoryStorage()} />
+            </ExtensionsContext.Provider>
+        );
+        const button = screen.getByRole('button', { name: 'Run 1' });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAccessibleDescription('Some actions need a selected node. Open this tab from a link that names a node.');
+    });
+
+    it('lists the action disabled when the path rule refuses the selected id', () => {
+        render(
+            <ExtensionsContext.Provider value={[scanner]}>
+                <ExtensionsTabPanel context={{ namespace: 'demo', selectedElement: 'a/b' }} storage={createMemoryStorage()} />
+            </ExtensionsContext.Provider>
+        );
+        const button = screen.getByRole('button', { name: 'Run 1' });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAccessibleDescription('Some actions cannot run for the selected node.');
+    });
+
+    it('enables the action when an element is selected', () => {
+        renderPanel([scanner]);
+        expect(screen.getByRole('button', { name: 'Run 1' })).toBeEnabled();
+        expect(screen.queryByText(/need a selected node/)).not.toBeInTheDocument();
+    });
+});
+
+it('puts each extension at h3 and its designer tab title at h4, below the h2 of the resource', async () => {
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+    renderPanel(fakeExtensions(1));
+    expect(screen.getByRole('heading', { name: /Extension 1/, level: 3 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'designer-tab 1', level: 4 })).toBeInTheDocument();
+});
+
+it('keeps the default open section of the full list when a filter changes', async () => {
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+    renderPanel(fakeExtensions(10));
+    const filter = screen.getByRole('searchbox', { name: 'Filter extensions' });
+    const toggle = (id: string) =>
+        screen.getAllByTestId('extension-section').find((section) => section.dataset.extension === id)!.querySelector('button');
+
+    await userEvent.type(filter, 'Provider 3');
+    expect(toggle('ext-3')).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.clear(filter);
+    expect(toggle('ext-1')).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle('ext-3')).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.type(filter, 'Provider 1');
+    expect(toggle('ext-1')).toHaveAttribute('aria-expanded', 'true');
 });

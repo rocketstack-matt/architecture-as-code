@@ -1,20 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { ExtensionContext, ExtensionContribution, ExtensionScreen, ExtensionSummary } from '../model/extensions.js';
-import { ExtensionService } from '../service/extension-service.js';
 import { ExtensionActionButton } from './ExtensionActionButton.js';
+import { Heading, HeadingLevel } from './Heading.js';
 import { ScreenErrorBoundary } from './ScreenErrorBoundary.js';
 import { BlockRenderer } from './blocks/BlockRenderer.js';
-import { isBlocksReply } from './landingCard.js';
+import { isBlocksReply } from './blocks/reply.js';
+import { useExtensionService } from './ExtensionsContext.js';
 
 export interface ExtensionSlotProps {
     extension: ExtensionSummary;
     contribution: ExtensionContribution;
     context?: ExtensionContext;
     action?: boolean;
+    /** The level of the slot title: one below the heading of the place that holds the slot. */
+    headingLevel?: HeadingLevel;
+    /** For an action: where its button is, so each button keeps its own result. */
+    placement?: string;
 }
 
-function SlotContent({ extension, contribution, context = {}, action }: ExtensionSlotProps) {
-    const service = useMemo(() => new ExtensionService(), []);
+function SlotContent({ extension, contribution, context = {}, action, headingLevel = 2, placement = 'default' }: ExtensionSlotProps) {
+    const service = useExtensionService();
     const route = extension.routes.find((entry) => entry.id === contribution.route);
     const [result, setResult] = useState<ExtensionScreen>();
     const [error, setError] = useState(false);
@@ -34,17 +39,34 @@ function SlotContent({ extension, contribution, context = {}, action }: Extensio
             });
         return () => controller.abort();
     }, [service, extension.id, extension.hubApi, route, action, namespace, resource, resourceType, resourceId, version, selectedElement]);
-    if (!route) return <p role="alert">Extension route unavailable.</p>;
-    if (action) return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} />;
-    if (error) return <p role="alert">Extension request failed.</p>;
-    if (route.method !== 'GET') return <p role="alert">Block routes must use GET.</p>;
-    if (!result) return <p role="status">Loading extension…</p>;
+    if (action) {
+        if (!route) return <p role="alert">Extension route unavailable.</p>;
+        return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} placement={placement} />;
+    }
+    // A slot keeps its heading in every state, so the outline does not change (on a screen page, it is the h1).
+    const state = !route ? (
+        <p role="alert">Extension route unavailable.</p>
+    ) : error ? (
+        <p role="alert">Extension request failed.</p>
+    ) : route.method !== 'GET' ? (
+        <p role="alert">Block routes must use GET.</p>
+    ) : !result ? (
+        <p role="status">Loading extension…</p>
+    ) : undefined;
     return (
-        <section className="flex flex-col gap-4 min-w-0 overflow-auto" aria-label={contribution.title}>
-            <h2 className="text-lg font-bold">{result.title ?? contribution.title}</h2>
-            {result.blocks.map((block, index) => (
-                <BlockRenderer key={index} block={block} />
-            ))}
+        <SlotFrame label={contribution.title} title={result?.title ?? contribution.title} level={headingLevel}>
+            {state ?? result?.blocks.map((block, index) => <BlockRenderer key={index} block={block} headingLevel={headingLevel} />)}
+        </SlotFrame>
+    );
+}
+
+function SlotFrame({ label, title, level, children }: { label: string; title: string; level: HeadingLevel; children: ReactNode }) {
+    return (
+        <section className="@container flex flex-col gap-4 min-w-0 overflow-auto" aria-label={label}>
+            <Heading level={level} className="text-lg font-bold">
+                {title}
+            </Heading>
+            {children}
         </section>
     );
 }
@@ -53,7 +75,18 @@ export function ExtensionSlot(props: ExtensionSlotProps) {
     // An action keeps its state when the context changes, so a change of selection does not reset a running write.
     const key = JSON.stringify([props.extension.id, props.contribution.id, props.action ? null : props.context]);
     return (
-        <ScreenErrorBoundary key={key}>
+        <ScreenErrorBoundary
+            key={key}
+            frame={
+                props.action
+                    ? undefined
+                    : (content) => (
+                          <SlotFrame label={props.contribution.title} title={props.contribution.title} level={props.headingLevel ?? 2}>
+                              {content}
+                          </SlotFrame>
+                      )
+            }
+        >
             <SlotContent key={key} {...props} />
         </ScreenErrorBoundary>
     );

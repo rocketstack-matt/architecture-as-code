@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ExtensionSummary } from '../../../model/extensions.js';
-import { ExtensionService } from '../../../service/extension-service.js';
 import { colors } from '../../../theme/colors.js';
 import { ExtensionMarker } from '../../../extensions/ExtensionMarker.js';
 import { ScreenErrorBoundary } from '../../../extensions/ScreenErrorBoundary.js';
 import { screenPath } from '../../../extensions/contributions.js';
-import { CardHeadline, cardHeadline, isBlocksReply } from '../../../extensions/landingCard.js';
+import { useExtensionService } from '../../../extensions/ExtensionsContext.js';
+import { CardHeadline, cardHeadline } from '../../../extensions/landingCard.js';
+import { isBlocksReply } from '../../../extensions/blocks/reply.js';
 
 /** The headline of the extension's first landing card. A failed or invalid reply shows no headline. */
 function useCardHeadline(extension: ExtensionSummary): CardHeadline | undefined {
-    const service = useMemo(() => new ExtensionService(), []);
+    const service = useExtensionService();
     const card = extension.contributes['landing-card']?.[0];
     const route = card && extension.routes.find((entry) => entry.id === card.route);
     const [headline, setHeadline] = useState<CardHeadline>();
@@ -65,10 +66,12 @@ function ExtensionCardContent({ extension }: { extension: ExtensionSummary }) {
         <>
             <span className="flex items-center gap-2 min-w-0">
                 <ExtensionMarker extensionId={extension.id} />
-                <span className="min-w-0 truncate font-medium text-[14px]">{extension.name}</span>
+                <span className="min-w-0 line-clamp-2 wrap-anywhere font-medium text-[14px]" title={extension.name}>
+                    {extension.name}
+                </span>
             </span>
             {extension.provider && (
-                <span className="text-[12px] truncate" style={{ color: colors.redesign.muted }}>
+                <span className="text-[12px] line-clamp-2 wrap-anywhere" style={{ color: colors.redesign.muted }} title={extension.provider}>
                     {extension.provider}
                 </span>
             )}

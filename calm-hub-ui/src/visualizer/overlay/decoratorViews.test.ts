@@ -1,15 +1,17 @@
-import { it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, it, expect, vi, type Mock } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import manifest from '../../../../calm-hub/src/test/resources/extensions-test/operator/scanner/extension.json' with { type: 'json' };
 import { overlayByElement } from './overlayEngine.js';
 import type { OverlayDecoratorView } from '../contracts/contracts.js';
 import { useDecoratorViews } from './decoratorViews.js';
 import { BUILTIN_DECORATOR_VIEWS } from './builtinDecoratorViews.js';
+import { ExtensionService } from '../../service/extension-service.js';
 
-const fetchViews = vi.hoisted(() => vi.fn());
-vi.mock('../../service/extension-service.js', () => ({
-    extensionService: { fetchDecoratorViews: fetchViews },
-}));
+let fetchViews: Mock;
+beforeEach(() => {
+    fetchViews = vi.spyOn(ExtensionService.prototype, 'fetchDecoratorViews') as unknown as Mock;
+});
+afterEach(() => vi.restoreAllMocks());
 
 it('loads a new decorator type without a UI mapping', async () => {
     const views = manifest.contributes['decorator-views'] as OverlayDecoratorView[];

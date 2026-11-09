@@ -5,7 +5,7 @@ import { CountBadge } from '../explore-rail/CountBadge.js';
 import { useIsMobile } from '../../../hooks/useMediaQuery.js';
 import { useClampToggle } from '../show-more/useClampToggle.js';
 import { ShowMoreToggle } from '../show-more/ShowMoreToggle.js';
-import { useExtensions } from '../../../components/extensions/ExtensionsContext.js';
+import { useExtensions } from '../../../extensions/ExtensionsContext.js';
 import { ExtensionCard } from './ExtensionCard.js';
 
 interface BrowseCardProps {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionContributions, resourceExtensions, screenPath } from './contributions.js';
+import { actionContributions, resourceExtensions, screenPath, selectionActions } from './contributions.js';
 import { fakeExtension } from '../test-support/fake-extensions.js';
 
 describe('extension contributions', () => {
@@ -37,6 +37,22 @@ describe('extension contributions', () => {
         const extension = fakeExtension(1, ['action']);
         expect(actionContributions(extension, { namespace: 'ns\n' })).toEqual([]);
         expect(actionContributions(extension, { namespace: 'ns\u007f' })).toEqual([]);
+    });
+
+    it('keeps an extension whose only action waits for a selected element, and moves the action when one is selected', () => {
+        const extension = fakeExtension(1, ['action']);
+        const scoped = { ...extension, routes: extension.routes.map((r) => (r.id === 'run' ? { ...r, path: '/scan/{selectedElement}' } : r)) };
+        const [waiting] = resourceExtensions([scoped], { namespace: 'ns' });
+        expect([waiting.actions.length, waiting.needsSelection.map((c) => c.id)]).toEqual([0, ['run']]);
+        const [selected] = resourceExtensions([scoped], { namespace: 'ns', selectedElement: 'node' });
+        expect([selected.actions.map((c) => c.id), selected.needsSelection.length]).toEqual([['run'], 0]);
+        expect(selectionActions(scoped, { selectedElement: 'a/b' }).map((c) => c.id)).toEqual(['run']);
+    });
+
+    it('does not keep an action that a selection cannot fill', () => {
+        const extension = fakeExtension(1, ['action']);
+        const scoped = { ...extension, routes: extension.routes.map((r) => (r.id === 'run' ? { ...r, path: '/scan/{version}' } : r)) };
+        expect(resourceExtensions([scoped], {})).toEqual([]);
     });
 
     it('builds an encoded screen path', () => {

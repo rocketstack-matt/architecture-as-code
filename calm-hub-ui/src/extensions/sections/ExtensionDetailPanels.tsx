@@ -1,4 +1,4 @@
-import { useExtensions } from '../../components/extensions/ExtensionsContext.js';
+import { useExtensions } from '../ExtensionsContext.js';
 import { ExtensionContext } from '../../model/extensions.js';
 import { ExtensionSlot } from '../ExtensionSlot.js';
 import { ExtensionSections } from './ExtensionSections.js';
@@ -14,6 +14,7 @@ export function ExtensionDetailPanels({ context, storage }: { context: Extension
         <Section title="Extensions">
             <ExtensionSections
                 compact
+                headingLevel={5}
                 storageKey={DETAIL_PANEL_SECTIONS_KEY}
                 storage={storage}
                 sections={extensions.map((extension) => ({
@@ -21,7 +22,13 @@ export function ExtensionDetailPanels({ context, storage }: { context: Extension
                     title: extension.name,
                     content: () =>
                         extension.contributes['detail-panel']!.map((contribution) => (
-                            <ExtensionSlot key={contribution.id} extension={extension} contribution={contribution} context={context} />
+                            <ExtensionSlot
+                                key={contribution.id}
+                                extension={extension}
+                                contribution={contribution}
+                                context={context}
+                                headingLevel={6}
+                            />
                         )),
                 }))}
             />

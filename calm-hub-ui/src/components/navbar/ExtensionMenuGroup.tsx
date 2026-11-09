@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useExtensions } from '../extensions/ExtensionsContext.js';
+import { useExtensions } from '../../extensions/ExtensionsContext.js';
 import { screenPath } from '../../extensions/contributions.js';
 import { ExtensionMarker } from '../../extensions/ExtensionMarker.js';
 

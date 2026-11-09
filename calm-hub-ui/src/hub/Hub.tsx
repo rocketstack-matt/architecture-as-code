@@ -1,7 +1,8 @@
-import { ExtensionResourceContext } from '../extensions/ExtensionResourceContext.js';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { IoCompassOutline } from 'react-icons/io5';
+import { ExtensionResourceContext } from '../extensions/ExtensionResourceContext.js';
+import { RESOURCE_ROUTE } from './routes.js';
 import { ExploreRail } from './components/explore-rail/ExploreRail.js';
 import { CollapsedRail } from './components/explore-rail/CollapsedRail.js';
 import { MobileNavMenu } from './components/tree-navigation/MobileNavMenu.js';
@@ -87,7 +88,7 @@ export default function Hub() {
     // route, so the URL — not residual state — decides what renders.
     const namespaceMatch = useMatch('/namespace/:ns');
     const domainMatch = useMatch('/domain/:domain');
-    const detailMatch = useMatch('/:namespace/:type/:id/:version');
+    const detailMatch = useMatch(RESOURCE_ROUTE);
     const searchMatch = useMatch('/search');
     const brokenRefMatch = useMatch('/broken-reference');
     const activeNamespace = namespaceMatch?.params.ns;

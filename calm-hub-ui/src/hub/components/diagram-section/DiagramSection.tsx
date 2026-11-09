@@ -1,10 +1,10 @@
-import { useExtensions } from '../../../components/extensions/ExtensionsContext.js';
-import { resourceExtensions } from '../../../extensions/contributions.js';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { IoChevronBackOutline, IoConstructOutline, IoGridOutline, IoTimeOutline, IoCloseOutline, IoCheckmarkOutline } from 'react-icons/io5';
 import { useIsMobile } from '../../../hooks/useMediaQuery.js';
+import { useExtensions } from '../../../extensions/ExtensionsContext.js';
+import { resourceExtensions } from '../../../extensions/contributions.js';
 import { BreadcrumbItem, Data } from '../../../model/calm.js';
 import { sortVersionsDescending } from '../../../model/version.js';
 import { Drawer } from '../../../visualizer/components/drawer/Drawer.js';
@@ -215,7 +215,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
 
     const implementationService = useMemo(() => new PatternImplementationService(), []);
     const extensions = useExtensions();
-    const hasExtensions = !showsDroppedFile && resourceExtensions(extensions, extensionContext(data, selectedElement)).length > 0;
+    const hasExtensions = !showsDroppedFile && resourceExtensions(extensions, extensionContext(data)).length > 0;
     const tabScope = { isArchitecture, patternName, hasExtensions };
     const visibleTabs = visibleDiagramTabs(DIAGRAM_TABS, tabScope);
     const activeTab = resolveDiagramTab(DIAGRAM_TABS, searchParams.get('tab'), tabScope);

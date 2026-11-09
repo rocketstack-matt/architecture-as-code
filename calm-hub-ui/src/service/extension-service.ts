@@ -1,10 +1,23 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, isAxiosError } from 'axios';
 import { getAuthHeaders } from '../authService.js';
+import { isBuiltInExtension } from '../extensions/extensionIdentity.js';
 import { ExtensionContext, ExtensionRoute, ExtensionSummary } from '../model/extensions.js';
 import type { DecoratorView } from '../visualizer/contracts/contracts.js';
-import { isBuiltInExtension } from '../extensions/extensionIdentity.js';
+import { authStore } from './utils/auth-store.js';
+
+/** The extension contract version this UI reads. The registry and each blocks reply give theirs. */
+export const SUPPORTED_HUB_API = 0;
 
 type RegistryEntry = ExtensionSummary & { contributes?: { 'decorator-views'?: DecoratorView[] } };
+
+/** A failed registry load. `signedOut` is true for a 401, which opens the sign-in prompt. */
+export class ExtensionRegistryError extends Error {
+    constructor(message: string, readonly signedOut: boolean) {
+        super(message);
+    }
+}
+
+const isSignedOut = (error: unknown) => isAxiosError(error) && error.response?.status === 401;
 
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
@@ -52,8 +65,11 @@ export class ExtensionService {
         this.registry ??= getAuthHeaders()
             .then((headers) => this.ax.get<{ values?: RegistryEntry[] }>('/api/calm/extensions', { headers }))
             .then((res) => (Array.isArray(res.data?.values) ? res.data.values : []))
+            .then((values) => values.filter((value) => value?.hubApi === SUPPORTED_HUB_API))
             .catch((error) => {
                 this.registry = undefined;
+                // The registry is a Hub call, so a 401 means the Hub session ended. An extension call keeps its 401 in its slot.
+                if (isSignedOut(error)) authStore.setAuthError(401);
                 return Promise.reject(error);
             });
         return this.registry;
@@ -62,7 +78,7 @@ export class ExtensionService {
     public async fetchExtensions(): Promise<ExtensionSummary[]> {
         return this.loadRegistry().catch((error) => {
             console.error('%s', 'Error fetching extensions:', error);
-            return Promise.reject(new Error('Error fetching extensions'));
+            return Promise.reject(new ExtensionRegistryError('Error fetching extensions', isSignedOut(error)));
         });
     }
 
@@ -109,5 +125,3 @@ export class ExtensionService {
             });
     }
 }
-
-export const extensionService = new ExtensionService();

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
@@ -6,7 +7,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { BreadcrumbItem, Data } from '../../../model/calm.js';
 import { saveNodePositions } from '../../../visualizer/services/node-position-service.js';
 import type { Node } from 'reactflow';
-import { ExtensionsContext } from '../../../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../../../extensions/ExtensionsContext.js';
 import { ExtensionService } from '../../../service/extension-service.js';
 import type { ExtensionSummary } from '../../../model/extensions.js';
 
@@ -792,6 +793,63 @@ describe('DiagramSection', () => {
                 resourceId: 'test-arch',
             });
             call.mockRestore();
+        });
+
+        it('keeps the Extensions tab open after a click when its only action needs the selected element', async () => {
+            const scanner: ExtensionSummary = {
+                id: 'scanner',
+                name: 'Scanner',
+                hubApi: 0,
+                routes: [{ id: 'scan', method: 'POST', path: '/scan/{selectedElement}', scope: 'authenticated', readOnly: false }],
+                contributes: { action: [{ id: 'scan', title: 'Scan', route: 'scan' }] },
+            };
+            // Hub clears a clicked selection on any change to the query.
+            function HubLike() {
+                const { search } = useLocation();
+                const [selection, setSelection] = useState<{ id?: string; search: string }>({ search });
+                const selectedElement = selection.search === search ? selection.id : undefined;
+                return (
+                    <>
+                        <button onClick={() => setSelection({ id: 'node-1', search })}>select node</button>
+                        <DiagramSection data={architectureData} selectedElement={selectedElement} />
+                        <div data-testid="search">{search}</div>
+                    </>
+                );
+            }
+            render(
+                <MemoryRouter>
+                    <ExtensionsContext.Provider value={[scanner]}>
+                        <HubLike />
+                    </ExtensionsContext.Provider>
+                </MemoryRouter>
+            );
+
+            expect(screen.getByRole('tab', { name: 'Extensions' })).toBeInTheDocument();
+            await userEvent.click(screen.getByRole('button', { name: 'select node' }));
+            await userEvent.click(screen.getByRole('tab', { name: 'Extensions' }));
+
+            expect(screen.getByTestId('search').textContent).toBe('?tab=extensions');
+            expect(screen.getByRole('tab', { name: 'Extensions' }).className).toContain('tab-active');
+            expect(screen.queryByTestId('drawer')).not.toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Scan' })).toBeDisabled();
+        });
+
+        it('enables an action that needs the selected element when a link names the node', () => {
+            const scanner: ExtensionSummary = {
+                id: 'scanner',
+                name: 'Scanner',
+                hubApi: 0,
+                routes: [{ id: 'scan', method: 'POST', path: '/scan/{selectedElement}', scope: 'authenticated', readOnly: false }],
+                contributes: { action: [{ id: 'scan', title: 'Scan', route: 'scan' }] },
+            };
+            render(
+                <MemoryRouter initialEntries={['/?node=node-1&tab=extensions']}>
+                    <ExtensionsContext.Provider value={[scanner]}>
+                        <DiagramSection data={architectureData} selectedElement="node-1" />
+                    </ExtensionsContext.Provider>
+                </MemoryRouter>
+            );
+            expect(screen.getByRole('button', { name: 'Scan' })).toBeEnabled();
         });
 
         it('keeps a link to the Extensions tab until the registry loads, then opens it', async () => {

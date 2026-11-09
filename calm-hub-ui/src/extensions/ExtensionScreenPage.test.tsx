@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ExtensionsContext, ExtensionsProvider } from '../components/extensions/ExtensionsContext.js';
-import { ExtensionService } from '../service/extension-service.js';
+import { ExtensionsContext, ExtensionsProvider } from './ExtensionsContext.js';
+import { ExtensionRegistryError, ExtensionService } from '../service/extension-service.js';
 import { ExtensionScreenPage } from './ExtensionScreenPage.js';
 import { fakeExtension } from '../test-support/fake-extensions.js';
 
@@ -23,7 +23,7 @@ const renderAt = (path: string) =>
 it('loads a screen from route parameters', async () => {
     vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
     renderAt('/extensions/ext-1/screen');
-    expect(await screen.findByRole('heading', { name: 'screen 1' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'screen 1', level: 1 })).toBeInTheDocument();
 });
 
 it('says so for an unknown screen', () => {
@@ -63,4 +63,39 @@ it('says so when the registry fails to load', async () => {
     renderWithRegistry(Promise.reject(new Error('down')));
     expect(await screen.findByRole('alert')).toHaveTextContent('Extensions could not be loaded.');
     expect(screen.queryByText('Extension screen unavailable.')).not.toBeInTheDocument();
+});
+
+it('asks the user to sign in when the registry gives 401', async () => {
+    renderWithRegistry(Promise.reject(new ExtensionRegistryError('Error fetching extensions', true)));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign in to see extensions.');
+});
+
+it('has an h1 while the registry loads', () => {
+    renderWithRegistry(new Promise(() => {}));
+    expect(screen.getByRole('heading', { level: 1, name: 'Extension screen' })).toBeInTheDocument();
+});
+
+it('has an h1 after the registry fails to load', async () => {
+    renderWithRegistry(Promise.reject(new Error('down')));
+    await screen.findByText('Extensions could not be loaded.');
+    expect(screen.getByRole('heading', { level: 1, name: 'Extension screen' })).toBeInTheDocument();
+});
+
+it('keeps the screen h1 while the screen loads and after its request fails', async () => {
+    let fail: (error: Error) => void = () => {};
+    vi.spyOn(ExtensionService.prototype, 'call').mockReturnValue(new Promise((_, reject) => (fail = reject)));
+    renderAt('/extensions/ext-1/screen');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading extension');
+    expect(screen.getByRole('heading', { level: 1, name: 'screen 1' })).toBeInTheDocument();
+    fail(new Error('down'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Extension request failed.');
+    expect(screen.getByRole('heading', { level: 1, name: 'screen 1' })).toBeInTheDocument();
+});
+
+it('keeps the screen h1 when the reply cannot be shown', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [{ type: 'table', columns: 'bad', rows: [] }] });
+    renderAt('/extensions/ext-1/screen');
+    expect(await screen.findByRole('alert')).toHaveTextContent('cannot show');
+    expect(screen.getByRole('heading', { level: 1, name: 'screen 1' })).toBeInTheDocument();
 });

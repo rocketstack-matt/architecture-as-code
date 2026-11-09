@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useExtensions } from '../../components/extensions/ExtensionsContext.js';
+import { useId, useState } from 'react';
+import { useExtensions } from '../ExtensionsContext.js';
 import { ExtensionContext } from '../../model/extensions.js';
 import { resourceExtensions } from '../contributions.js';
 import { ExtensionSlot } from '../ExtensionSlot.js';
@@ -18,6 +18,7 @@ interface ExtensionsTabPanelProps {
 export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps) {
     const entries = resourceExtensions(useExtensions(), context);
     const [filter, setFilter] = useState('');
+    const baseId = useId();
     const needle = filter.trim().toLowerCase();
     const shown = needle
         ? entries.filter(({ extension }) =>
@@ -42,14 +43,15 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
             ) : (
                 <ExtensionSections
                     storageKey={EXTENSIONS_TAB_SECTIONS_KEY}
+                    defaultOpenId={entries[0]?.extension.id}
                     storage={storage}
-                    sections={shown.map(({ extension, actions, tabs }) => ({
+                    sections={shown.map(({ extension, actions, needsSelection, tabs }, index) => ({
                         id: extension.id,
                         title: extension.name,
                         subtitle: extension.provider,
                         content: () => (
                             <>
-                                {actions.length > 0 && (
+                                {actions.length + needsSelection.length > 0 && (
                                     <div className="flex flex-wrap gap-2" role="group" aria-label={`${extension.name} actions`}>
                                         {actions.map((contribution) => (
                                             <ExtensionSlot
@@ -58,9 +60,28 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
                                                 contribution={contribution}
                                                 context={context}
                                                 action
+                                                placement="extensions-tab"
                                             />
                                         ))}
+                                        {needsSelection.map((contribution) => (
+                                            <button
+                                                key={contribution.id}
+                                                type="button"
+                                                className="btn btn-sm"
+                                                disabled
+                                                aria-describedby={`${baseId}-${index}`}
+                                            >
+                                                {contribution.title}
+                                            </button>
+                                        ))}
                                     </div>
+                                )}
+                                {needsSelection.length > 0 && (
+                                    <p id={`${baseId}-${index}`} className="text-xs text-base-content/60">
+                                        {context.selectedElement === undefined
+                                            ? 'Some actions need a selected node. Open this tab from a link that names a node.'
+                                            : 'Some actions cannot run for the selected node.'}
+                                    </p>
                                 )}
                                 {tabs.map((contribution) => (
                                     <ExtensionSlot
@@ -68,6 +89,7 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
                                         extension={extension}
                                         contribution={contribution}
                                         context={context}
+                                        headingLevel={4}
                                     />
                                 ))}
                             </>

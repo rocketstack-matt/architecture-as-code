@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ExtensionsContext } from '../../../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../../../extensions/ExtensionsContext.js';
 import type { ExtensionSummary } from '../../../model/extensions.js';
 import { ExtensionService } from '../../../service/extension-service.js';
 import { fakeExtension, fakeExtensions } from '../../../test-support/fake-extensions.js';
@@ -45,6 +45,18 @@ describe('ExtensionCard', () => {
         vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [{ type: 'alert', text: 'Rolling out' }] });
         renderCard(fakeExtension(1));
         expect(await screen.findByText('Rolling out')).toHaveClass('truncate');
+    });
+
+    it('wraps a very long name and provider to two lines, with the full text as a title', () => {
+        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
+        const name = 'N'.repeat(120);
+        const provider = 'P'.repeat(120);
+        renderCard({ ...fakeExtension(1), name, provider });
+        for (const text of [screen.getByText(name), screen.getByText(provider)]) {
+            expect(text).toHaveClass('line-clamp-2', 'wrap-anywhere');
+            expect(text).not.toHaveClass('truncate');
+        }
+        expect(screen.getByText(name)).toHaveAttribute('title', name);
     });
 
     it('is not a link without a screen, and needs no landing card', () => {

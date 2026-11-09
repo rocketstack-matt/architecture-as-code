@@ -1,4 +1,4 @@
-import { ExtensionsContext } from '../../../components/extensions/ExtensionsContext.js';
+import { ExtensionsContext } from '../../../extensions/ExtensionsContext.js';
 import { ExtensionResourceContext } from '../../../extensions/ExtensionResourceContext.js';
 import { ExtensionService } from '../../../service/extension-service.js';
 import { fakeExtensions } from '../../../test-support/fake-extensions.js';

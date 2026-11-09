@@ -21,13 +21,14 @@ function defaultStorage(): Storage | undefined {
 }
 
 /**
- * Which collapsible sections are open, by section id. Without a stored choice only the first section is open.
+ * Which collapsible sections are open, by section id. Without a stored choice only `defaultOpenId` is open: give the
+ * first id of the full list, not of a filtered one, so a filter does not close a section.
  * A choice is kept in storage under `storageKey`.
  */
 export function useOpenSections(storageKey: string, storage: Storage | undefined = defaultStorage()) {
     const [open, setOpen] = useState<OpenState>(() => read(storage, storageKey));
 
-    const isOpen = useCallback((id: string, index: number) => open[id] ?? index === 0, [open]);
+    const isOpen = useCallback((id: string, defaultOpenId: string | undefined) => open[id] ?? id === defaultOpenId, [open]);
 
     const setSectionOpen = useCallback(
         (id: string, value: boolean) => {

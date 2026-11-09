@@ -192,13 +192,17 @@ details drawer and `Drawer`. Do not add a second request. `Drawer` gives the ove
 `DecoratorOverlayContext`. Nodes and
 edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
 Evaluations panel read control-evaluation fields, so they use `isControlEvaluationView()`: the id and
-`source.builtIn`. An operator view can have the same id.
+`source.builtIn`: when the built-in extension is disabled, an operator view can take its id.
 
 `ExtensionService` uses its own axios instance, not `apiClient`, so a registry or extension call failure does not
-open the global auth or outage page. The shared `extensionService` loads the registry one time for
-`ExtensionsProvider` and `useDecoratorViews()`. After a failed load, the next call tries again.
-`useExtensionsStatus()` gives `loading`, `loaded` or `failed`. Use it where an empty list must not mean "no
-extension", for example `ExtensionScreenPage` on a deep link.
+open the global auth or outage page. The exception is a registry `401`: the registry is a Hub call, so it opens
+the sign-in prompt. `ExtensionsProvider` (`extensions/ExtensionsContext.tsx`) owns the one `ExtensionService`.
+Get it with `useExtensionService()`, not `new ExtensionService()` or a module singleton: the registry, the
+decorator views and the slots then share one registry request, and a test can inject a service. The service
+drops registry entries whose `hubApi` the UI does not support, for both paths. After a failed load the provider
+tries again with a backoff (5 s, doubled, up to 60 s; a new service starts it again), but not after a `401`.
+`useExtensionsStatus()` gives `loading`, `loaded`, `failed` or `signed-out`. Use it where an empty list must not
+mean "no extension", for example `ExtensionScreenPage` on a deep link.
 
 ### Extension UI layout
 
@@ -211,14 +215,29 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 - Architecture: one `extensions` tab in `DIAGRAM_TABS`, hidden (not unknown) until the registry loads, so a link
   to it keeps the tab. `resourceExtensions()` decides if it shows.
 - Actions: `ExtensionActionButton`. A route that is not `readOnly` asks in `ConfirmActionDialog`, not
-  `window.confirm`. Do not abort it: the backend can still finish it, so a retry can write twice. An action slot
-  key leaves out the context, so a change of selection does not remount it.
+  `window.confirm`. The dialog opens with `showModal()` and names the target context. Do not abort a confirmed
+  write: the backend can still finish it, so a retry can write twice. The busy state and the last result live in
+  the provider's `ActionRuns` (`extensions/actionRuns.ts`), not in the button, so a remount cannot enable a write
+  in flight or lose its result. A call in flight disables each button of the action (key: extension and
+  contribution); a result shows only on the button that ran it (key: also the `placement` prop, which must be
+  stable across a remount). An action slot key leaves out the context, so a change of selection does not remount
+  it. A change of context clears the result. The button uses `aria-disabled`, not `disabled`, so focus can go back to it after the
+  dialog. While the dialog is modal the page is inert and `focus()` outside it does nothing: the dialog calls
+  `close()` before its callback, and the button takes focus in an effect after the dialog unmounts. jsdom has no
+  modal dialogs, so a test that checks focus must model inertness (see `ExtensionSlot.test.tsx`).
 - Node details: `ExtensionDetailPanels`.
 - Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
   closed section renders nothing, so it sends no request.
+  Give `ExtensionSections` and `ExtensionSlot` a `headingLevel` one below the heading of the place that holds
+  them: `h3`/`h4` in the Extensions tab, `h5`/`h6` in the node details, `h1` on a screen page (nothing else
+  there is an `h1`).
+  A block slot shows its title and its named region in every state (loading, failed, a reply it cannot show:
+  the error boundary takes a `frame`), and the screen page has
+  an `h1` before the registry loads, so the outline does not change.
 - Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
-  `view.id` alone: Hub refuses an id that two enabled extensions declare, but another extension can use it when the
-  first is off, and a choice in the legend must stay with its view. `extensionMarkerColour()` gives the marker colour.
+  `view.id` alone. Hub does not start when two enabled extensions declare the same view id, but a disabled one frees
+  its id for another extension, and a stored legend choice must not move to it.
+  `extensionMarkerColour()` gives the marker colour.
   When there is no stored choice, `useOverlayVisibility` switches on the built-in views and the first 3 extension
   views in registry order. It takes the registered views, not the views drawn, so a default is the same on each diagram.
 
