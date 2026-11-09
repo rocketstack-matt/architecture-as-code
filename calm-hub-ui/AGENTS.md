@@ -219,7 +219,7 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 - Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
   closed section renders nothing, so it sends no request.
   Give `ExtensionSections` and `ExtensionSlot` a `headingLevel` one below the heading of the place that holds
-  them: `h3`/`h4` in the Extensions tab, `h5`/`h6` in the node details, `h2` on a screen page.
+  them: `h3`/`h4` in the Extensions tab, `h5`/`h6` in the node details, `h1` on a screen page (nothing else there is an `h1`).
 - Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
   `view.id` alone. Hub does not start when two enabled extensions declare the same view id, but a disabled
   built-in frees its id for an operator view, and a stored legend choice must not move to it.

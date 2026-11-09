@@ -12,7 +12,7 @@ function ScreenBody() {
     if (status === 'signed-out') return <p role="alert">Sign in to see extensions.</p>;
     if (status === 'failed') return <p role="alert">Extensions could not be loaded.</p>;
     if (!extension || !contribution) return <p>Extension screen unavailable.</p>;
-    return <ExtensionSlot extension={extension} contribution={contribution} />;
+    return <ExtensionSlot extension={extension} contribution={contribution} headingLevel={1} />;
 }
 
 export function ExtensionScreenPage() {

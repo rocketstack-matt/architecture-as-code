@@ -23,7 +23,7 @@ const renderAt = (path: string) =>
 it('loads a screen from route parameters', async () => {
     vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [] });
     renderAt('/extensions/ext-1/screen');
-    expect(await screen.findByRole('heading', { name: 'screen 1', level: 2 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'screen 1', level: 1 })).toBeInTheDocument();
 });
 
 it('says so for an unknown screen', () => {
