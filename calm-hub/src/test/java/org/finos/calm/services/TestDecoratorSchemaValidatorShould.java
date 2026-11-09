@@ -102,6 +102,36 @@ class TestDecoratorSchemaValidatorShould {
     }
 
     @Test
+    void leave_a_schema_unknown_when_a_nested_ref_does_not_resolve() {
+        DecoratorSchemaValidator fixtureValidator =
+                new DecoratorSchemaValidator(List.of("9.8", "9.7"), "decorator-standards-fixture/");
+
+        assertThat(fixtureValidator.isKnown(
+                "https://calm.finos.org/standards/test/nested-unresolvable.decorator.standard.json"), is(false));
+        assertThat(fixtureValidator.isKnown("https://calm.finos.org/release/9.7/meta/decorators.json#/defs/decorator"),
+                is(false));
+        assertThat(fixtureValidator.isKnown("https://calm.finos.org/release/9.8/meta/decorators.json#/defs/decorator"),
+                is(true));
+    }
+
+    @Test
+    void leave_a_ref_outside_calm_finos_org_unchecked() {
+        DecoratorSchemaValidator fixtureValidator = new DecoratorSchemaValidator(List.of(), "decorator-standards-fixture/");
+
+        assertThat(fixtureValidator.isKnown("https://calm.finos.org/standards/test/external-ref.decorator.standard.json"), is(true));
+    }
+
+    @Test
+    void load_a_release_schema_that_a_nested_relative_ref_names() {
+        DecoratorSchemaValidator fixtureValidator = new DecoratorSchemaValidator(List.of("9.6"), "no-such-path/");
+        String schema = "https://calm.finos.org/release/9.6/meta/decorators.json#/defs/decorator";
+
+        assertThat(fixtureValidator.isKnown(schema), is(true));
+        assertThat(fixtureValidator.validate(new JsonObject().put("$schema", schema).put("data", new JsonObject())), is(empty()));
+        assertThat(fixtureValidator.validate(new JsonObject().put("$schema", schema).put("data", 5)), is(not(empty())));
+    }
+
+    @Test
     void validate_a_known_schema_that_contains_null_values() {
         DecoratorSchemaValidator fixtureValidator =
                 new DecoratorSchemaValidator(List.of("9.8"), "decorator-standards-fixture/");

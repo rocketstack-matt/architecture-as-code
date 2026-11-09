@@ -114,7 +114,7 @@ The decorator endpoints (`/api/calm/namespaces/{namespace}/decorators`) and the 
 | Schema check | The decorator `$schema` is one that Hub knows, and the decorator does not match it. The body lists the first 20 errors, each with its `location` (a JSON Pointer). If there are more, `moreErrors` gives how many. MCP gives the same list and "and n more" | `400` |
 | Hub-owned fields | The decorator has a top-level `creationDateTime`, `updateDateTime`, `supersededDateTime`, `supersedes` or `supersededBy`. Hub sets these fields and keeps them beside the decorator | `400` |
 
-Hub knows the calm-schema decorator Standards that it bundles (`deployment`, `kubernetes`, `control-evaluation`) and the base decorator definition (`https://calm.finos.org/release/<version>/meta/decorators.json#/defs/decorator`). Hub accepts a decorator with any other `$schema` without a check.
+Hub knows the calm-schema decorator Standards that it bundles (`deployment`, `kubernetes`, `control-evaluation`) and the base decorator definition (`https://calm.finos.org/release/<version>/meta/decorators.json#/defs/decorator`). Hub accepts a decorator with any other `$schema` without a check. At startup, Hub checks that each `$ref` to `calm.finos.org` in a bundled schema resolves, also a nested one. A schema with a `$ref` that does not resolve stays unknown, and Hub logs a warning.
 
 No type is reserved by default. Reserve a type in `application.properties`:
 
