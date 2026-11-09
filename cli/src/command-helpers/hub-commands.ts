@@ -1174,7 +1174,7 @@ export async function runExtensionCommand(options: RunExtensionCommandOptions): 
         for (const [key, value] of args) {
             input[key] = coerceArg(value, command.input?.['properties'], key);
         }
-        const reply = await client.callExtension(extension.id, route, input, { timeoutMs });
+        const reply = await client.callExtension(extension, route, input, { timeoutMs });
         if (typeof reply.data === 'string') {
             if (reply.data !== '') {
                 process.stdout.write(reply.data.endsWith('\n') ? reply.data : `${reply.data}\n`);
@@ -1353,7 +1353,8 @@ function parseExtensionTimeout(timeout: string | undefined, request: string, for
  * Converts an `--arg` value to the type that the input schema declares for the property, so that
  * `--arg limit=5` sends a number. A value that does not convert stays a string. The REST proxy does
  * not check the input, so the extension must reject it. A number converts only when it is in the form
- * that it is sent in, so that `0x10`, `1e3` and an integer above 2^53 do not change value.
+ * that it is sent in and is finite, so that `0x10`, `1e3` and an integer above 2^53 do not change value, and so
+ * that JSON does not send `NaN` or `Infinity` as `null`.
  */
 function coerceArg(value: string, properties: unknown, key: string): unknown {
     const schema = properties && typeof properties === 'object' && Object.prototype.hasOwnProperty.call(properties, key)
@@ -1366,7 +1367,7 @@ function coerceArg(value: string, properties: unknown, key: string): unknown {
     }
     if (types.includes('integer') || types.includes('number')) {
         const number = Number(value);
-        if (numberText(number) === value.trim() && (types.includes('number') || Number.isSafeInteger(number))) {
+        if (Number.isFinite(number) && numberText(number) === value.trim() && (types.includes('number') || Number.isSafeInteger(number))) {
             return number;
         }
     }

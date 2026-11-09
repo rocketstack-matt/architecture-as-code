@@ -3,8 +3,11 @@ package org.finos.calm.mcp.tools;
 import io.quarkiverse.mcp.server.ToolManager;
 import io.quarkiverse.mcp.server.ToolResponse;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.quarkus.vertx.http.runtime.CurrentVertxRequest;
+import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.extensions.ExtensionManifest;
 import org.finos.calm.extensions.ExtensionManifestLoader;
@@ -58,6 +61,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -95,8 +99,8 @@ class TestExtensionToolsShould {
         extensionTools.mcpEnabled = true;
     }
 
-    private static final String PATH_RULE = "must not be empty or ., or contain .., /, \\, %, @, a look-alike of / or \\, "
-            + "a control character or a lone surrogate";
+    private static final String PATH_RULE = "must not be empty or ., or contain .., /, \\, %, @, a look-alike of /, \\, ., %, "
+            + "@ or ;, a control character or a lone surrogate";
     private static final String LINE_TOO_LONG = "The path and query are too long: the request line of the same REST call "
             + "would be longer than 4096 characters.";
     private static final JsonObject PATH_VALUES = pathValues();
@@ -110,17 +114,43 @@ class TestExtensionToolsShould {
     }
 
     static Stream<String> refusedPathValues() {
-        return PATH_VALUES.getJsonArray("refused").stream().map(String.class::cast);
+        return Stream.concat(PATH_VALUES.getJsonArray("refused").stream().map(String.class::cast),
+                PATH_VALUES.getJsonArray("lookAlikes").stream().map(c -> "a" + c + "b"));
+    }
+
+    static Stream<JsonObject> encodedValues() {
+        return PATH_VALUES.getJsonArray("encoded").stream().map(JsonObject.class::cast);
+    }
+
+    static Stream<String> otherRouteRefusedValues() {
+        return PATH_VALUES.getJsonObject("otherRoute").getJsonArray("refused").stream().map(String.class::cast);
+    }
+
+    static Stream<String> otherRouteAcceptedValues() {
+        return PATH_VALUES.getJsonObject("otherRoute").getJsonArray("accepted").stream().map(String.class::cast);
+    }
+
+    // The tool of the "route" of otherRoute, in an extension with the routes of otherRoute.
+    private static ExtensionTools.ExtensionTool otherRouteTool() {
+        JsonObject otherRoute = PATH_VALUES.getJsonObject("otherRoute");
+        List<ExtensionManifest.Route> routes = otherRoute.getJsonArray("routes").stream().map(JsonObject.class::cast)
+                .map(r -> new ExtensionManifest.Route(r.getString("id"), r.getString("method"), r.getString("path"), "authenticated", false))
+                .toList();
+        Map<String, ExtensionManifest.Command> commands = new LinkedHashMap<>();
+        routes.forEach(r -> commands.put(r.id(), new ExtensionManifest.Command(r.id(), "C", Map.of("type", "object"), null, null, null)));
+        ExtensionManifest manifest = new ExtensionManifest("x", "1.0.0", 0, "X", "X", "X", routes, commands, null);
+        return ExtensionTools.tools(List.of(manifest)).stream()
+                .filter(t -> t.route().id().equals(otherRoute.getString("route"))).findFirst().orElseThrow();
     }
 
     static Stream<String> acceptedPathValues() {
         return PATH_VALUES.getJsonArray("accepted").stream().map(String.class::cast);
     }
 
-    // The encodeURIComponent form, which the CLI and the UI send.
-    private static String uriComponent(String value) {
-        return ExtensionTools.encode(value).replace("%21", "!").replace("%2A", "*").replace("%27", "'")
-                .replace("%28", "(").replace("%29", ")");
+    // A client such as curl can encode !*'(), which encodeURIComponent and MCP leave as they are.
+    private static String strictlyEncoded(String value) {
+        return ExtensionTools.encodePathValue(value).replace("!", "%21").replace("*", "%2A").replace("'", "%27")
+                .replace("(", "%28").replace(")", "%29");
     }
 
     private static String text(ToolResponse r) {
@@ -935,7 +965,7 @@ class TestExtensionToolsShould {
         assertThat(request.extensionId(), is("mcp-test"));
         assertThat(request.method(), is("GET"));
         assertThat(request.path(), is("/namespaces/finos/services"));
-        assertThat(request.rawQuery(), is("limit=5&tag=a%20b&tag=c"));
+        assertThat(request.rawQuery(), is("limit=5&tag=a+b&tag=c"));
         assertThat(request.body(), nullValue());
     }
 
@@ -985,7 +1015,7 @@ class TestExtensionToolsShould {
 
         assertThat(e.getMessage(), is("Input property 'name' " + PATH_RULE + ", because it fills the path "
                 + tool("remove-service").route().path()));
-        for (String encoded : List.of(ExtensionTools.encode(value), uriComponent(value))) {
+        for (String encoded : List.of(ExtensionTools.encodePathValue(value), strictlyEncoded(value))) {
             assertThrows(ExtensionProxyException.class, () -> ExtensionPaths.checkPath("/x/" + encoded + "/y"), encoded);
         }
     }
@@ -996,9 +1026,9 @@ class TestExtensionToolsShould {
         ExtensionProxyRequest request = ExtensionTools.request(tool("remove-service"),
                 new JsonObject().put("namespace", "finos").put("name", value));
 
-        assertThat(request.path(), is("/namespaces/finos/services/" + ExtensionTools.encode(value)));
-        // MCP encodes !*'() and encodeURIComponent in the CLI and the UI does not. Hub accepts and keeps both forms.
-        for (String encoded : List.of(ExtensionTools.encode(value), uriComponent(value))) {
+        assertThat(request.path(), is("/namespaces/finos/services/" + ExtensionTools.encodePathValue(value)));
+        // Hub accepts and keeps !*'() both raw and encoded.
+        for (String encoded : List.of(ExtensionTools.encodePathValue(value), strictlyEncoded(value))) {
             assertThat(ExtensionPaths.checkPath("/x/" + encoded + "/y"), is("/x/" + encoded + "/y"));
         }
     }
@@ -1017,13 +1047,42 @@ class TestExtensionToolsShould {
         List<String> encodedNever = PATH_VALUES.getJsonArray("encodedNever").stream().map(String.class::cast).toList();
         for (String part : ExtensionPaths.FORBIDDEN) {
             boolean covered = refusedPathValues().anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(part)
-                    || ExtensionTools.encode(value).toLowerCase(Locale.ROOT).contains(part));
+                    || ExtensionTools.encodePathValue(value).toLowerCase(Locale.ROOT).contains(part));
             assertThat(part, covered || encodedNever.contains(part), is(true));
         }
         for (String part : encodedNever) {
             assertThat(part, ExtensionPaths.FORBIDDEN.contains(part), is(true));
-            assertThat(part, ExtensionTools.encode(part).contains(part), is(false));
+            assertThat(part, ExtensionTools.encodePathValue(part).contains(part), is(false));
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("encodedValues")
+    void encode_a_value_in_the_path_and_the_query_as_the_shared_client_does(JsonObject encoded) {
+        String value = encoded.getString("value");
+        ExtensionProxyRequest request = ExtensionTools.request(tool("remove-service"),
+                new JsonObject().put("namespace", "finos").put("name", value).put("q", value));
+
+        assertThat(request.path(), is("/namespaces/finos/services/" + encoded.getString("path")));
+        assertThat(request.rawQuery(), is("q=" + encoded.getString("query")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("otherRouteRefusedValues")
+    void refuse_a_shared_value_that_fills_the_path_so_that_it_matches_another_route(String value) {
+        ExtensionTools.ExtensionTool tool = otherRouteTool();
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> ExtensionTools.request(tool, new JsonObject().put("name", value)));
+
+        assertThat(e.getMessage(), is("The input fills the path /services/{name} so that it matches route 'get-admin', "
+                + "not route 'get-service' of this command."));
+    }
+
+    @ParameterizedTest
+    @MethodSource("otherRouteAcceptedValues")
+    void accept_a_shared_value_that_fills_the_path_of_its_own_route(String value) {
+        assertThat(ExtensionTools.request(otherRouteTool(), new JsonObject().put("name", value)).path(), is("/services/" + value));
     }
 
     @Test
@@ -1167,6 +1226,47 @@ class TestExtensionToolsShould {
         ArgumentCaptor<ExtensionProxyRequest> request = ArgumentCaptor.forClass(ExtensionProxyRequest.class);
         verify(proxyService).call(same(identity), request.capture());
         assertThat(request.getValue().path(), is("/namespaces/finos/services"));
+    }
+
+    private ExtensionProxyRequest callWithForwardedFor(boolean captureSourceIp) {
+        CurrentVertxRequest currentRequest = mock(CurrentVertxRequest.class);
+        RoutingContext context = mock(RoutingContext.class);
+        HttpServerRequest httpRequest = mock(HttpServerRequest.class);
+        lenient().when(currentRequest.getCurrent()).thenReturn(context);
+        lenient().when(context.request()).thenReturn(httpRequest);
+        lenient().when(httpRequest.getHeader("X-Forwarded-For")).thenReturn("203.0.113.7");
+        extensionTools.currentRequest = currentRequest;
+        extensionTools.captureSourceIp = captureSourceIp;
+        when(proxyService.call(any(), any())).thenReturn(reply(200, "{\"services\":[]}"));
+
+        extensionTools.call(tool("list-services"), Map.of("namespace", "finos"));
+
+        ArgumentCaptor<ExtensionProxyRequest> request = ArgumentCaptor.forClass(ExtensionProxyRequest.class);
+        verify(proxyService).call(same(identity), request.capture());
+        return request.getValue();
+    }
+
+    @Test
+    void send_the_forwarded_for_header_of_the_mcp_request_as_the_source_ip_when_it_is_captured() {
+        assertThat(callWithForwardedFor(true).sourceIp(), is("203.0.113.7"));
+    }
+
+    @Test
+    void send_no_source_ip_when_it_is_not_captured() {
+        assertThat(callWithForwardedFor(false).sourceIp(), nullValue());
+    }
+
+    @Test
+    void send_no_source_ip_when_there_is_no_current_http_request() {
+        extensionTools.captureSourceIp = true;
+        extensionTools.currentRequest = mock(CurrentVertxRequest.class);
+        when(proxyService.call(any(), any())).thenReturn(reply(200, "{\"services\":[]}"));
+
+        extensionTools.call(tool("list-services"), Map.of("namespace", "finos"));
+
+        ArgumentCaptor<ExtensionProxyRequest> request = ArgumentCaptor.forClass(ExtensionProxyRequest.class);
+        verify(proxyService).call(same(identity), request.capture());
+        assertThat(request.getValue().sourceIp(), nullValue());
     }
 
     @Test

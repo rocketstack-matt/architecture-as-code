@@ -30,7 +30,8 @@ class TestExtensionPathsShould {
             "/a b", "/a\tb", "/a?b", "/a#b", "/ä", "/a{b}", "/services/%2561dmin", "/a%", "/a%gg",
             "/services/a%2Fb", "/services/a%2fb", "/services/a%252Fb", "/services/a%25252fb",
             "/a;v=1", "/a;", "/;/b", "/a%E2%81%84b", "/a%E2%88%95b", "/a%e2%88%95b", "/a%E2%88%96b", "/a%E2%A7%B5b",
-            "/a%E2%A7%B8b", "/a%EF%B9%A8b", "/a%EF%BC%8Fb", "/a%ef%bc%bcb"
+            "/a%E2%A7%B8b", "/a%EF%B9%A8b", "/a%EF%BC%8Fb", "/a%ef%bc%bcb", "/a%E2%80%A5b", "/a%E2%80%A4b", "/a%CD%BEb",
+            "/a%EF%BC%85b", "/a%EF%BC%A0b", "/a%EF%BC%9Bb"
     })
     void reject_a_path_that_could_leave_the_route(String path) {
         ExtensionProxyException e = assertThrows(ExtensionProxyException.class, () -> ExtensionPaths.checkPath(path));

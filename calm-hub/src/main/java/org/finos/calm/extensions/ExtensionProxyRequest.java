@@ -23,7 +23,7 @@ public record ExtensionProxyRequest(
         InputStream body
 ) {
 
-    /** A call with no conditional headers and no source IP, as an MCP tool makes. */
+    /** A call with no conditional headers and no source IP. */
     public ExtensionProxyRequest(String extensionId, String method, String path, String rawQuery, String contentType,
                                  String accept, String acceptLanguage, InputStream body) {
         this(extensionId, method, path, rawQuery, contentType, accept, acceptLanguage, null, null, null, body);

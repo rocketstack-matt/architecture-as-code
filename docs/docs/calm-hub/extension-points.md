@@ -46,8 +46,8 @@ contribution, but the call fails.
 
 The UI sends the context as query parameters. A route path can also use these names as
 placeholders, for example `/namespaces/{namespace}/{resourceType}/{resourceId}`. A placeholder
-value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@`, a look-alike of `/` or `\`, a
-control character or a lone surrogate, because CALM Hub refuses these in a path. A context value must
+value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@`, a look-alike of `/`, `\`, `.`, `%`,
+`@` or `;`, a code point whose NFKC form contains `/` or `\` (such as U+2100, `a/c`), a control character or a lone surrogate, because CALM Hub refuses these in a path. A context value must
 not contain a control character or a lone surrogate, because the UI sends it in the query. The UI
 hides an action whose path gets such a value. Thus use `resource` only as a query parameter.
 
@@ -207,7 +207,8 @@ Commands that the CLI and MCP can run, keyed by name. The name uses lowercase le
   [Extension tools](mcp-and-api.md#extension-tools), or the command gets no tool.
 - Input properties that match a placeholder fill the path. The others go to the query for `GET` and
   `DELETE`, and to the JSON body for other methods.
-- For an MCP tool, CALM Hub checks the scope, then the input against `input`, before it calls the
-  backend. The CLI calls the route through the REST proxy, and CALM Hub does not check the input
+- For an MCP tool, CALM Hub first maps the input to a request. It refuses a path value that it does
+  not accept, a path that matches another route, and a query or path that is too long. Then it
+  checks the scope, and then the input against `input`, before it calls the backend. The CLI calls the route through the REST proxy, and CALM Hub does not check the input
   there. Thus the backend must check its input.
 - A read-only Hub leaves out a command whose route changes data and is not `readOnly`.

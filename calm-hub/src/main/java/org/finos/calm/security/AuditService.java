@@ -126,6 +126,6 @@ public class AuditService {
                 + ", version=" + sanitize(entry.getVersion())
                 + ", outcome=" + entry.getOutcome()
                 + ", sourceIp=" + sanitize(entry.getSourceIp())
-                + ", timestamp=" + entry.getTimestamp() + "}";
+                + ", timestamp=" + entry.getTimestamp() + extensionFields(entry) + "}";
     }
 }

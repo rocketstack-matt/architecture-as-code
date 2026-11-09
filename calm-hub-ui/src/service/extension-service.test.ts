@@ -130,7 +130,7 @@ describe('ExtensionService', () => {
         expect(() => extensionRequest('test', route, {})).toThrow('Missing extension context');
     });
     // Some JSON parsers refuse a lone surrogate, so the shared list has none.
-    it.each([...PATH_VALUES.refused, '\ud800', 'a\udc00b'])('rejects the invalid path value %j', (value) => {
+    it.each([...PATH_VALUES.refused, ...PATH_VALUES.lookAlikes.map((c) => `a${c}b`), '\ud800', 'a\udc00b'])('rejects the invalid path value %j', (value) => {
         expect(() => extensionRequest('test', route, { namespace: value })).toThrow(`Invalid extension context: namespace`);
     });
     it('rejects the delete control character in a path value', () => {

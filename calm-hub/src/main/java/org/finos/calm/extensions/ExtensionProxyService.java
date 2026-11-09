@@ -365,7 +365,7 @@ public class ExtensionProxyService {
                 .proxy(ProxySelector.getDefault())
                 .connectTimeout(extension.limits().connectTimeout())
                 .followRedirects(HttpClient.Redirect.NEVER)
-                // No h2c upgrade on a plain http backend; https still negotiates its version.
+                // HTTP/1.1 only, also for https, so that a plain http backend gets no h2c upgrade.
                 .version(HttpClient.Version.HTTP_1_1)
                 .build());
     }

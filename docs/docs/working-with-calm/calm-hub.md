@@ -123,7 +123,7 @@ An unknown `?tab=` value opens the Diagram tab. The old `?tab=deployments` link 
 
 ### Decorator Overlays
 
-Some decorator types are drawn on the diagram as an overlay. Each node or relationship gets a badge with its status, and a status that needs attention also colours the element: red for an error, amber for a warning. CALM Hub draws two overlays:
+Some decorator types are drawn on the diagram as an overlay. Each node or relationship gets a badge with its status, and a status that needs attention also colours the element: red for an error, amber for a warning. CALM Hub has two built-in overlays, and an extension can add more (see [decorator views](../calm-hub/decorator-views.md)):
 
 | Overlay | Decorator type | Shows |
 |---|---|---|
