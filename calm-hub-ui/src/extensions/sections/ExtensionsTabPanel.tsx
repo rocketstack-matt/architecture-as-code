@@ -64,11 +64,12 @@ export function ExtensionsTabPanel({ context, storage }: ExtensionsTabPanelProps
                                             />
                                         ))}
                                         {needsSelection.map((contribution) => (
+                                            // aria-disabled, not disabled: a disabled button cannot take focus, so a keyboard user could not reach the hint.
                                             <button
                                                 key={contribution.id}
                                                 type="button"
-                                                className="btn btn-sm"
-                                                disabled
+                                                className="btn btn-sm btn-disabled"
+                                                aria-disabled="true"
                                                 aria-describedby={`${baseId}-${index}`}
                                             >
                                                 {contribution.title}

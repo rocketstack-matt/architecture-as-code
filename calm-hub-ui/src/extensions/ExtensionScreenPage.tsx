@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useExtensions, useExtensionsStatus } from './ExtensionsContext.js';
 import { Navbar } from '../components/navbar/Navbar.js';
-import { ExtensionSlot } from './ExtensionSlot.js';
+import { ExtensionSlot, SlotFrame } from './ExtensionSlot.js';
 
 function ScreenBody() {
     const { extensionId, contributionId } = useParams();
@@ -19,11 +19,11 @@ function ScreenBody() {
             <p>Extension screen unavailable.</p>
         ) : undefined;
     if (state || !extension || !contribution) {
+        // The same named region as the slot, so a failed or unknown screen has the outline of a loaded one.
         return (
-            <>
-                <h1 className="text-lg font-bold">{contribution?.title ?? 'Extension screen'}</h1>
+            <SlotFrame title={contribution?.title ?? 'Extension screen'} level={1}>
                 {state}
-            </>
+            </SlotFrame>
         );
     }
     return <ExtensionSlot extension={extension} contribution={contribution} headingLevel={1} />;

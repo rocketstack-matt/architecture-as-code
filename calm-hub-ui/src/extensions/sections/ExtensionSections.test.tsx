@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -32,6 +33,29 @@ describe('ExtensionSections', () => {
         expect(toggle('Extension 2')).toHaveAttribute('aria-expanded', 'false');
         expect(toggle('Extension 3')).toHaveAttribute('aria-expanded', 'true');
         expect(screen.getByText('content ext-3')).toBeInTheDocument();
+    });
+
+    it('writes a choice once, after the render, and writes nothing when there is no choice', async () => {
+        const storage = createMemoryStorage();
+        const setItem = vi.spyOn(storage, 'setItem');
+        // StrictMode calls each state updater two times, so a write in an updater would run two times.
+        render(
+            <StrictMode>
+                <ExtensionSections sections={sections(2)} storageKey="k" storage={storage} />
+            </StrictMode>
+        );
+        expect(setItem).not.toHaveBeenCalled();
+        await userEvent.click(toggle('Extension 2'));
+        expect(setItem).toHaveBeenCalledTimes(1);
+        expect(setItem).toHaveBeenCalledWith('k', JSON.stringify({ 'ext-2': true }));
+    });
+
+    it('keeps a choice for this visit when the storage refuses the write', async () => {
+        const storage = createMemoryStorage();
+        vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError'); });
+        render(<ExtensionSections sections={sections(2)} storageKey="k" storage={storage} />);
+        await userEvent.click(toggle('Extension 2'));
+        expect(toggle('Extension 2')).toHaveAttribute('aria-expanded', 'true');
     });
 
     it('ignores a broken stored value', () => {

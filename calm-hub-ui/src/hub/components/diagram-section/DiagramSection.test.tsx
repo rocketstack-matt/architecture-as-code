@@ -831,7 +831,7 @@ describe('DiagramSection', () => {
             expect(screen.getByTestId('search').textContent).toBe('?tab=extensions');
             expect(screen.getByRole('tab', { name: 'Extensions' }).className).toContain('tab-active');
             expect(screen.queryByTestId('drawer')).not.toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Scan' })).toBeDisabled();
+            expect(screen.getByRole('button', { name: 'Scan' })).toHaveAttribute('aria-disabled', 'true');
         });
 
         it('enables an action that needs the selected element when a link names the node', () => {

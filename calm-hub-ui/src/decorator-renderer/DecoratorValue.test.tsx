@@ -54,6 +54,13 @@ describe('DecoratorValue', () => {
         expect(within(rows[2]).getAllByRole('cell').map((td) => td.textContent)).toEqual(['db', '', 'true']);
     });
 
+    it('leaves a cell empty when only the prototype has the column name', () => {
+        render(<DecoratorValue value={[{ name: 'api', toString: 'own' }, { name: 'db' }]} />);
+        const rows = within(screen.getByRole('table')).getAllByRole('row');
+        expect(within(rows[1]).getAllByRole('cell').map((td) => td.textContent)).toEqual(['api', 'own']);
+        expect(within(rows[2]).getAllByRole('cell').map((td) => td.textContent)).toEqual(['db', '']);
+    });
+
     it('renders nesting as collapsible branches, open at the first level and closed below', () => {
         const { container } = render(
             <DecoratorValue value={{ kubernetes: { cluster: 'prod', resources: { pods: ['a', 'b'] } } }} />

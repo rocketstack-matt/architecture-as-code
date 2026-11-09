@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { EnvironmentPill } from './EnvironmentPill.js';
 
 describe('EnvironmentPill', () => {
@@ -36,8 +36,51 @@ describe('EnvironmentPill', () => {
     });
 });
 
+/** jsdom does no layout, so a test sets how wide the name is and how wide it may be. */
+function mockWidths(scrollWidth: number, clientWidth: number) {
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(scrollWidth);
+    const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(clientWidth);
+    return () => { scroll.mockRestore(); client.mockRestore(); };
+}
+
+describe('EnvironmentPill that fits', () => {
+    it('is a plain badge, not a button, when the name is not truncated', () => {
+        const restore = mockWidths(40, 40);
+        render(<EnvironmentPill environment={{ name: 'UAT', colour: 'info' }} />);
+        expect(screen.queryByRole('button')).not.toBeInTheDocument();
+        expect(screen.getByTestId('environment-pill').tagName).toBe('SPAN');
+        restore();
+    });
+
+    it('becomes a button when a resize truncates the name', () => {
+        let resize: () => void = () => {};
+        const original = globalThis.ResizeObserver;
+        // Not vi.stubGlobal: vi.unstubAllGlobals would also undo the storage stubs of vitest.setup.ts.
+        globalThis.ResizeObserver = class {
+            constructor(callback: () => void) { resize = callback; }
+            observe() {}
+            unobserve() {}
+            disconnect() {}
+        } as unknown as typeof ResizeObserver;
+        let width = 40;
+        const scroll = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(40);
+        const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
+        render(<EnvironmentPill environment={{ name: 'UAT', colour: 'info' }} />);
+        expect(screen.queryByRole('button')).not.toBeInTheDocument();
+        width = 20;
+        act(() => resize());
+        expect(screen.getByRole('button', { name: 'UAT' })).toBeInTheDocument();
+        scroll.mockRestore();
+        client.mockRestore();
+        globalThis.ResizeObserver = original;
+    });
+});
+
 describe('EnvironmentPill full name', () => {
     const name = 'Pre-production EMEA';
+    let restore: () => void;
+    beforeEach(() => { restore = mockWidths(200, 68); });
+    afterEach(() => restore());
     const renderPill = () => {
         render(
             <>

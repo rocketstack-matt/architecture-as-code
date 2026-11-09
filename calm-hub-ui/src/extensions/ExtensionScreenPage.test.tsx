@@ -99,3 +99,30 @@ it('keeps the screen h1 when the reply cannot be shown', async () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('cannot show');
     expect(screen.getByRole('heading', { level: 1, name: 'screen 1' })).toBeInTheDocument();
 });
+
+it('keeps the contribution title as the h1 when the reply has its own title, and shows that title under it', async () => {
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, title: 'Releases this week', blocks: [] });
+    renderAt('/extensions/ext-1/screen');
+    expect(await screen.findByText('Releases this week')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('screen 1');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+});
+
+it.each([
+    ['the registry fails to load', () => renderWithRegistry(Promise.reject(new Error('down'))), 'Extension screen'],
+    ['the screen is unknown', () => renderAt('/extensions/ext-1/nothing'), 'Extension screen'],
+])('names the region that holds the h1 when %s', async (_name, renderPage, title) => {
+    renderPage();
+    const region = await screen.findByRole('region', { name: title });
+    expect(region).toContainElement(screen.getByRole('heading', { level: 1, name: title }));
+});
+
+it('keeps the h1 in the named region when the reply cannot be shown', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [{ type: 'table', columns: 'bad', rows: [] }] });
+    renderAt('/extensions/ext-1/screen');
+    const alert = await screen.findByRole('alert');
+    const region = screen.getByRole('region', { name: 'screen 1' });
+    expect(region).toContainElement(alert);
+    expect(region).toContainElement(screen.getByRole('heading', { level: 1, name: 'screen 1' }));
+});

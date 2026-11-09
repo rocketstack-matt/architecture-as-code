@@ -33,4 +33,8 @@ describe('writableDecorator', () => {
     it('does not let an unknown field replace a mapped one', () => {
         expect(writableDecorator({ uniqueId: 'd1', 'unique-id': 'other' })).toEqual({ 'unique-id': 'd1' });
     });
+
+    it('keeps an unknown field whose name the prototype also has', () => {
+        expect(writableDecorator({ uniqueId: 'd1', constructor: 'x', toString: 'y' })).toEqual({ 'unique-id': 'd1', constructor: 'x', toString: 'y' });
+    });
 });

@@ -14,9 +14,12 @@ export function safeHref(href: string | undefined): string | undefined {
     }
 }
 
-// resourcePath throws on a missing part, and that would replace the whole slot for one bad link.
+// resourcePath throws on a missing part, and that would replace the whole slot for one bad link. A browser resolves a
+// dot segment, even encoded, so a "." or ".." part would open another page.
 const isHubTarget = (hub: Partial<HubTarget>): hub is HubTarget =>
-    [hub.namespace, hub.type, hub.id, hub.version].every((part) => typeof part === 'string' && part !== '');
+    [hub.namespace, hub.type, hub.id, hub.version].every(
+        (part) => typeof part === 'string' && part !== '' && part !== '.' && part !== '..'
+    );
 
 export function ScreenLink({ link, className, children }: { link: ScreenLinkValue; className?: string; children?: ReactNode }) {
     const content = children ?? link.label;

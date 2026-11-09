@@ -14,11 +14,17 @@ export interface ActionOutcome {
  */
 export class ActionRuns {
     private readonly running = new Set<string>();
+    // The buttons that started a call in flight, so only that button says that it runs.
+    private readonly runningButtons = new Set<string>();
     private readonly outcomes = new Map<string, ActionOutcome>();
     private readonly listeners = new Set<() => void>();
 
     isRunning(key: string): boolean {
         return this.running.has(key);
+    }
+
+    isRunningOn(outcomeKey: string): boolean {
+        return this.runningButtons.has(outcomeKey);
     }
 
     outcome(key: string): ActionOutcome | undefined {
@@ -27,12 +33,14 @@ export class ActionRuns {
 
     start(key: string, outcomeKey: string): void {
         this.running.add(key);
+        this.runningButtons.add(outcomeKey);
         this.outcomes.delete(outcomeKey);
         this.notify();
     }
 
     finish(key: string, outcomeKey: string, outcome?: ActionOutcome): void {
         const wasRunning = this.running.delete(key);
+        this.runningButtons.delete(outcomeKey);
         if (outcome) this.outcomes.set(outcomeKey, outcome);
         if (wasRunning || outcome) this.notify();
     }
@@ -71,6 +79,13 @@ export function useActionRunning(runs: ActionRuns, key: string): boolean {
     return useSyncExternalStore(
         (listener) => runs.subscribe(listener),
         () => runs.isRunning(key),
+    );
+}
+
+export function useActionRunningOn(runs: ActionRuns, outcomeKey: string): boolean {
+    return useSyncExternalStore(
+        (listener) => runs.subscribe(listener),
+        () => runs.isRunningOn(outcomeKey),
     );
 }
 

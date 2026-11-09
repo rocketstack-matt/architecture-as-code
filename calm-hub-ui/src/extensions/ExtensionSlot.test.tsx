@@ -44,7 +44,7 @@ describe('ExtensionSlot', () => {
     });
     it('confirms a non-read-only action in a dialog before calling it', async () => {
         const spy = vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
-        render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={{ version: '1' }} />);
+        render(<ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={{ version: '1' }} />);
         fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
         expect(screen.getByRole('dialog')).toHaveTextContent('Run Summary?');
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -58,7 +58,7 @@ describe('ExtensionSlot', () => {
     });
     it('reports a failed write', async () => {
         vi.spyOn(ExtensionService.prototype, 'call').mockRejectedValue(new Error());
-        render(<ExtensionSlot action extension={writeExtension} contribution={contribution} />);
+        render(<ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} />);
         fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
         fireEvent.click(screen.getByRole('button', { name: 'Run' }));
         expect(await screen.findByRole('alert')).toHaveTextContent('failed');
@@ -66,7 +66,7 @@ describe('ExtensionSlot', () => {
     });
     it('does not confirm read-only actions and reports failures', async () => {
         vi.spyOn(ExtensionService.prototype, 'call').mockRejectedValue(new Error());
-        render(<ExtensionSlot action extension={extension} contribution={contribution} />);
+        render(<ExtensionSlot action placement="test" extension={extension} contribution={contribution} />);
         fireEvent.click(screen.getByRole('button'));
         expect(await screen.findByRole('alert')).toHaveTextContent('failed');
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -95,7 +95,7 @@ it('aborts a previous slot request and ignores its late reply', async () => {
 
 it('aborts a read-only action when its host slot unmounts', async () => {
     const spy = vi.spyOn(ExtensionService.prototype, 'call').mockReturnValue(new Promise(() => {}));
-    const view = render(<ExtensionSlot action extension={extension} contribution={contribution} />);
+    const view = render(<ExtensionSlot action placement="test" extension={extension} contribution={contribution} />);
     fireEvent.click(screen.getByRole('button'));
     view.unmount();
     expect(spy.mock.calls[0][3]?.aborted).toBe(true);
@@ -103,7 +103,7 @@ it('aborts a read-only action when its host slot unmounts', async () => {
 
 it('does not abort a confirmed write when its host slot unmounts', async () => {
     const spy = vi.spyOn(ExtensionService.prototype, 'call').mockReturnValue(new Promise(() => {}));
-    const view = render(<ExtensionSlot action extension={writeExtension} contribution={contribution} />);
+    const view = render(<ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} />);
     fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
@@ -118,11 +118,11 @@ it('keeps a confirmed write running when the context changes', async () => {
             complete = resolve;
         })
     );
-    const view = render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={{ version: '1' }} />);
+    const view = render(<ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={{ version: '1' }} />);
     fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
-    view.rerender(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={{ version: '2' }} />);
+    view.rerender(<ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={{ version: '2' }} />);
     expect(spy.mock.calls[0][3]).toBeUndefined();
     expect(spy.mock.calls[0][2]).toEqual({ version: '1' });
     expect(screen.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'true');
@@ -163,7 +163,7 @@ describe('ExtensionSlot actions', () => {
         const service = providerService();
         const page = (shown: boolean) => (
             <ExtensionsProvider service={service}>
-                {shown && <ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />}
+                {shown && <ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={target} />}
             </ExtensionsProvider>
         );
         const view = render(page(true));
@@ -185,14 +185,14 @@ describe('ExtensionSlot actions', () => {
 
     it('clears a failure when the context changes', async () => {
         vi.spyOn(ExtensionService.prototype, 'call').mockRejectedValue(new Error());
-        const view = render(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '1' }} />);
+        const view = render(<ExtensionSlot action placement="test" extension={extension} contribution={contribution} context={{ version: '1' }} />);
         fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
         expect(await screen.findByRole('alert')).toHaveTextContent('failed');
 
-        view.rerender(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '2' }} />);
+        view.rerender(<ExtensionSlot action placement="test" extension={extension} contribution={contribution} context={{ version: '2' }} />);
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-        view.rerender(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '1' }} />);
+        view.rerender(<ExtensionSlot action placement="test" extension={extension} contribution={contribution} context={{ version: '1' }} />);
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
@@ -202,7 +202,7 @@ describe('ExtensionSlot actions', () => {
         const service = providerService();
         const page = (shown: boolean) => (
             <ExtensionsProvider service={service}>
-                {shown && <ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />}
+                {shown && <ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={target} />}
             </ExtensionsProvider>
         );
         const view = render(page(true));
@@ -251,11 +251,11 @@ describe('ExtensionSlot actions', () => {
         const restore = modelModalDialogs();
         try {
             vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
-            render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />);
+            render(<ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={target} />);
             const button = screen.getByRole('button', { name: 'Summary' });
 
             fireEvent.click(button);
-            screen.getByRole('button', { name: 'Cancel' }).focus();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
             expect(button).toHaveFocus();
 
@@ -292,26 +292,42 @@ describe('ExtensionSlot actions', () => {
         const other = within(screen.getByTestId('other'));
         fireEvent.click(tab.getByRole('button', { name: 'Summary' }));
         expect(other.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'true');
+        expect(tab.getByRole('status')).toHaveTextContent('Summary: running…');
+        expect(other.getByRole('status')).toBeEmptyDOMElement();
 
         await act(async () => complete(undefined));
         expect(tab.getByRole('status')).toHaveTextContent('Summary: done.');
-        expect(other.queryByRole('status')).not.toBeInTheDocument();
+        expect(other.getByRole('status')).toBeEmptyDOMElement();
         expect(other.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'false');
     });
 
     it('says when an action is done, until the context changes', async () => {
         vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
-        const view = render(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '1' }} />);
+        const view = render(<ExtensionSlot action placement="test" extension={extension} contribution={contribution} context={{ version: '1' }} />);
         fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
         expect(await screen.findByRole('status')).toHaveTextContent('Summary: done.');
 
-        view.rerender(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '2' }} />);
-        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        view.rerender(<ExtensionSlot action placement="test" extension={extension} contribution={contribution} context={{ version: '2' }} />);
+        expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    });
+
+    it('says that a call runs in a live region that is in the page before the call, and stops when it fails', async () => {
+        let fail: (error: Error) => void = () => {};
+        vi.spyOn(ExtensionService.prototype, 'call').mockReturnValue(new Promise((_, reject) => (fail = reject)));
+        render(<ExtensionSlot action placement="test" extension={extension} contribution={contribution} context={{ version: '1' }} />);
+        const live = screen.getByRole('status');
+        expect(live).toBeEmptyDOMElement();
+        fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+        expect(live).toHaveTextContent('Summary: running…');
+
+        await act(async () => fail(new Error('502')));
+        expect(screen.getByRole('alert')).toHaveTextContent('failed');
+        expect(live).toBeEmptyDOMElement();
     });
 
     it('names the target in the dialog, and sends the context of the click after the context changes', async () => {
         const spy = vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
-        const view = render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />);
+        const view = render(<ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={target} />);
         fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
         const dialog = screen.getByRole('dialog', { name: 'Confirm action' });
         expect(within(dialog).getAllByRole('definition').map((value) => value.textContent)).toEqual([
@@ -325,7 +341,7 @@ describe('ExtensionSlot actions', () => {
         expect(dialog).toHaveTextContent('Elementweb-app');
 
         view.rerender(
-            <ExtensionSlot action extension={writeExtension} contribution={contribution} context={{ ...target, version: '2.0.0' }} />
+            <ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={{ ...target, version: '2.0.0' }} />
         );
         expect(screen.getByRole('dialog')).toHaveTextContent('Version1.0.0');
         fireEvent.click(screen.getByRole('button', { name: 'Run' }));
@@ -340,9 +356,11 @@ describe('ExtensionSlot actions', () => {
         Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: showModal });
         try {
             const spy = vi.spyOn(ExtensionService.prototype, 'call');
-            render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />);
+            render(<ExtensionSlot action placement="test" extension={writeExtension} contribution={contribution} context={target} />);
             fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
             expect(showModal).toHaveBeenCalledOnce();
+            // Cancel, not Run, so an Enter does not confirm a write.
+            expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
 
             fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
             expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

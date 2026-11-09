@@ -57,6 +57,15 @@ describe('extension blocks', () => {
         expect(screen.getByRole('link')).toHaveTextContent('site');
     });
 
+    it.each(['.', '..'])('shows a Hub link with a %s part as text, so it cannot open another page', (part) => {
+        draw({ type: 'links', items: [
+            { label: 'Dot', hub: { namespace: 'finos', type: 'architectures', id: part, version: '1.0.0' } },
+            { label: 'Fine', hub: { namespace: 'finos', type: 'architectures', id: '..x', version: '1.0.0' } },
+        ] });
+        expect(screen.getByText('Dot').closest('a')).toBeNull();
+        expect(screen.getByRole('link')).toHaveAttribute('href', '/finos/architectures/..x/1.0.0');
+    });
+
     it('shows a placeholder for a future block', () => {
         draw({ type: 'future' } as unknown as ScreenBlock);
         expect(screen.getByText(/block type/)).toBeInTheDocument();

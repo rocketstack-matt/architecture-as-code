@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DecoratorView } from '../contracts/contracts.js';
 import { hasOverlay, viewKey } from './overlayEngine.js';
 
@@ -37,6 +37,18 @@ function defaultStorage(): Storage | undefined {
  */
 export function useOverlayVisibility(views: readonly DecoratorView[], storage: Storage | undefined = defaultStorage()) {
     const [choices, setChoices] = useState<Choices>(() => readChoices(storage));
+    // Only a choice is written: a visit that changes nothing leaves storage as it is.
+    const chosen = useRef(false);
+
+    // In an effect, not in the state updater, which React can call more than one time.
+    useEffect(() => {
+        if (!chosen.current) return;
+        try {
+            storage?.setItem(OVERLAY_VISIBILITY_KEY, JSON.stringify(choices));
+        } catch {
+            // A full or blocked storage only loses the choice for the next visit.
+        }
+    }, [choices, storage]);
 
     const hiddenViews = useMemo(() => {
         const hidden = new Set<string>();
@@ -51,18 +63,14 @@ export function useOverlayVisibility(views: readonly DecoratorView[], storage: S
 
     const setViewsShown = useCallback(
         (keys: readonly string[], shown: boolean) => {
+            chosen.current = true;
             setChoices((prev) => {
                 const next = { ...prev };
                 for (const key of keys) next[key] = shown;
-                try {
-                    storage?.setItem(OVERLAY_VISIBILITY_KEY, JSON.stringify(next));
-                } catch {
-                    // A full or blocked storage only loses the choice for the next visit.
-                }
                 return next;
             });
         },
-        [storage],
+        [],
     );
 
     const toggleView = useCallback(
