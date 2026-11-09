@@ -1794,7 +1794,7 @@ describe('CLI Commands', () => {
         it('calls runExtensionCommand with the input and every --arg', async () => {
             await program.parseAsync([
                 'node', 'cli.js', 'hub', 'ext', 'example', 'add-service',
-                '--input', '-', '--arg', 'namespace=finos', '--arg', 'name=a=b', '-c', 'http://hub',
+                '--input', '-', '--arg', 'namespace=finos', '--arg', 'name=a=b', '--timeout', '90', '-c', 'http://hub',
             ]);
 
             expect(hubCommandsModule.runExtensionCommand).toHaveBeenCalledWith({
@@ -1803,6 +1803,7 @@ describe('CLI Commands', () => {
                 command: 'add-service',
                 input: '-',
                 args: ['namespace=finos', 'name=a=b'],
+                timeout: '90',
                 format: 'json',
             });
         });
@@ -1822,6 +1823,7 @@ describe('CLI Commands', () => {
 
             expect(help).toContain('--input <file>');
             expect(help).toContain('--arg <key=value>');
+            expect(help).toContain('--timeout <seconds>');
             expect(cliConfigModule.loadCliConfig).not.toHaveBeenCalled();
             expect(hubCommandsModule.runExtensionCommand).not.toHaveBeenCalled();
         });

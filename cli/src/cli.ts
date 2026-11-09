@@ -990,6 +990,7 @@ Example:
         .argument('<command>', 'Command name')
         .option('--input <file>', 'JSON file with the command input object, or - for stdin')
         .option('--arg <key=value>', 'Set a top-level input property. Repeatable; overrides --input', collectArg)
+        .option('--timeout <seconds>', 'Stop waiting for the reply after this many seconds. By default, CALM Hub sets the limit')
         .option(CALMHUB_URL_OPTION, 'URL to CALMHub instance')
         .addOption(hubOutputOption)
         .action(async (id: string, command: string, options) => {
@@ -999,6 +1000,7 @@ Example:
                 command,
                 input: options.input,
                 args: options.arg,
+                timeout: options.timeout,
                 format: options.format
             });
         });
