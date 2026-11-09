@@ -10,17 +10,26 @@ import java.util.Locale;
  * Checks a caller-supplied path and query and builds the backend URI from them (ADR 0011). Each
  * check works on the raw, percent-encoded form, so that an encoded or double-encoded form cannot
  * hide a dot segment, an extra segment or user info. An encoded slash is not allowed, because a
- * backend that decodes it before routing sees a path other than the one that Hub matched.
+ * backend that decodes it before routing sees a path other than the one that Hub matched. For the
+ * same reason, an encoded look-alike of a slash or a backslash is not allowed: a backend that
+ * normalises Unicode (NFKC) before routing reads U+FF0F as a slash. A matrix parameter is not
+ * allowed, because JAX-RS drops it from the path that Hub matches.
  */
 public final class ExtensionPaths {
 
-    private static final List<String> FORBIDDEN = List.of("..", "%2e", "%2f", "%5c", "%25", "%40", "\\", "//", "@");
+    /** Lower case. The clients refuse a path value that would give one of these (test resource extensions-test/path-values.json). */
+    public static final List<String> FORBIDDEN = List.of("..", "%2e", "%2f", "%5c", "%25", "%40", "\\", "//", "@", ";",
+            // U+2044 fraction slash, U+2215 division slash, U+2216 set minus, U+29F5 reverse solidus operator,
+            // U+29F8 big solidus, U+FE68 small reverse solidus, U+FF0F fullwidth solidus, U+FF3C fullwidth reverse solidus.
+            "%e2%81%84", "%e2%88%95", "%e2%88%96", "%e2%a7%b5", "%e2%a7%b8", "%ef%b9%a8", "%ef%bc%8f", "%ef%bc%bc");
+
+    public static final String NOT_ALLOWED = "The extension path or query is not allowed";
 
     private ExtensionPaths() {
     }
 
     /** Returns the path when it is safe to send to a backend, or throws 400. */
-    static String checkPath(String rawPath) {
+    public static String checkPath(String rawPath) {
         if (rawPath == null || !rawPath.startsWith("/") || !printableAscii(rawPath, "?#")) {
             throw badRequest();
         }
@@ -145,6 +154,6 @@ public final class ExtensionPaths {
     }
 
     private static ExtensionProxyException badRequest() {
-        return new ExtensionProxyException(400, "The extension path or query is not allowed");
+        return new ExtensionProxyException(400, NOT_ALLOWED);
     }
 }

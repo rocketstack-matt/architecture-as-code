@@ -194,7 +194,8 @@ public class TestReadOnlyRequestFilterShould {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"team%2Fservice", "team%2fservice", "team%252Fservice", "team%40x", "team@x", "team%5Cx"})
+    @ValueSource(strings = {"team%2Fservice", "team%2fservice", "team%252Fservice", "team%40x", "team@x", "team%5Cx",
+            "team;v=1", "team%EF%BC%8Fservice"})
     void reject_a_write_whose_path_the_extension_proxy_refuses(String parameter) {
         filter.readOnly = true;
         String path = "/api/calm/extensions/team-services/api/services/" + parameter;

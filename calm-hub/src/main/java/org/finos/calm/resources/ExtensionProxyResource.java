@@ -18,6 +18,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.finos.calm.extensions.ExtensionPaths;
 import org.finos.calm.extensions.ExtensionProxyException;
 import org.finos.calm.extensions.ExtensionProxyRequest;
 import org.finos.calm.extensions.ExtensionProxyResponse;
@@ -97,6 +98,10 @@ public class ExtensionProxyResource {
                 headers.getHeaderString(HttpHeaders.CONTENT_TYPE), headers.getHeaderString(HttpHeaders.ACCEPT),
                 headers.getHeaderString(HttpHeaders.ACCEPT_LANGUAGE), body);
         try {
+            // JAX-RS can drop a matrix parameter from the path parameter, so Hub refuses it here and does not drop it.
+            if (uriInfo.getRequestUri().getRawPath().indexOf(';') >= 0) {
+                throw new ExtensionProxyException(400, ExtensionPaths.NOT_ALLOWED);
+            }
             ExtensionProxyResponse reply = service.call(identity, request);
             Response.ResponseBuilder builder = Response.status(reply.status())
                     .entity(reply.body().length == 0 ? null : reply.body());

@@ -15,7 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class TestExtensionPathsShould {
 
     @ParameterizedTest
-    @ValueSource(strings = {"/screen", "/namespaces/finos.payments/services", "/a:b", "/a%20b", "/a-b_c~d"})
+    @ValueSource(strings = {"/screen", "/namespaces/finos.payments/services", "/a:b", "/a%20b", "/a-b_c~d", "/a%3Bv%3D1",
+            "/a%E2%88%94b", "/a%C3%A9"})
     void accept_a_normal_path(String path) {
         assertThat(ExtensionPaths.checkPath(path), is(path));
     }
@@ -27,7 +28,9 @@ class TestExtensionPathsShould {
             "/%252e%252e/admin", "/%25252e/admin", "/a%5cb", "/a\\b", "//evil.example.com/x",
             "/a//b", "/@evil.example.com", "/a@b", "/a%40b", "/./a", "/a/.", "/a%00b", "/a%0d%0ab", "/a%7fb",
             "/a b", "/a\tb", "/a?b", "/a#b", "/ä", "/a{b}", "/services/%2561dmin", "/a%", "/a%gg",
-            "/services/a%2Fb", "/services/a%2fb", "/services/a%252Fb", "/services/a%25252fb"
+            "/services/a%2Fb", "/services/a%2fb", "/services/a%252Fb", "/services/a%25252fb",
+            "/a;v=1", "/a;", "/;/b", "/a%E2%81%84b", "/a%E2%88%95b", "/a%e2%88%95b", "/a%E2%88%96b", "/a%E2%A7%B5b",
+            "/a%E2%A7%B8b", "/a%EF%B9%A8b", "/a%EF%BC%8Fb", "/a%ef%bc%bcb"
     })
     void reject_a_path_that_could_leave_the_route(String path) {
         ExtensionProxyException e = assertThrows(ExtensionProxyException.class, () -> ExtensionPaths.checkPath(path));

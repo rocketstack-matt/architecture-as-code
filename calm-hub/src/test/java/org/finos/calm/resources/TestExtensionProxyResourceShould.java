@@ -126,6 +126,28 @@ class TestExtensionProxyResourceShould {
 
     @Test
     @TestSecurity(user = "alice")
+    void refuse_a_matrix_parameter_and_not_drop_it() {
+        for (String path : new String[]{"/services/team;v=1", "/screen;x", "/services;v=1/team", "/screen;"}) {
+            given().urlEncodingEnabled(false)
+                    .when().get(BASE + path)
+                    .then().statusCode(400).body("error", equalTo("The extension path or query is not allowed"));
+        }
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void refuse_an_encoded_look_alike_of_a_slash_or_a_backslash() {
+        for (String value : new String[]{"team%E2%88%95service", "team%EF%BC%8Fservice", "team%ef%bc%bcservice"}) {
+            given().urlEncodingEnabled(false)
+                    .when().get(BASE + "/services/" + value)
+                    .then().statusCode(400).body("error", equalTo("The extension path or query is not allowed"));
+        }
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
     void forward_an_encoded_parameter_and_bind_it_in_the_assertion() throws Exception {
         given().urlEncodingEnabled(false)
                 .when().get(BASE + "/services/team%3Aservice")
