@@ -37,20 +37,33 @@ function SlotContent({ extension, contribution, context = {}, action, headingLev
             });
         return () => controller.abort();
     }, [service, extension.id, extension.hubApi, route, action, namespace, resource, resourceType, resourceId, version, selectedElement]);
-    if (!route) return <p role="alert">Extension route unavailable.</p>;
-    if (action) return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} />;
-    if (error) return <p role="alert">Extension request failed.</p>;
-    if (route.method !== 'GET') return <p role="alert">Block routes must use GET.</p>;
-    if (!result) return <p role="status">Loading extension…</p>;
+    if (action) {
+        if (!route) return <p role="alert">Extension route unavailable.</p>;
+        return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} />;
+    }
+    // A slot keeps its heading in every state, so the outline does not change (on a screen page, it is the h1).
+    const state = !route ? (
+        <p role="alert">Extension route unavailable.</p>
+    ) : error ? (
+        <p role="alert">Extension request failed.</p>
+    ) : route.method !== 'GET' ? (
+        <p role="alert">Block routes must use GET.</p>
+    ) : !result ? (
+        <p role="status">Loading extension…</p>
+    ) : undefined;
     return (
         <section className="@container flex flex-col gap-4 min-w-0 overflow-auto" aria-label={contribution.title}>
-            <Heading level={headingLevel} className="text-lg font-bold">
-                {result.title ?? contribution.title}
-            </Heading>
-            {result.blocks.map((block, index) => (
-                <BlockRenderer key={index} block={block} headingLevel={headingLevel} />
-            ))}
+            <SlotTitle level={headingLevel}>{result?.title ?? contribution.title}</SlotTitle>
+            {state ?? result?.blocks.map((block, index) => <BlockRenderer key={index} block={block} headingLevel={headingLevel} />)}
         </section>
+    );
+}
+
+function SlotTitle({ level, children }: { level: HeadingLevel; children: string }) {
+    return (
+        <Heading level={level} className="text-lg font-bold">
+            {children}
+        </Heading>
     );
 }
 
@@ -58,7 +71,10 @@ export function ExtensionSlot(props: ExtensionSlotProps) {
     // An action keeps its state when the context changes, so a change of selection does not reset a running write.
     const key = JSON.stringify([props.extension.id, props.contribution.id, props.action ? null : props.context]);
     return (
-        <ScreenErrorBoundary key={key}>
+        <ScreenErrorBoundary
+            key={key}
+            heading={props.action ? undefined : <SlotTitle level={props.headingLevel ?? 2}>{props.contribution.title}</SlotTitle>}
+        >
             <SlotContent key={key} {...props} />
         </ScreenErrorBoundary>
     );
