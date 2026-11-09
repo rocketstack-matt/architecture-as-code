@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useStoreApi } from 'reactflow';
 import { THEME } from '../theme.js';
@@ -58,6 +58,14 @@ export function OverlayBadgeDetails({ shown, anchor, trigger, onClose }: Overlay
         });
     }, [store, onClose]);
 
+    // A portal still sends React events up the React tree, to the node: a click would select it, an arrow key move it.
+    const stop = (event: SyntheticEvent) => event.stopPropagation();
+    // The stop also keeps the key from the document listener, so Escape closes here.
+    const onKeyDown = (event: ReactKeyboardEvent) => {
+        event.stopPropagation();
+        if (event.key === 'Escape') onClose(true);
+    };
+
     const source = view.source;
     const extraEntries = overlay.entries.length - DETAILS_MAX_ENTRIES;
     return createPortal(
@@ -68,6 +76,9 @@ export function OverlayBadgeDetails({ shown, anchor, trigger, onClose }: Overlay
             tabIndex={-1}
             data-testid="overlay-badge-details"
             className="nodrag nopan nowheel"
+            onClick={stop}
+            onDoubleClick={stop}
+            onKeyDown={onKeyDown}
             style={{
                 position: 'fixed',
                 ...detailsPosition(anchor, window.innerWidth, window.innerHeight),
@@ -108,6 +119,7 @@ export function OverlayBadgeDetails({ shown, anchor, trigger, onClose }: Overlay
                 <button
                     type="button"
                     className="link"
+                    aria-label={`View all ${viewTitle(view)}`}
                     style={{ marginTop: '8px', color: THEME.colors.accentText }}
                     onClick={() => {
                         onOpenView(view);
