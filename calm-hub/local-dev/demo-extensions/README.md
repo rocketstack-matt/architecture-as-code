@@ -9,7 +9,7 @@ The data is made up.
 | [release-tracker](release-tracker/README.md) | Release tracker | 8092 | `release-risk` |
 | [stride-threats](stride-threats/README.md) | STRIDE threat model | 8093 | `threat-model` |
 
-Hub loads every manifest in this folder, and does not start if an enabled one has no backend URL. Run both from
+Hub loads every manifest in this folder, and does not start if an enabled one has routes but no backend URL. Run both from
 `calm-hub/`, with the keys from the [example-services README](../extensions/example-services/README.md):
 
 ```bash
