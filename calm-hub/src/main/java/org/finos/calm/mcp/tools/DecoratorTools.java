@@ -20,6 +20,7 @@ import org.finos.calm.domain.exception.DecoratorTooLargeException;
 import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
+import org.finos.calm.domain.exception.StorageWriteException;
 import org.finos.calm.security.CalmHubScopes;
 import org.finos.calm.services.DecoratorWriteService;
 import org.finos.calm.store.DecoratorStore;
@@ -134,7 +135,8 @@ public class DecoratorTools {
                 () -> McpValidationHelper.checkEnabled(mcpEnabled),
                 () -> McpValidationHelper.validateNamespace(namespace),
                 () -> McpValidationHelper.validateNotBlank(decoratorJson, "Decorator JSON"),
-                () -> McpValidationHelper.validateMaxLength(decoratorJson, SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES, "Decorator JSON"),
+                // Before the parse, so that a body over the limit costs no parse.
+                () -> McpValidationHelper.validateMaxBytes(decoratorJson, SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES, "Decorator JSON"),
                 () -> McpValidationHelper.validateJson(decoratorJson, "Decorator JSON"));
         if (err.isPresent()) return err.get();
 
@@ -157,6 +159,8 @@ public class DecoratorTools {
             return reservedTypeError(namespace, null, e);
         } catch (DecoratorSchemaValidationException e) {
             return schemaError(e);
+        } catch (StorageWriteException e) {
+            return storageError(namespace, e);
         }
     }
 
@@ -172,7 +176,8 @@ public class DecoratorTools {
                 () -> McpValidationHelper.validateNamespace(namespace),
                 () -> McpValidationHelper.validatePositiveId(decoratorId, "Decorator ID"),
                 () -> McpValidationHelper.validateNotBlank(decoratorJson, "Decorator JSON"),
-                () -> McpValidationHelper.validateMaxLength(decoratorJson, SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES, "Decorator JSON"),
+                // Before the parse, so that a body over the limit costs no parse.
+                () -> McpValidationHelper.validateMaxBytes(decoratorJson, SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES, "Decorator JSON"),
                 () -> McpValidationHelper.validateJson(decoratorJson, "Decorator JSON"));
         if (err.isPresent()) return err.get();
 
@@ -214,6 +219,8 @@ public class DecoratorTools {
             return reservedTypeError(namespace, decoratorId, e);
         } catch (DecoratorSchemaValidationException e) {
             return schemaError(e);
+        } catch (StorageWriteException e) {
+            return storageError(namespace, e);
         }
     }
 
@@ -258,6 +265,13 @@ public class DecoratorTools {
     private static ToolResponse reservedTypeError(String namespace, Integer decoratorId, ReservedDecoratorTypeException e) {
         logger.warn("Refused a write of reserved decorator type [{}] to decorator [{}] in namespace [{}]", e.getType(), decoratorId, namespace);
         return ToolResponse.error("Error: Decorator type '" + e.getType() + "' is reserved and the caller may not write it.");
+    }
+
+    private static ToolResponse storageError(String namespace, StorageWriteException e) {
+        logger.error("Decorator write failed in namespace [{}]", namespace, e);
+        return ToolResponse.error(e.isCapacityExceeded()
+                ? "Error: The namespace has reached the maximum storage size and cannot accept the decorator."
+                : "Error: The decorator write could not be completed due to a storage error.");
     }
 
     private static ToolResponse schemaError(DecoratorSchemaValidationException e) {

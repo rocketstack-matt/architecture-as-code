@@ -131,6 +131,8 @@ public class DecoratorWriteService {
     }
 
     // The caller controls the size, and the schema check makes every error before Hub keeps the first ones.
+    // Vert.x cannot stop at the error cap: Basic output has no limit option, and only Flag output stops
+    // early, with no errors. So this size limit is what bounds the cost.
     // A char is at least one UTF-8 byte, so a long string is refused without a copy.
     private static void requireSize(String decoratorJson) throws DecoratorTooLargeException {
         if (decoratorJson != null && (decoratorJson.length() > SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES

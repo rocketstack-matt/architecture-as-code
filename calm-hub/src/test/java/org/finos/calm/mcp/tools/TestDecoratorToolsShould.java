@@ -11,6 +11,7 @@ import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
+import org.finos.calm.domain.exception.StorageWriteException;
 import org.finos.calm.services.DecoratorSchemaValidator;
 import org.finos.calm.services.DecoratorWriteService;
 import org.finos.calm.store.DecoratorStore;
@@ -435,7 +436,7 @@ class TestDecoratorToolsShould {
         ToolResponse response = decoratorTools.createDecorator("workshop", json);
 
         assertThat(response.isError(), is(true));
-        assertThat(text(response), containsString("must not exceed " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES));
+        assertThat(text(response), is("Error: Decorator JSON must not exceed " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + " bytes."));
         verifyNoInteractions(decoratorStore);
     }
 
@@ -446,9 +447,73 @@ class TestDecoratorToolsShould {
         ToolResponse create = decoratorTools.createDecorator("workshop", json);
         ToolResponse update = decoratorTools.updateDecorator("workshop", 1, json);
 
-        assertThat(text(create), is("Error: Decorator JSON is larger than " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + " bytes."));
+        assertThat(text(create), is("Error: Decorator JSON must not exceed " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + " bytes."));
         assertThat(text(update), is(text(create)));
         verifyNoInteractions(decoratorStore);
+    }
+
+    @Test
+    void refuse_a_multibyte_decorator_over_the_size_limit_before_it_is_parsed() {
+        // Under the limit in characters but over it in bytes, and not JSON: a parse first would say "not valid JSON".
+        String notJson = "é".repeat(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES / 2 + 1);
+
+        ToolResponse create = decoratorTools.createDecorator("workshop", notJson);
+        ToolResponse update = decoratorTools.updateDecorator("workshop", 1, notJson);
+
+        assertThat(text(create), is("Error: Decorator JSON must not exceed " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + " bytes."));
+        assertThat(text(update), is(text(create)));
+        verifyNoInteractions(decoratorStore);
+    }
+
+    @Test
+    void accept_a_multibyte_decorator_at_the_size_limit() throws Exception {
+        String prefix = "{\"type\":\"test\",\"data\":\"";
+        String suffix = "\"}";
+        int room = SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES - prefix.length() - suffix.length();
+        String json = prefix + "é".repeat(room / 2) + "x".repeat(room % 2) + suffix;
+        when(decoratorStore.createDecorator(eq("workshop"), anyString())).thenReturn(3);
+
+        ToolResponse response = decoratorTools.createDecorator("workshop", json);
+
+        assertThat(response.isError(), is(false));
+        assertThat(text(response), containsString("ID: 3"));
+    }
+
+    @Test
+    void return_error_when_the_namespace_is_full_on_create() throws Exception {
+        when(decoratorStore.createDecorator(eq("workshop"), anyString()))
+                .thenThrow(StorageWriteException.capacityExceeded(new RuntimeException("too big")));
+
+        ToolResponse response = decoratorTools.createDecorator("workshop", "{\"type\":\"test\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), is("Error: The namespace has reached the maximum storage size and cannot accept the decorator."));
+    }
+
+    @Test
+    void return_error_when_the_namespace_is_full_on_update() throws Exception {
+        org.mockito.Mockito.doThrow(StorageWriteException.capacityExceeded(new RuntimeException("too big")))
+                .when(decoratorStore).updateDecorator(eq("workshop"), eq(1), anyString());
+
+        ToolResponse response = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"test\"}");
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), is("Error: The namespace has reached the maximum storage size and cannot accept the decorator."));
+    }
+
+    @Test
+    void return_error_when_a_decorator_write_fails_in_the_store() throws Exception {
+        when(decoratorStore.createDecorator(eq("workshop"), anyString()))
+                .thenThrow(StorageWriteException.writeFailed(new RuntimeException("disk")));
+        org.mockito.Mockito.doThrow(StorageWriteException.writeFailed(new RuntimeException("disk")))
+                .when(decoratorStore).updateDecorator(eq("workshop"), eq(1), anyString());
+
+        ToolResponse create = decoratorTools.createDecorator("workshop", "{\"type\":\"test\"}");
+        ToolResponse update = decoratorTools.updateDecorator("workshop", 1, "{\"type\":\"test\"}");
+
+        assertThat(create.isError(), is(true));
+        assertThat(text(create), is("Error: The decorator write could not be completed due to a storage error."));
+        assertThat(text(update), is(text(create)));
     }
 
     // --- write rules ---
