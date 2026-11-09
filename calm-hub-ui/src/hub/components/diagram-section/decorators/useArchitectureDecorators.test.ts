@@ -249,7 +249,7 @@ describe('useArchitectureDecorators', () => {
         expect(resolve).toHaveBeenCalledTimes(1);
     });
 
-    it('keeps the backoff while inactive, so a change of tab does not reset the failure count', async () => {
+    it('keeps the backoff while inactive, and does not load at once when it becomes active during the backoff', async () => {
         fetch.mockRejectedValue(new Error('hub down'));
         const { rerender } = renderFor(architecture);
         await flush();
@@ -259,10 +259,38 @@ describe('useArchitectureDecorators', () => {
         rerender({ d: architecture, a: true, on: false });
         rerender({ d: architecture, a: true, on: true });
         await flush();
-        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(fetch).toHaveBeenCalledTimes(3);
         await advance(25000);
+        expect(fetch).toHaveBeenCalledTimes(3);
+        await advance(5000);
         expect(fetch).toHaveBeenCalledTimes(4);
         expect(errorSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not load at once when the browser tab becomes visible during the backoff', async () => {
+        fetch.mockRejectedValue(new Error('hub down'));
+        renderFor(architecture);
+        await flush();
+        await advance(10000);
+        expect(fetch).toHaveBeenCalledTimes(3);
+
+        await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('loads at once when it becomes active after the backoff ran out while inactive', async () => {
+        fetch.mockRejectedValue(new Error('hub down'));
+        const { rerender } = renderFor(architecture);
+        await flush();
+        await advance(10000);
+        rerender({ d: architecture, a: true, on: false });
+        await advance(60000);
+        expect(fetch).toHaveBeenCalledTimes(3);
+
+        rerender({ d: architecture, a: true, on: true });
+        await flush();
+        expect(fetch).toHaveBeenCalledTimes(4);
     });
 
     it('stops listening for visibility changes once unmounted', async () => {

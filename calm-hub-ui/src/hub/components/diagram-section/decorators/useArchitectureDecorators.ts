@@ -30,8 +30,8 @@ const NONE: ArchitectureDecoratorsState = { status: 'loaded', decorators: [] };
  * They change while the diagram is open (a merge gateway records each decision), so they are re-read every few
  * seconds while `active` (something on screen shows them). State changes only when the list does, so an unchanged refresh
  * does not re-render the diagram. A failed refresh keeps what was last shown; a hidden browser tab is not polled, nor is
- * an inactive one, which loads at once when it becomes active again. The result is kept with the `data` it was fetched
- * for, so another resource or version never shows it.
+ * an inactive one, which loads at once when it becomes active again unless it is backing off. The result is kept with
+ * the `data` it was fetched for, so another resource or version never shows it.
  */
 export function useArchitectureDecorators(
     service: CalmService,
@@ -114,12 +114,16 @@ export function useArchitectureDecorators(
             }
             load();
         };
+        // A return to the tab or the view waits out a backoff, so each return does not send a request to a Hub that is down.
+        const resume = () => {
+            if (ticksToSkip === 0) load();
+        };
         const onVisibilityChange = () => {
-            if (document.visibilityState === 'visible') load();
+            if (document.visibilityState === 'visible') resume();
         };
 
         load();
-        loadNow.current = load;
+        loadNow.current = resume;
         const timer = setInterval(tick, DECORATOR_REFRESH_MS);
         document.addEventListener('visibilitychange', onVisibilityChange);
         return () => {
