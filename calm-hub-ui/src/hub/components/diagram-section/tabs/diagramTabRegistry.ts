@@ -25,6 +25,8 @@ export interface DiagramTabContext extends DiagramTabScope {
     usedBy: ImplementationsState;
     /** The tab opened from a control that it replaces, such as "View all", so its content takes focus. */
     focusPanel?: boolean;
+    /** Called once the content took that focus, so a later visit to the tab does not take it again. */
+    onPanelFocused?: () => void;
 }
 
 export interface DiagramTab {

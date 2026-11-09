@@ -30,6 +30,19 @@ describe('DecoratorsPanel', () => {
         expect(screen.getByRole('region', { name: 'Decorators' })).not.toHaveFocus();
     });
 
+    it('reports once that it took focus, and not when it was not asked to', () => {
+        const onAutoFocused = vi.fn();
+        const { rerender, unmount } = render(
+            <DecoratorsPanel state={loaded} typeFilter={null} onTypeFilterChange={vi.fn()} autoFocus onAutoFocused={onAutoFocused} />
+        );
+        rerender(<DecoratorsPanel state={loaded} typeFilter={null} onTypeFilterChange={vi.fn()} autoFocus onAutoFocused={onAutoFocused} />);
+        expect(onAutoFocused).toHaveBeenCalledTimes(1);
+        unmount();
+
+        render(<DecoratorsPanel state={loaded} typeFilter={null} onTypeFilterChange={vi.fn()} onAutoFocused={onAutoFocused} />);
+        expect(onAutoFocused).toHaveBeenCalledTimes(1);
+    });
+
     describe('schema filter', () => {
         const scans = { status: 'loaded' as const, decorators: [...decorators, withSchema('scan-1', 'scan', 'https://example.org/scan.json')] };
 

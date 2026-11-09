@@ -228,11 +228,9 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
     const allDecorators = decoratorsState.status === 'loaded' ? decoratorsState.decorators : NO_DECORATORS;
 
     // "View all" opens the Decorators tab and unmounts itself, so the tab takes focus.
+    // The panel reads it on mount only, and clears it once it took focus, so a later visit does not take focus.
     const [focusPanel, setFocusPanel] = useState(false);
-    // The panel reads it on mount only, so it is cleared once the tab shows: a later visit does not take focus.
-    useEffect(() => {
-        if (focusPanel && activeTab.id === DECORATORS_TAB_ID) setFocusPanel(false);
-    }, [focusPanel, activeTab.id]);
+    const clearFocusPanel = useCallback(() => setFocusPanel(false), []);
     const setActiveTab = (tab: DiagramTab) => {
         setFocusPanel(false);
         setSearchParams({ tab: tab.id }, { replace: true, state: location.state });
@@ -509,6 +507,7 @@ export function DiagramSection({ data, onItemSelect, hasDetailsPanel, breadcrumb
         decorators: decoratorsState,
         usedBy,
         focusPanel,
+        onPanelFocused: clearFocusPanel,
     };
 
     // Desktop: inline tabs in the section header (unchanged).

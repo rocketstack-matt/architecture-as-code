@@ -12,17 +12,21 @@ interface DecoratorsPanelProps {
     onSchemaFilterChange?: (schema: string | null) => void;
     /** Takes focus on mount. */
     autoFocus?: boolean;
+    /** Called on mount after it took focus. */
+    onAutoFocused?: () => void;
 }
 
 function Message({ children }: { children: string }) {
     return <p className="text-sm text-base-content/60 text-center py-8">{children}</p>;
 }
 
-export function DecoratorsPanel({ state, typeFilter, schemaFilter = null, onTypeFilterChange, onSchemaFilterChange, autoFocus }: DecoratorsPanelProps) {
+export function DecoratorsPanel({ state, typeFilter, schemaFilter = null, onTypeFilterChange, onSchemaFilterChange, autoFocus, onAutoFocused }: DecoratorsPanelProps) {
     const ref = useRef<HTMLDivElement>(null);
-    const focusOnMount = useRef(autoFocus);
+    const focusOnMount = useRef({ autoFocus, onAutoFocused });
     useEffect(() => {
-        if (focusOnMount.current) ref.current?.focus({ preventScroll: true });
+        if (!focusOnMount.current.autoFocus) return;
+        ref.current?.focus({ preventScroll: true });
+        focusOnMount.current.onAutoFocused?.();
     }, []);
     const all = useMemo(() => (state.status === 'loaded' ? state.decorators : []), [state]);
     const decorators = useMemo(
