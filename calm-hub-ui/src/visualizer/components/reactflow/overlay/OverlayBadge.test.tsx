@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { ReactFlowProvider, useStoreApi } from 'reactflow';
+import ReactFlow, { ReactFlowProvider, useStoreApi } from 'reactflow';
 import type { ReactNode } from 'react';
 import { DecoratorOverlayContext } from '../../../context/DecoratorOverlayContext.js';
 import { fakeDecorator, fakeView } from '../../../../test-support/fake-overlays.js';
@@ -130,7 +130,7 @@ describe('OverlayBadge details', () => {
     it('links to the view list', () => {
         const { onOpenView } = renderBadge();
         fireEvent.click(screen.getByTestId('overlay-badge'));
-        fireEvent.click(screen.getByRole('button', { name: 'View all View release-risk' }));
+        fireEvent.click(screen.getByRole('button', { name: 'View all View release-risk · Release tracker' }));
         expect(onOpenView).toHaveBeenCalledWith(view);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -161,7 +161,7 @@ describe('OverlayBadge details', () => {
         expect(badge).toHaveFocus();
 
         fireEvent.click(badge);
-        fireEvent.click(screen.getByRole('button', { name: 'View all View release-risk' }));
+        fireEvent.click(screen.getByRole('button', { name: 'View all View release-risk · Release tracker' }));
         expect(badge).toHaveFocus();
 
         fireEvent.click(badge);
@@ -220,6 +220,61 @@ describe('OverlayBadge details', () => {
         render(<Flow><OverlayBadge shown={builtIn} presenting={false} /></Flow>);
         fireEvent.click(screen.getByTestId('overlay-badge'));
         expect(screen.getByRole('dialog')).toHaveTextContent('Built-in (Deployments)');
+    });
+});
+
+describe('OverlayBadge details in a React Flow node', () => {
+    const view = fakeView('release-tracker', 'release-risk', 'Release tracker');
+    const riskShown = {
+        view,
+        overlay: { status: 'error' as const, value: 'high', entries: [{ decorator: fakeDecorator('d1', {}), value: 'high', status: 'error' as const }] },
+    };
+    const nodeTypes = { badged: () => <OverlayBadge shown={riskShown} presenting={false} /> };
+
+    function renderFlow() {
+        const onNodeClick = vi.fn();
+        const onNodeDoubleClick = vi.fn();
+        const onNodesChange = vi.fn();
+        render(
+            <div style={{ width: 800, height: 600 }}>
+                <ReactFlow
+                    nodes={[{ id: 'n1', type: 'badged', position: { x: 0, y: 0 }, data: {}, selected: true }]}
+                    edges={[]}
+                    nodeTypes={nodeTypes}
+                    onNodeClick={onNodeClick}
+                    onNodeDoubleClick={onNodeDoubleClick}
+                    onNodesChange={onNodesChange}
+                />
+            </div>
+        );
+        fireEvent.click(screen.getByTestId('overlay-badge'));
+        onNodesChange.mockClear();
+        return { onNodeClick, onNodeDoubleClick, onNodesChange, details: screen.getByRole('dialog') };
+    }
+
+    it('keeps a click, a double click and a key in the details away from the node', () => {
+        const { onNodeClick, onNodeDoubleClick, onNodesChange, details } = renderFlow();
+        fireEvent.click(details);
+        fireEvent.doubleClick(details);
+        fireEvent.keyDown(details, { key: 'Enter' });
+        fireEvent.keyDown(details, { key: 'ArrowRight' });
+        expect(onNodeClick).not.toHaveBeenCalled();
+        expect(onNodeDoubleClick).not.toHaveBeenCalled();
+        expect(onNodesChange).not.toHaveBeenCalled();
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('still closes on Escape inside the details, and gives focus back to the badge', () => {
+        const { details } = renderFlow();
+        fireEvent.keyDown(details, { key: 'Escape' });
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.getByTestId('overlay-badge')).toHaveFocus();
+    });
+
+    it('lets a click on the node outside the badge select it', () => {
+        const { onNodeClick } = renderFlow();
+        fireEvent.click(screen.getByTestId('overlay-badge').closest('.react-flow__node')!);
+        expect(onNodeClick).toHaveBeenCalledTimes(1);
     });
 });
 

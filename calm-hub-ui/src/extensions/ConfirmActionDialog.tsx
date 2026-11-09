@@ -12,12 +12,15 @@ interface ConfirmActionDialogProps {
 export function ConfirmActionDialog({ title, target, onConfirm, onCancel }: ConfirmActionDialogProps) {
     const ref = useRef<HTMLDialogElement>(null);
     const headingId = useId();
+    const cancel = useRef<HTMLButtonElement>(null);
     useEffect(() => {
         const dialog = ref.current;
         if (!dialog || dialog.open) return;
         // showModal gives Escape and a focus trap. jsdom does not have it.
         if (typeof dialog.showModal === 'function') dialog.showModal();
         else dialog.setAttribute('open', '');
+        // showModal focuses Run, the first button, so an Enter would confirm a write.
+        cancel.current?.focus();
     }, []);
 
     // close() first: while the dialog is modal the page is inert, so the caller cannot move focus out of it.
@@ -63,7 +66,7 @@ export function ConfirmActionDialog({ title, target, onConfirm, onCancel }: Conf
                     <button type="button" className="btn btn-primary" onClick={() => closeThen(onConfirm)}>
                         Run
                     </button>
-                    <button type="button" className="btn btn-ghost" onClick={() => closeThen(onCancel)}>
+                    <button ref={cancel} type="button" className="btn btn-ghost" onClick={() => closeThen(onCancel)}>
                         Cancel
                     </button>
                 </div>

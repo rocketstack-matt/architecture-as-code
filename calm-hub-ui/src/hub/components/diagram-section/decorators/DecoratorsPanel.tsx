@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { DecoratorCard, decoratorTypeLabel } from '../../../../decorator-renderer/index.js';
+import { DecoratorCard, decoratorKeys, decoratorTypeLabel } from '../../../../decorator-renderer/index.js';
 import type { ArchitectureDecoratorsState } from './useArchitectureDecorators.js';
 
 interface DecoratorsPanelProps {
@@ -57,10 +57,11 @@ export function DecoratorsPanel({ state, typeFilter, schemaFilter = null, onType
     } else if (shown.length === 0) {
         body = <Message>{typeFilter === null ? `No decorators with schema ${schemaFilter}.` : `No decorators of type ${typeFilter}.`}</Message>;
     } else {
+        const keys = decoratorKeys(shown);
         body = (
             <div className="flex flex-col gap-3">
                 {shown.map((decorator, index) => (
-                    <DecoratorCard key={`${decorator.uniqueId}-${index}`} decorator={decorator} />
+                    <DecoratorCard key={keys[index]} decorator={decorator} />
                 ))}
             </div>
         );

@@ -24,7 +24,7 @@ export function writableDecorator(decorator: object): Record<string, unknown> {
         if (source[read] !== undefined) writable[write] = source[read];
     }
     for (const [field, value] of Object.entries(source)) {
-        if (!known.has(field) && !HUB_OWNED_FIELDS.has(field) && !(field in writable)) writable[field] = value;
+        if (!known.has(field) && !HUB_OWNED_FIELDS.has(field) && !Object.hasOwn(writable, field)) writable[field] = value;
     }
     return writable;
 }

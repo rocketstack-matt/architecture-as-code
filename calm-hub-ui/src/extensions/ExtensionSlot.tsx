@@ -7,18 +7,26 @@ import { BlockRenderer } from './blocks/BlockRenderer.js';
 import { isBlocksReply } from './blocks/reply.js';
 import { useExtensionService } from './ExtensionsContext.js';
 
-export interface ExtensionSlotProps {
+interface SlotProps {
     extension: ExtensionSummary;
     contribution: ExtensionContribution;
     context?: ExtensionContext;
-    action?: boolean;
     /** The level of the slot title: one below the heading of the place that holds the slot. */
     headingLevel?: HeadingLevel;
-    /** For an action: where its button is, so each button keeps its own result. */
-    placement?: string;
 }
 
-function SlotContent({ extension, contribution, context = {}, action, headingLevel = 2, placement = 'default' }: ExtensionSlotProps) {
+export type ExtensionSlotProps =
+    | (SlotProps & { action?: false; placement?: never })
+    | (SlotProps & {
+          action: true;
+          /**
+           * Where the button is, so each button keeps its own result. Required, so that two places cannot share a
+           * default. It must be the same across a remount.
+           */
+          placement: string;
+      });
+
+function SlotContent({ extension, contribution, context = {}, action, headingLevel = 2, placement }: ExtensionSlotProps) {
     const service = useExtensionService();
     const route = extension.routes.find((entry) => entry.id === contribution.route);
     const [result, setResult] = useState<ExtensionScreen>();
@@ -41,7 +49,7 @@ function SlotContent({ extension, contribution, context = {}, action, headingLev
     }, [service, extension.id, extension.hubApi, route, action, namespace, resource, resourceType, resourceId, version, selectedElement]);
     if (action) {
         if (!route) return <p role="alert">Extension route unavailable.</p>;
-        return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} placement={placement} />;
+        return <ExtensionActionButton service={service} extension={extension} contribution={contribution} route={route} context={context} placement={placement!} />;
     }
     // A slot keeps its heading in every state, so the outline does not change (on a screen page, it is the h1).
     const state = !route ? (
@@ -54,15 +62,20 @@ function SlotContent({ extension, contribution, context = {}, action, headingLev
         <p role="status">Loading extension…</p>
     ) : undefined;
     return (
-        <SlotFrame label={contribution.title} title={result?.title ?? contribution.title} level={headingLevel}>
+        <SlotFrame title={contribution.title} level={headingLevel}>
+            {result?.title && result.title !== contribution.title && <p className="text-base-content/70">{result.title}</p>}
             {state ?? result?.blocks.map((block, index) => <BlockRenderer key={index} block={block} headingLevel={headingLevel} />)}
         </SlotFrame>
     );
 }
 
-function SlotFrame({ label, title, level, children }: { label: string; title: string; level: HeadingLevel; children: ReactNode }) {
+/**
+ * The named region of a slot. Its heading is the region name in every state, so a reply or a failure does not change
+ * the outline. A reply `title` shows under it.
+ */
+export function SlotFrame({ title, level, children }: { title: string; level: HeadingLevel; children: ReactNode }) {
     return (
-        <section className="@container flex flex-col gap-4 min-w-0 overflow-auto" aria-label={label}>
+        <section className="@container flex flex-col gap-4 min-w-0 overflow-auto" aria-label={title}>
             <Heading level={level} className="text-lg font-bold">
                 {title}
             </Heading>
@@ -81,7 +94,7 @@ export function ExtensionSlot(props: ExtensionSlotProps) {
                 props.action
                     ? undefined
                     : (content) => (
-                          <SlotFrame label={props.contribution.title} title={props.contribution.title} level={props.headingLevel ?? 2}>
+                          <SlotFrame title={props.contribution.title} level={props.headingLevel ?? 2}>
                               {content}
                           </SlotFrame>
                       )

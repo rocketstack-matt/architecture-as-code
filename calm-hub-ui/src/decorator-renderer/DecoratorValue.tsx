@@ -39,7 +39,7 @@ function Table({ columns, rows }: { columns: string[]; rows: FlatObject[] }) {
                         <tr key={index}>
                             {columns.map((column) => (
                                 <td key={column}>
-                                    {column in row ? <DecoratorValue value={row[column]} /> : null}
+                                    {Object.hasOwn(row, column) ? <DecoratorValue value={row[column]} /> : null}
                                 </td>
                             ))}
                         </tr>

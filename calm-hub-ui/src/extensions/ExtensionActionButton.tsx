@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExtensionContext, ExtensionContribution, ExtensionRoute, ExtensionSummary } from '../model/extensions.js';
 import { ExtensionService } from '../service/extension-service.js';
-import { actionButtonKey, actionRunKey, useActionOutcome, useActionRunning, useActionRuns } from './actionRuns.js';
+import { actionButtonKey, actionRunKey, useActionOutcome, useActionRunning, useActionRunningOn, useActionRuns } from './actionRuns.js';
 import { ConfirmActionDialog } from './ConfirmActionDialog.js';
 
 interface ExtensionActionButtonProps {
@@ -22,6 +22,7 @@ export function ExtensionActionButton({ service, extension, contribution, route,
     const busy = useActionRunning(runs, runKey);
     const outcomeKey = actionButtonKey(extension.id, contribution.id, placement);
     const outcome = useActionOutcome(runs, outcomeKey);
+    const runningHere = useActionRunningOn(runs, outcomeKey);
     const [pending, setPending] = useState<ExtensionContext>();
     const readRequest = useRef<AbortController | null>(null);
     const button = useRef<HTMLButtonElement>(null);
@@ -91,11 +92,10 @@ export function ExtensionActionButton({ service, extension, contribution, route,
                 />
             )}
             {shown?.ok === false && <p role="alert">Extension request failed.</p>}
-            {shown?.ok && (
-                <p role="status" className="text-xs text-success">
-                    {contribution.title}: done.
-                </p>
-            )}
+            {/* Always in the page: a screen reader may not read a live region that is added with its text. */}
+            <p role="status" className={`text-xs ${runningHere ? 'text-base-content/60' : 'text-success'}`}>
+                {runningHere ? `${contribution.title}: running…` : shown?.ok ? `${contribution.title}: done.` : ''}
+            </p>
         </div>
     );
 }

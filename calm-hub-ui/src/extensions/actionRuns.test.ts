@@ -40,6 +40,16 @@ describe('ActionRuns', () => {
         expect(listener).toHaveBeenCalledTimes(6);
     });
 
+    it('knows which button started the call in flight', () => {
+        const runs = new ActionRuns();
+        const other = actionButtonKey('ext', 'scan', 'details');
+        runs.start(key, button);
+        expect(runs.isRunningOn(button)).toBe(true);
+        expect(runs.isRunningOn(other)).toBe(false);
+        runs.finish(key, button);
+        expect(runs.isRunningOn(button)).toBe(false);
+    });
+
     it('keeps the result of each button of an action apart', () => {
         const runs = new ActionRuns();
         const other = actionButtonKey('ext', 'scan', 'details');

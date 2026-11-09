@@ -1,5 +1,6 @@
+import { StrictMode } from 'react';
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMemoryStorage } from '../../test-support/memory-storage.js';
 import { fakeView, fakeViewOverlays } from '../../test-support/fake-overlays.js';
 import { OVERLAY_VISIBILITY_KEY, useOverlayVisibility } from './useOverlayVisibility.js';
@@ -25,6 +26,27 @@ describe('useOverlayVisibility', () => {
         expect(second.result.current.hiddenViews.has('ext-1/risk')).toBe(true);
         expect(second.result.current.hiddenViews.has('ext-9/risk')).toBe(false);
         expect(second.result.current.hiddenViews.has('ext-2/risk')).toBe(false);
+    });
+
+    it('writes a choice once, after the render, and writes nothing when there is no choice', () => {
+        const views = fakeViewOverlays(5).map(({ view }) => view);
+        const storage = createMemoryStorage();
+        const setItem = vi.spyOn(storage, 'setItem');
+        // StrictMode calls each state updater two times, so a write in an updater would run two times.
+        const { result } = renderHook(() => useOverlayVisibility(views, storage), { wrapper: StrictMode });
+        expect(setItem).not.toHaveBeenCalled();
+        act(() => result.current.toggleView('ext-1/risk'));
+        expect(setItem).toHaveBeenCalledTimes(1);
+        expect(setItem).toHaveBeenCalledWith(OVERLAY_VISIBILITY_KEY, JSON.stringify({ 'ext-1/risk': false }));
+    });
+
+    it('keeps a choice for this visit when the storage refuses the write', () => {
+        const views = fakeViewOverlays(5).map(({ view }) => view);
+        const storage = createMemoryStorage();
+        vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError'); });
+        const { result } = renderHook(() => useOverlayVisibility(views, storage));
+        act(() => result.current.toggleView('ext-1/risk'));
+        expect(result.current.hiddenViews.has('ext-1/risk')).toBe(true);
     });
 
     it('switches several views at once', () => {

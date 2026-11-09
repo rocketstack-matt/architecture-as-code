@@ -1,14 +1,41 @@
 import axios, { AxiosInstance, isAxiosError } from 'axios';
 import { getAuthHeaders } from '../authService.js';
 import { isBuiltInExtension } from '../extensions/extensionIdentity.js';
-import { ExtensionContext, ExtensionRoute, ExtensionSummary } from '../model/extensions.js';
+import { ExtensionContext, ExtensionPoint, ExtensionRoute, ExtensionSummary } from '../model/extensions.js';
 import type { DecoratorView } from '../visualizer/contracts/contracts.js';
 import { authStore } from './utils/auth-store.js';
 
 /** The extension contract version this UI reads. The registry and each blocks reply give theirs. */
 export const SUPPORTED_HUB_API = 0;
 
-type RegistryEntry = ExtensionSummary & { contributes?: { 'decorator-views'?: DecoratorView[] } };
+type RegistryEntry = ExtensionSummary & { contributes: { 'decorator-views'?: unknown } };
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const UI_POINTS: readonly ExtensionPoint[] = ['screen', 'designer-tab', 'landing-card', 'detail-panel', 'action'];
+
+const hasStrings = (value: unknown, fields: readonly string[]) =>
+    isObject(value) && fields.every((field) => typeof value[field] === 'string');
+
+// Hub always sends these fields. The pages read them outside an error boundary, so a malformed entry must not reach them.
+function isRegistryEntry(value: unknown): value is RegistryEntry {
+    if (!isObject(value) || value.hubApi !== SUPPORTED_HUB_API || typeof value.id !== 'string') return false;
+    const { routes, contributes } = value;
+    return Array.isArray(routes) && routes.every((route) => hasStrings(route, ['id', 'method', 'path']))
+        && isObject(contributes)
+        && UI_POINTS.every((point) => {
+            const entries = contributes[point];
+            return entries === undefined || (Array.isArray(entries) && entries.every((entry) => hasStrings(entry, ['id', 'title', 'route'])));
+        });
+}
+
+function keepRegistryEntry(value: unknown): value is RegistryEntry {
+    if (isRegistryEntry(value)) return true;
+    const id = isObject(value) && typeof value.id === 'string' ? value.id : undefined;
+    console.warn('%s', id === undefined ? 'Dropped an extension registry entry with no id' : `Dropped extension registry entry: ${id}`);
+    return false;
+}
 
 /** A failed registry load. `signedOut` is true for a 401, which opens the sign-in prompt. */
 export class ExtensionRegistryError extends Error {
@@ -63,9 +90,9 @@ export class ExtensionService {
 
     private loadRegistry(): Promise<RegistryEntry[]> {
         this.registry ??= getAuthHeaders()
-            .then((headers) => this.ax.get<{ values?: RegistryEntry[] }>('/api/calm/extensions', { headers }))
-            .then((res) => (Array.isArray(res.data?.values) ? res.data.values : []))
-            .then((values) => values.filter((value) => value?.hubApi === SUPPORTED_HUB_API))
+            .then((headers) => this.ax.get<{ values?: unknown }>('/api/calm/extensions', { headers }))
+            .then((res) => (Array.isArray(res.data?.values) ? (res.data.values as unknown[]) : []))
+            .then((values) => values.filter(keepRegistryEntry))
             .catch((error) => {
                 this.registry = undefined;
                 // The registry is a Hub call, so a 401 means the Hub session ended. An extension call keeps its 401 in its slot.
@@ -85,20 +112,17 @@ export class ExtensionService {
     public async fetchDecoratorViews(): Promise<DecoratorView[]> {
         return this.loadRegistry()
             .then((values) =>
-                values.flatMap((extension) =>
-                    (extension.contributes?.['decorator-views'] ?? []).map((view) =>
-                        typeof extension.id === 'string'
-                            ? {
-                                  ...view,
-                                  source: {
-                                      id: extension.id,
-                                      name: extension.name || extension.id,
-                                      builtIn: isBuiltInExtension(extension.id),
-                                  },
-                              }
-                            : view
-                    )
-                )
+                values.flatMap((extension) => {
+                    const views = extension.contributes['decorator-views'];
+                    // One bad value must not fail the load, which would replace every view with the built-in ones.
+                    if (!Array.isArray(views)) return [];
+                    const source = {
+                        id: extension.id,
+                        name: extension.name || extension.id,
+                        builtIn: isBuiltInExtension(extension.id),
+                    };
+                    return (views as DecoratorView[]).map((view) => ({ ...view, source }));
+                })
             )
             .catch((error) => {
                 const errorMessage = 'Error fetching decorator views:';

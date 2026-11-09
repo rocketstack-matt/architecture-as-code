@@ -9,6 +9,9 @@ import type { Data, Adr } from '../model/calm.js';
 import type { ControlData } from '../model/control.js';
 import type { InterfaceData } from '../model/interface.js';
 
+// Each value of ExtensionResourceContext that the DiagramSection stub reads, in render order.
+const resourceContexts = vi.hoisted(() => [] as unknown[]);
+
 /**
  * Force `useIsMobile()` (which reads window.matchMedia) to report a mobile
  * viewport. Returns a restore function.
@@ -144,6 +147,8 @@ vi.mock('./components/diagram-section/DiagramSection', async () => {
     // Real context, not a mock: the stub consumes Hub's provider exactly like the
     // production tree (CustomNode / NodeDetails) does.
     const { useDiagramActions } = await import('../visualizer/context/DiagramActionsContext.js');
+    const { ExtensionResourceContext } = await import('../extensions/ExtensionResourceContext.js');
+    const { useContext } = await import('react');
     const DiagramSection = ({
         data,
         onItemSelect,
@@ -158,6 +163,7 @@ vi.mock('./components/diagram-section/DiagramSection', async () => {
         onDecoratorsChange?: (decorators: unknown[]) => void;
     }) => {
         const { onNavigateToDetailedArch } = useDiagramActions();
+        resourceContexts.push(useContext(ExtensionResourceContext));
         return (
         <div data-testid="diagram-section">
             Diagram: {data?.id}
@@ -861,6 +867,30 @@ describe('Hub', () => {
         expect(screen.getByText('Node One')).toBeInTheDocument();
     });
 
+    describe('extension resource context', () => {
+        it('keeps one context object across a render that does not change the resource', () => {
+            renderAt('/');
+            loadData();
+            const before = resourceContexts.at(-1);
+            expect(before).toMatchObject({ namespace: 'test-namespace', resource: 'patterns/test', version: '1.0' });
+            const renders = resourceContexts.length;
+            fireEvent.click(screen.getByTestId('select-node'));
+            expect(resourceContexts.length).toBeGreaterThan(renders);
+            expect(resourceContexts.at(-1)).toBe(before);
+        });
+
+        it('gives a new context when the resource changes', () => {
+            renderAt('/');
+            loadData();
+            const first = resourceContexts.at(-1);
+            act(() => {
+                captured?.onDataLoad({ id: 'other', version: '2.0', calmType: 'Patterns', name: 'test-namespace', data: {} } as Data);
+            });
+            expect(resourceContexts.at(-1)).not.toBe(first);
+            expect(resourceContexts.at(-1)).toMatchObject({ resource: 'patterns/other', version: '2.0' });
+        });
+    });
+
     describe('decorators in the details drawer', () => {
         it('lists the decorators of the selected node on desktop', () => {
             renderAt('/');
@@ -868,7 +898,7 @@ describe('Hub', () => {
             fireEvent.click(screen.getByTestId('report-decorators'));
             fireEvent.click(screen.getByTestId('select-node'));
 
-            expect(screen.getByRole('heading', { name: 'Decorators' })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'All decorators' })).toBeInTheDocument();
             expect(screen.getByRole('article', { name: 'observability decorator obs-n1' })).toBeInTheDocument();
             expect(screen.queryByRole('article', { name: 'observability decorator obs-n2' })).not.toBeInTheDocument();
         });
@@ -926,7 +956,7 @@ describe('Hub', () => {
             fireEvent.click(screen.getByTestId('select-cluster'));
 
             expect(screen.getByTestId('diagram-section')).toBeInTheDocument();
-            expect(screen.queryByRole('heading', { name: 'Decorators' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('heading', { name: 'All decorators' })).not.toBeInTheDocument();
         });
 
         it('shows no Decorators section when none applies to the selected element', () => {
@@ -935,7 +965,7 @@ describe('Hub', () => {
             fireEvent.click(screen.getByTestId('report-decorators'));
             fireEvent.click(screen.getByTestId('select-edge'));
 
-            expect(screen.queryByRole('heading', { name: 'Decorators' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('heading', { name: 'All decorators' })).not.toBeInTheDocument();
         });
     });
 

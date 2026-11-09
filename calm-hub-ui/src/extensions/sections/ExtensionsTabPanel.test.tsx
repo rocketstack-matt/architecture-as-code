@@ -73,8 +73,23 @@ describe('ExtensionsTabPanel with an action that needs a selected element', () =
             </ExtensionsContext.Provider>
         );
         const button = screen.getByRole('button', { name: 'Run 1' });
-        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute('aria-disabled', 'true');
         expect(button).toHaveAccessibleDescription('Some actions need a selected node. Open this tab from a link that names a node.');
+    });
+
+    it('lets a keyboard user reach the disabled action and its hint, and a click runs nothing', () => {
+        const call = vi.spyOn(ExtensionService.prototype, 'call');
+        render(
+            <ExtensionsContext.Provider value={[scanner]}>
+                <ExtensionsTabPanel context={{ namespace: 'demo' }} storage={createMemoryStorage()} />
+            </ExtensionsContext.Provider>
+        );
+        const button = screen.getByRole('button', { name: 'Run 1' });
+        button.focus();
+        expect(button).toHaveFocus();
+        button.click();
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(call).not.toHaveBeenCalled();
     });
 
     it('lists the action disabled when the path rule refuses the selected id', () => {
@@ -84,7 +99,7 @@ describe('ExtensionsTabPanel with an action that needs a selected element', () =
             </ExtensionsContext.Provider>
         );
         const button = screen.getByRole('button', { name: 'Run 1' });
-        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute('aria-disabled', 'true');
         expect(button).toHaveAccessibleDescription('Some actions cannot run for the selected node.');
     });
 

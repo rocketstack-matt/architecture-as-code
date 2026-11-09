@@ -174,7 +174,9 @@ code, so that it can move to a package that the VS Code extension shares. The UI
 under the diagram). Hub gets the decorators from `DiagramSection` (`onDecoratorsChange`) and gives
 them to the details drawer through `DecoratorsContext`, with the containment map that the overlays use, so a
 container lists each decorator that its badges count. The API does not require any decorator field, so guard each
-read. A missing type shows as "(no type)", and a decorator without a `uniqueId` is keyed by its list index. The card's
+read. A missing type shows as "(no type)". A card is keyed by `decoratorKeys()`: the `uniqueId`, or the list index when the id is missing or
+not unique, so a shift in the list does not remount a card. The details drawer heads its list "All decorators": a badge can count only
+the newest decorator of each key. The card's
 JSON view uses the write field names (`writableDecorator`) and leaves out the Hub-owned times, so it can be copied into
 a `PUT`.
 
@@ -184,13 +186,15 @@ One engine (`visualizer/overlay/`) draws decorators on the diagram from `decorat
 `overlay` (types in `visualizer/contracts/decorator-view-contracts.ts`). Status values map to the fixed scale
 `ok`, `warn`, `error`, `info`. The built-in views for `control-evaluation` and `deployment` come from classpath manifests through
 `GET /api/calm/extensions`. If the registry is unavailable, `useDecoratorViews()` returns the bundled copy in
-`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. Only the registry says that an operator turned a
+`builtinDecoratorViews.ts`; its test keeps it the same as the manifests. It reads the views again when `useExtensionsStatus()`
+becomes `loaded`, so a retry that succeeds brings back the extension views. Only the registry says that an operator turned a
 built-in off (`calm.extensions."<id>".enabled=false`), so the fallback draws both built-ins. `DiagramSection` polls all decorators of
 the version every 5 s while the diagram, the Decorators tab or the details drawer shows (`useArchitectureDecorators`, one request;
 after three failures in a row it backs off to 30 s, also when the view shows again) and gives the one list to the Decorators tab, the
 details drawer and `Drawer`. Do not add a second request. `Drawer` gives the overlays to the diagram through
 `DecoratorOverlayContext`. Nodes and
-edges read `useElementOverlays(id)`; do not add a type-specific badge. The decision callouts, the hover list and the
+edges read `useElementOverlays(id)`; do not add a type-specific badge. The badge details are a portal, but React still sends their events up to the node, so the details root
+stops a click, a double click and a key (it handles Escape itself). The decision callouts, the hover list and the
 Evaluations panel read control-evaluation fields, so they use `isControlEvaluationView()`: the id and
 `source.builtIn`: when the built-in extension is disabled, an operator view can take its id.
 
@@ -199,7 +203,9 @@ open the global auth or outage page. The exception is a registry `401`: the regi
 the sign-in prompt. `ExtensionsProvider` (`extensions/ExtensionsContext.tsx`) owns the one `ExtensionService`.
 Get it with `useExtensionService()`, not `new ExtensionService()` or a module singleton: the registry, the
 decorator views and the slots then share one registry request, and a test can inject a service. The service
-drops registry entries whose `hubApi` the UI does not support, for both paths. After a failed load the provider
+drops registry entries whose `hubApi` the UI does not support, and malformed entries (no string `id`, no list of routes, no
+`contributes` object, or a UI extension point that is not a list of entries), for both paths. A `decorator-views` value
+that is not a list gives no views, and the other views stay. After a failed load the provider
 tries again with a backoff (5 s, doubled, up to 60 s; a new service starts it again), but not after a `401`.
 `useExtensionsStatus()` gives `loading`, `loaded`, `failed` or `signed-out`. Use it where an empty list must not
 mean "no extension", for example `ExtensionScreenPage` on a deep link.
@@ -215,12 +221,13 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 - Architecture: one `extensions` tab in `DIAGRAM_TABS`, hidden (not unknown) until the registry loads, so a link
   to it keeps the tab. `resourceExtensions()` decides if it shows.
 - Actions: `ExtensionActionButton`. A route that is not `readOnly` asks in `ConfirmActionDialog`, not
-  `window.confirm`. The dialog opens with `showModal()` and names the target context. Do not abort a confirmed
+  `window.confirm`. The dialog opens with `showModal()`, gives Cancel the focus, and names the target context. Do not abort a confirmed
   write: the backend can still finish it, so a retry can write twice. The busy state and the last result live in
   the provider's `ActionRuns` (`extensions/actionRuns.ts`), not in the button, so a remount cannot enable a write
   in flight or lose its result. A call in flight disables each button of the action (key: extension and
   contribution); a result shows only on the button that ran it (key: also the `placement` prop, which must be
-  stable across a remount). An action slot key leaves out the context, so a change of selection does not remount
+  stable across a remount). An action slot must name its `placement`: there is no default that two places could share.
+  The button says `<title>: running…` in a live region that is always in the page. An action slot key leaves out the context, so a change of selection does not remount
   it. A change of context clears the result. The button uses `aria-disabled`, not `disabled`, so focus can go back to it after the
   dialog. While the dialog is modal the page is inert and `focus()` outside it does nothing: the dialog calls
   `close()` before its callback, and the button takes focus in an effect after the dialog unmounts. jsdom has no
@@ -233,7 +240,8 @@ per-extension toolbar button or tab: it does not scale to many extensions.
   there is an `h1`).
   A block slot shows its title and its named region in every state (loading, failed, a reply it cannot show:
   the error boundary takes a `frame`), and the screen page has
-  an `h1` before the registry loads, so the outline does not change.
+  an `h1` in the same region (`SlotFrame`) before the registry loads, so the outline does not change. The heading is
+  the contribution title; a reply `title` shows under it.
 - Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
   `view.id` alone. Hub does not start when two enabled extensions declare the same view id, but a disabled one frees
   its id for another extension, and a stored legend choice must not move to it.
@@ -246,7 +254,7 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 `UiConfigProvider` (`components/ui-config/`) loads `GET /api/calm/ui/config` one time.
 `useUiConfig()` returns only the sections the operator configured, or `{}` if the request
 fails. The `EnvironmentPill` shows in the `Navbar` and on the `IntroScreen`, which has no navbar. A tap shows a truncated
-name in full, because a touch screen has no hover for its `title`.
+name in full, because a touch screen has no hover for its `title`. The pill is a button only while the name is truncated.
 Identity and items show at the bottom of the navbar drawer (`MenuInfo`). The drawer identity is
 the server's principal, not the OIDC token profile that `UserMenu` shows.
 

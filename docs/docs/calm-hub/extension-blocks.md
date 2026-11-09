@@ -28,7 +28,7 @@ signed-in user. CALM Hub does not check a reply against it: the UI checks only `
 | Field | Required | Rule |
 |---|---|---|
 | `hubApi` | Yes | Must equal the `hubApi` of the manifest, now `0` |
-| `title` | No | Replaces the contribution `title` as the heading |
+| `title` | No | Shows under the heading. The heading stays the contribution `title` |
 | `blocks` | Yes | A list of blocks, drawn in order |
 
 ## Block types
