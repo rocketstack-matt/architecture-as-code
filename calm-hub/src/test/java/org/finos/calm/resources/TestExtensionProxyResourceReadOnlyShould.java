@@ -71,11 +71,10 @@ class TestExtensionProxyResourceReadOnlyShould {
     @Test
     @TestSecurity(user = "alice")
     void leave_a_post_with_no_slash_after_api_to_the_proxy() {
-        // The proxy, not the read-only filter, refuses it: the manifest has no route with the path "/".
+        // Not the read-only 405. JAX-RS gives the 404: the proxy resource needs a slash after "api".
         given().contentType("application/json").body("{}")
                 .when().post(BASE)
-                .then().statusCode(404)
-                .body("error", equalTo("The extension has no such route"));
+                .then().statusCode(404);
     }
 
     @Test

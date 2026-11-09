@@ -199,7 +199,7 @@ The JSON Schema is `META-INF/calm-extensions/schema/0/extension.schema.json` in 
 
 ### Calling an extension
 
-CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route path>`. For each call, CALM Hub:
+CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route path>`. A route with the path `/` is at `/api/calm/extensions/<id>/api/`, with the trailing slash. Without it, CALM Hub gives `404`, also on a CALM Hub that is not read-only. For each call, CALM Hub:
 
 - refuses an encoded slash (`%2F`, in any case, or double-encoded) with `400`, and does not call the backend. A backend that decodes `%2F` before routing would see a path other than the one CALM Hub checked
 - decodes percent-encoded unreserved characters and uppercases other escapes before matching and forwarding. Percent-encoding in a matched literal segment gets `400`
