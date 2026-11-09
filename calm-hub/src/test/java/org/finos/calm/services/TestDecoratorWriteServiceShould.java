@@ -6,12 +6,18 @@ import org.finos.calm.config.DecoratorConfig;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.DecoratorSchemaError;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
+import org.finos.calm.domain.exception.DecoratorTooLargeException;
+import org.finos.calm.domain.exception.GitHubWriteNotSupportedException;
 import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.store.DecoratorStore;
+import org.finos.calm.store.github.GitHubDecoratorStore;
+import org.finos.calm.store.github.registry.RegistrySnapshot;
+import org.finos.calm.store.github.registry.ResourceRegistry;
 import org.finos.calm.testutil.LogCapture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -355,5 +361,60 @@ class TestDecoratorWriteServiceShould {
         when(mockDecoratorStore.createDecorator(NAMESPACE, json)).thenReturn(3);
 
         assertThat(service.createDecorator(null, NAMESPACE, json), is(3));
+    }
+
+    @Test
+    void refuse_a_delete_in_github_mode_before_it_looks_up_the_history() {
+        DecoratorWriteService gitHubService = new DecoratorWriteService(gitHubStore(), mockConfig, mockSchemaValidator);
+
+        assertThrows(GitHubWriteNotSupportedException.class, () -> gitHubService.deleteDecorator(NAMESPACE, 1));
+    }
+
+    @Test
+    void look_up_the_history_of_a_delete_only_after_the_store_accepts_writes() throws Exception {
+        doThrow(new GitHubWriteNotSupportedException("no writes")).when(mockDecoratorStore).requireWritable();
+
+        assertThrows(GitHubWriteNotSupportedException.class, () -> service.deleteDecorator(NAMESPACE, 1));
+
+        verify(mockDecoratorStore, never()).getDecoratorHistory(anyString(), anyInt());
+        verify(mockDecoratorStore, never()).deleteCurrentDecoratorHistory(anyString(), anyInt());
+    }
+
+    @Test
+    void accept_a_decorator_of_exactly_the_size_limit() throws Exception {
+        String json = decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES);
+        when(mockDecoratorStore.createDecorator(NAMESPACE, json)).thenReturn(1);
+
+        assertThat(service.createDecorator("alice", NAMESPACE, json), is(1));
+    }
+
+    @Test
+    void refuse_a_decorator_over_the_size_limit_before_any_other_check() {
+        String json = decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + 1);
+
+        assertThrows(DecoratorTooLargeException.class, () -> service.createDecorator("alice", NAMESPACE, json));
+        assertThrows(DecoratorTooLargeException.class, () -> service.updateDecorator("alice", NAMESPACE, 1, json));
+        verifyNoInteractions(mockDecoratorStore, mockSchemaValidator);
+    }
+
+    @Test
+    void count_the_size_limit_in_utf8_bytes() {
+        String json = "{\"data\": \"" + "\u00e9".repeat(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES / 2) + "\"}";
+
+        assertThrows(DecoratorTooLargeException.class, () -> service.createDecorator("alice", NAMESPACE, json));
+        verifyNoInteractions(mockDecoratorStore);
+    }
+
+    // A {"data": "..."} decorator of the given size in UTF-8 bytes.
+    static String decoratorOfBytes(int bytes) {
+        String prefix = "{\"data\": \"";
+        String suffix = "\"}";
+        return prefix + "x".repeat(bytes - prefix.length() - suffix.length()) + suffix;
+    }
+
+    private static GitHubDecoratorStore gitHubStore() {
+        ResourceRegistry registry = mock(ResourceRegistry.class);
+        lenient().when(registry.getSnapshot()).thenReturn(new RegistrySnapshot(Map.of(NAMESPACE, List.of()), Map.of()));
+        return new GitHubDecoratorStore(registry);
     }
 }

@@ -2,6 +2,8 @@ package org.finos.calm.resources;
 
 import jakarta.ws.rs.core.Response;
 import org.finos.calm.domain.ResourceType;
+import org.finos.calm.domain.SchemaValidationLimits;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 
 import java.util.LinkedHashMap;
@@ -9,6 +11,9 @@ import java.util.List;
 import java.util.Map;
 
 public class CalmResourceErrorResponses {
+    static final String INVALID_DECORATOR_JSON = "Invalid decorator JSON. The body must be a JSON object. $schema, unique-id and type "
+            + "must be strings, and target, target-type and applies-to must be arrays of strings";
+
     public static Response invalidNamespaceResponse(String namespace) {
         return Response.status(Response.Status.NOT_FOUND)
                 .entity("Invalid namespace provided: " + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(namespace))
@@ -35,8 +40,22 @@ public class CalmResourceErrorResponses {
         return Response.status(Response.Status.NOT_FOUND).entity("Decorator with ID " + id + " does not exist in namespace: " + namespace).build();
     }
 
-    public static Response invalidDecoratorJsonResponse(String message) {
-        return Response.status(Response.Status.BAD_REQUEST).entity("Invalid decorator JSON: " + message).build();
+    /**
+     * Returns a 400 response for a decorator body that does not parse, or a field that Hub reads with the wrong type.
+     * Like {@link #invalidJsonResponse}, it never echoes the request.
+     */
+    public static Response invalidDecoratorJsonResponse() {
+        return Response.status(Response.Status.BAD_REQUEST).entity(INVALID_DECORATOR_JSON).build();
+    }
+
+    public static Response decoratorKeyRefusedResponse(DecoratorKeyRefusedException exception) {
+        return Response.status(Response.Status.BAD_REQUEST).entity(exception.getMessage()).build();
+    }
+
+    public static Response decoratorTooLargeResponse() {
+        return Response.status(Response.Status.REQUEST_ENTITY_TOO_LARGE)
+                .entity("The decorator JSON is larger than " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + " bytes")
+                .build();
     }
 
     public static Response decoratorSupersededResponse(String namespace, int id) {

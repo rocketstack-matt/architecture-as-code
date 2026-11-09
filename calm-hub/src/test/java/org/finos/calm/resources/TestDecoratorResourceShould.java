@@ -7,6 +7,8 @@ import io.restassured.http.ContentType;
 import org.bson.json.JsonParseException;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
+import org.finos.calm.domain.SchemaValidationLimits;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
@@ -626,6 +628,22 @@ public class TestDecoratorResourceShould {
     }
 
     @Test
+    void never_echo_the_text_of_a_parse_error() throws Exception {
+        when(decoratorStore.createDecorator(anyString(), anyString()))
+                .thenThrow(new JsonParseException("Unrecognized token '<script>alert(1)</script>'"));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(VALID_DECORATOR_JSON)
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body(equalTo(CalmResourceErrorResponses.INVALID_DECORATOR_JSON))
+                .body(not(containsString("script")));
+    }
+
+    @Test
     void return_404_when_namespace_does_not_exist_for_create_decorator() throws Exception {
         when(decoratorStore.createDecorator(anyString(), anyString()))
                 .thenThrow(new NamespaceNotFoundException());
@@ -750,6 +768,82 @@ public class TestDecoratorResourceShould {
     }
 
     @Test
+    void return_400_with_a_plain_message_when_the_store_cannot_keep_a_key_on_create() throws Exception {
+        when(decoratorStore.createDecorator(anyString(), anyString())).thenThrow(DecoratorKeyRefusedException.nulCharacter());
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": \"deployment\", \"data\": {}}")
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body(equalTo(DecoratorKeyRefusedException.nulCharacter().getMessage()));
+    }
+
+    @Test
+    void return_400_with_a_plain_message_when_the_store_cannot_keep_a_key_on_update() throws Exception {
+        doThrow(DecoratorKeyRefusedException.emptyKeyPart())
+                .when(decoratorStore).updateDecorator(anyString(), anyInt(), anyString());
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": \"deployment\", \"data\": {}}")
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(400)
+                .body(equalTo(DecoratorKeyRefusedException.emptyKeyPart().getMessage()));
+    }
+
+    @Test
+    void return_413_when_a_created_decorator_is_over_the_size_limit() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body(decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + 1))
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(413)
+                .body(equalTo("The decorator JSON is larger than 1048576 bytes"));
+
+        verify(decoratorStore, never()).createDecorator(anyString(), anyString());
+    }
+
+    @Test
+    void return_413_when_an_updated_decorator_is_over_the_size_limit() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body(decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + 1))
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(413);
+
+        verify(decoratorStore, never()).getDecoratorById(anyString(), anyInt());
+        verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void accept_a_decorator_of_exactly_the_size_limit() throws Exception {
+        when(decoratorStore.createDecorator(anyString(), anyString())).thenReturn(1);
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES))
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(201);
+    }
+
+    private static String decoratorOfBytes(int bytes) {
+        String prefix = "{\"data\": \"";
+        String suffix = "\"}";
+        return prefix + "x".repeat(bytes - prefix.length() - suffix.length()) + suffix;
+    }
+
+    @Test
     void return_400_when_update_decorator_json_is_invalid() throws Exception {
         doThrow(new JsonParseException("Invalid JSON"))
                 .when(decoratorStore).updateDecorator(anyString(), anyInt(), anyString());
@@ -773,7 +867,7 @@ public class TestDecoratorResourceShould {
                 .post("/api/calm/namespaces/finos/decorators")
                 .then()
                 .statusCode(400)
-                .body(containsString("'type' must be a string"));
+                .body(equalTo(CalmResourceErrorResponses.INVALID_DECORATOR_JSON));
 
         verify(decoratorStore, never()).createDecorator(anyString(), anyString());
     }
@@ -787,7 +881,7 @@ public class TestDecoratorResourceShould {
                 .post("/api/calm/namespaces/finos/decorators")
                 .then()
                 .statusCode(400)
-                .body(containsString("'unique-id' must be a string"));
+                .body(equalTo(CalmResourceErrorResponses.INVALID_DECORATOR_JSON));
 
         verify(decoratorStore, never()).createDecorator(anyString(), anyString());
     }
@@ -801,7 +895,7 @@ public class TestDecoratorResourceShould {
                 .put("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(400)
-                .body(containsString("'target' must be an array of strings"));
+                .body(equalTo(CalmResourceErrorResponses.INVALID_DECORATOR_JSON));
 
         verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
     }
