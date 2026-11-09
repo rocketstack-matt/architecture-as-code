@@ -151,7 +151,7 @@ Hub records when it writes each decorator. Every read returns the times: `GET ..
 | `updateDateTime` | Hub stores the decorator, and on each in-place update |
 | `supersededDateTime` (history entry) | A newer decorator supersedes this one. The old decorator keeps its own `updateDateTime`, so that time stays the time its content was last written |
 
-The times are UTC ISO-8601 strings with milliseconds, for example `2026-11-06T10:15:30.123Z`. Hub stores them in its own storage fields, not in the decorator. A decorator that Hub stored before it recorded times has no times: the fields are not in the response, and `supersededDateTime` is `null`. Hub does not add times to old decorators.
+The times are UTC ISO-8601 strings with milliseconds, for example `2026-11-06T10:15:30.123Z`. Hub stores them in its own storage fields, not in the decorator. A decorator that Hub stored before it recorded times has no times: the fields are not in the response, and `supersededDateTime` is `null`. Hub does not know when such a decorator was created, so it never adds a `creationDateTime`. An in-place update gives it an `updateDateTime` only.
 
 ### Access Control
 
