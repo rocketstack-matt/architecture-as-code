@@ -133,7 +133,7 @@ CALM_UI_ITEMS_1__VALUE=2026.10.1
 ```
 
 - Each item needs a `label` and a `value`, a `url`, or both. With both, the `value` is the link text.
-- Use a short environment name, for example `DEV`, `QA` or `PROD`. On narrow screens the UI truncates long names: tap or click the pill to see the full name.
+- Use a short environment name, for example `DEV`, `QA` or `PROD`. The header cuts a long name to fit, and cuts it most on a narrow screen. Tap or click the pill to see the full name.
 - CALM Hub does not start if a colour or URL is not valid. URLs must be absolute `http` or `https` URLs.
 - Identity and roles are off by default. Turn on `show-roles` only if your role names are safe to show to users.
 - The UI gets these values from `GET /api/calm/ui/config`, which requires authentication.
@@ -175,7 +175,7 @@ Put one folder for each extension in `calm.extensions.dir`, with an `extension.j
 | `calm.extensions."<id>".max-response-bytes` | `calm.extensions.http.max-response-bytes` (`1048576`) | A larger reply gets `502` |
 | `calm.extensions."<id>".max-concurrent-calls` | `calm.extensions.http.max-concurrent-calls` (`32`) | The calls to the extension at the same time. One more call gets `503` with `Retry-After: 1`, so that a slow backend cannot hold every worker thread |
 | `calm.extensions.identity.private-key-location` | not set | The PKCS#8 PEM key that signs the identity assertion: RSA (2048 bits or more, RS256) or P-256 (ES256). Required when an enabled extension has routes. A shared secret (HS256) is refused |
-| `calm.extensions.identity.public-key-locations` | not set | Comma-separated PEM public keys for the JWKS. The first is the public key of the signing key |
+| `calm.extensions.identity.public-key-locations` | not set | Comma-separated PEM public keys for the JWKS. The first is the public key of the signing key. Required when `private-key-location` is set, and not allowed without it |
 | `calm.extensions.identity.ttl-seconds` | `60` | The lifetime of an assertion, at most `300` |
 | `calm.extensions.allow-without-auth` | `false` | Allows enabled extensions with routes when `calm.auth.enabled=false`. Only for local development: every caller is then a global admin |
 
@@ -203,7 +203,7 @@ CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route pa
 
 - refuses an encoded slash (`%2F`, in any case, or double-encoded) with `400`, and does not call the backend. A backend that decodes `%2F` before routing would see a path other than the one CALM Hub checked
 - decodes percent-encoded unreserved characters and uppercases other escapes before matching and forwarding. Percent-encoding in a matched literal segment gets `400`
-- on a read-only CALM Hub, gives `405`, not `400`, to a method other than `GET` with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`, `//` or `@` in the path. CALM Hub refuses such a path before it finds the route
+- on a read-only CALM Hub, gives `405`, not `400`, to a `POST`, `PUT`, `PATCH` or `DELETE` with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`, `//` or `@` in the path. CALM Hub refuses such a path before it finds the route
 - gives `415`, before it signs the assertion, to a `POST` that has no `application/json` or other `+json` `Content-Type`, also when it has no body. A `PUT`, `PATCH` or `DELETE` gets `415` only for a body of another type. Thus a cross-site form or fetch cannot call a route as the user. Those three methods need a CORS preflight, which CALM Hub does not allow cross-site
 - matches the path against the declared routes only, and refuses `..`, `%2e`, `\`, `//`, `@` and their encoded forms
 - checks the route `scope` with the same rules as the rest of CALM Hub. The namespace or domain comes only from the path
@@ -215,6 +215,8 @@ CALM Hub proxies each declared route at `/api/calm/extensions/<id>/api/<route pa
 - audits every non-`readOnly` call, including `GET`, as entity type `EXTENSION` with the extension id, route id and assertion `jti`. The entry has the namespace only for a `read`, `write` or `admin` route, and the domain only for a `domain_*` route. Outcomes are `SUCCESS`, `DENIED`, `FAILURE` (a refusal after the scope check, such as `400`, `413`, `415` or `503`, or a returned client error), or `UNKNOWN` (an upstream failure or unusable reply; the backend may have completed the call). The entry has the `jti` only when CALM Hub sent the call, and the source IP when `calm.audit.capture-source-ip=true`
 
 Replies are buffered. Streaming is not supported yet.
+
+CALM Hub does not audit a call that it refuses before the scope check: a `404`, a `400` for the path, the namespace or the domain, or a `405`.
 
 CALM Hub does not start with an enabled extension that has routes when `calm.auth.enabled=false`, because every caller is then a global admin. Set `calm.extensions.allow-without-auth=true` only for local development.
 

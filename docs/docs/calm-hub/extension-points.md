@@ -59,8 +59,9 @@ CALM Hub refuses these in a path. The UI hides an action whose path gets such a 
 | `version` | The version on screen, for example `1.0.0` | `designer-tab`, `detail-panel`, `action` |
 | `selectedElement` | The `unique-id` of the selected node | `detail-panel`, when you click a node. A link that names a node with `?node=<unique-id>` also sends it to `designer-tab` and `action`. A tab change clears a clicked selection |
 
-CALM Hub checks only the format of a `{namespace}` or `{domain}` path value. A user can send any value, so check that the user may see the
-data that you return (see [Extension access](extension-access.md#what-hub-checks)).
+CALM Hub checks the format of a `{namespace}` or `{domain}` path value, and checks the route `scope`
+against the value that the scope needs. It checks no other path value. A user can send any value,
+so check that the user may see the data that you return (see [Extension access](extension-access.md#what-hub-checks)).
 
 ## screen
 
@@ -101,7 +102,7 @@ A compact card in the **Extensions** section of the home page.
 - The card shows the extension `name` and `provider`, and a headline from the reply: the first
   three valid items of the first `stats` block. A valid item has a string `label` and a string or number
   `value`. Hub ignores other items. If a card cannot render, it shows an error and the other cards stay.
-  With no valid `stats` items, it shows the text of the first
+  With no valid item in the first `stats` block, it shows the text of the first
   `alert` block, on one line. Hub does not show other blocks on the card.
 - A card gets no context. If the call fails, the card shows no headline.
 - An extension with a `screen` and no `landing-card` also gets a card, with no headline.

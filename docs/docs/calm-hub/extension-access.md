@@ -29,8 +29,8 @@ MCP or any other client, with the same rules as for its own resources (see
 - A signed-out caller gets `401`. A signed-in caller without the scope gets `403`. CALM Hub does not
   call the backend.
 - On a read-only Hub, only `GET` and `readOnly` routes run. Any other call to a declared route gets
-  `405`. A non-`GET` call with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`, `//` or `@` in the path
-  also gets `405`, not `400`.
+  `405`. A `POST`, `PUT`, `PATCH` or `DELETE` with `%2F`, `%2E`, `%5C`, `%25`, `%40`, `..`, `\`,
+  `//` or `@` in the path also gets `405`, not `400`.
 - CALM Hub refuses an encoded slash (`%2F`, also double-encoded) in a route path with `400`, and does
   not call the backend.
 - CALM Hub gives `415` to a `POST` with no `application/json` or other `+json` `Content-Type`, also

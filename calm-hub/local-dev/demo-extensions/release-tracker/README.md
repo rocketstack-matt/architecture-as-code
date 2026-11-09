@@ -27,4 +27,5 @@ The detail panel has data for the nodes `web-app`, `api-gateway`, `user-service`
 
 Test the backend with `node --test local-dev/demo-extensions/release-tracker/server.test.mjs`, from
 `calm-hub/`. Set `PORT` or `CALM_HUB_URL` (where the backend gets the JWKS) to change the defaults. The backend
-accepts only the issuer `http://localhost:8080`; see the [demo-extensions README](../README.md).
+accepts one issuer, by default `http://localhost:8080`. Set `CALM_HUB_ISSUER` to the `calm.hub.base-url` of your
+Hub to change it; see the [demo-extensions README](../README.md).

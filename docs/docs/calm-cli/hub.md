@@ -457,11 +457,13 @@ echo '{"namespace":"finos","name":"payments"}' | calm hub ext example-services a
 
 Input properties that match a `{param}` in the route path fill the path. Such a value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@` or a control character, because CALM Hub refuses these in a path. The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. A JSON reply is printed as JSON, and a text reply as text.
 
-CALM Hub checks the route, the path and the scope. It does not check the input against the input schema, as it does for an MCP tool: the extension checks it. If CALM Hub or the extension rejects the call, the CLI exits with code 1 and prints the error with the body as CALM Hub sent it. If the extension replies with a 3xx, 401, 407 or 5xx status, or with a content type that CALM Hub does not pass on, CALM Hub sends a generic `502` with the error `The extension failed` in its place:
+CALM Hub checks the route, the path and the scope. It does not check the input against the input schema, as it does for an MCP tool: the extension checks it. If CALM Hub or the extension rejects the call, the CLI exits with code 1 and prints the error with the body as CALM Hub sent it. For example, `add-service` with no `name`:
 
 ```json
-{"status":400,"error":"Input is not valid","request":"POST /api/calm/extensions/example-services/api/namespaces/finos/services","body":{"error":"Input is not valid"}}
+{"status":400,"error":"name is required","request":"POST /api/calm/extensions/example-services/api/namespaces/finos/services","body":{"error":"name is required"}}
 ```
+
+CALM Hub sends a generic `502` with the error `The extension failed` when the extension refuses the connection, when the reply is larger than the reply limit, when the extension replies with a 3xx, 401, 407 or 5xx status, or when the reply has a content type that CALM Hub does not pass on. The extension's own body does not reach the CLI. CALM Hub sends `504` with the error `The extension did not reply in time` when the connection or the reply takes longer than its timeout.
 
 ## Output Formats
 

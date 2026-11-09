@@ -415,7 +415,7 @@ All four workflows:
   read `SecurityIdentity` unless `calm.ui.identity.enabled=true`
 
 ### Extensions
-- ADRs 0009–0016 (not merged yet) are the design. `ExtensionRegistry` loads manifests at start up from
+- ADRs 0009–0014 in `decisions/` are the design. `ExtensionRegistry` loads manifests at start up from
   `calm.extensions.dir` and from the classpath index `META-INF/calm-extensions/builtin/index.txt`.
   `ExtensionManifestLoader` validates them with the schema in `META-INF/calm-extensions/schema/<hubApi>/`
   (vertx-json-schema) and then does the cross-reference checks. A bad manifest or setting stops start up
