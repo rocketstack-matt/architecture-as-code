@@ -315,6 +315,11 @@ export default function Hub() {
     );
 
     const isDiagramView = data?.calmType === 'Architectures' || data?.calmType === 'Patterns';
+    // Memoised: a new object on each render would re-render each consumer and restart its effects.
+    const resourceContext = useMemo(
+        () => (data && isDiagramView && !showsDroppedFile ? extensionContext(data) : null),
+        [data, isDiagramView, showsDroppedFile]
+    );
 
     const decoratorsState = useMemo(
         (): DecoratorsState => ({
@@ -471,7 +476,7 @@ export default function Hub() {
 
     return (
         <DiagramActionsContext.Provider value={diagramActions}>
-        <ExtensionResourceContext.Provider value={isDiagramView && !showsDroppedFile ? extensionContext(data) : null}>
+        <ExtensionResourceContext.Provider value={resourceContext}>
         <DecoratorsContext.Provider value={decoratorsState}>
         <div className="flex flex-col h-screen overflow-hidden">
             <Navbar />

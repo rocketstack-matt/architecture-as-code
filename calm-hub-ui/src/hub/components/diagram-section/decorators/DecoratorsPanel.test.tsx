@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import axios from 'axios';
 import AxiosMockAdapter from 'axios-mock-adapter';
 import userEvent from '@testing-library/user-event';
@@ -41,6 +41,31 @@ describe('DecoratorsPanel', () => {
 
         render(<DecoratorsPanel state={loaded} typeFilter={null} onTypeFilterChange={vi.fn()} onAutoFocused={onAutoFocused} />);
         expect(onAutoFocused).toHaveBeenCalledTimes(1);
+    });
+
+    describe('card identity', () => {
+        const jsonShown = (name: string) =>
+            within(screen.getByRole('article', { name })).getByRole('button', { name: 'JSON' }).getAttribute('aria-pressed');
+
+        it('keeps a card and its view when a decorator arrives earlier in the list or the type filter changes', () => {
+            const onTypeFilterChange = vi.fn();
+            const { rerender } = render(<DecoratorsPanel state={loaded} typeFilter={null} onTypeFilterChange={onTypeFilterChange} />);
+            fireEvent.click(within(screen.getByRole('article', { name: 'deployment decorator dep-2' })).getByRole('button', { name: 'JSON' }));
+
+            const arrived = { status: 'loaded' as const, decorators: [decorator('dep-0', 'deployment'), ...decorators] };
+            rerender(<DecoratorsPanel state={arrived} typeFilter={null} onTypeFilterChange={onTypeFilterChange} />);
+            expect(jsonShown('deployment decorator dep-2')).toBe('true');
+            expect(jsonShown('deployment decorator dep-1')).toBe('false');
+
+            rerender(<DecoratorsPanel state={arrived} typeFilter="deployment" onTypeFilterChange={onTypeFilterChange} />);
+            expect(jsonShown('deployment decorator dep-2')).toBe('true');
+        });
+
+        it('keys cards with a repeated uniqueId on the index, so both still show', () => {
+            const repeated = { status: 'loaded' as const, decorators: [decorator('same', 'deployment'), decorator('same', 'deployment')] };
+            render(<DecoratorsPanel state={repeated} typeFilter={null} onTypeFilterChange={vi.fn()} />);
+            expect(screen.getAllByRole('article', { name: 'deployment decorator same' })).toHaveLength(2);
+        });
     });
 
     describe('schema filter', () => {
