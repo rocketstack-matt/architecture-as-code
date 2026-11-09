@@ -109,10 +109,12 @@ The decorator endpoints (`/api/calm/namespaces/{namespace}/decorators`) and the 
 
 | Rule | When | Status |
 |:-----|:-----|:-------|
-| Field types | `$schema`, `unique-id` or `type` is not a string, or `target`, `target-type` or `applies-to` is not an array of strings. Hub reads these fields, so it checks them also when there is no `$schema` | `400` |
+| Size | The decorator JSON is larger than 1 MiB (1,048,576 bytes of UTF-8). The schema check makes all errors before Hub keeps the first 20, so this limit bounds its cost | `413` |
+| Field types | `$schema`, `unique-id` or `type` is not a string, or `target`, `target-type` or `applies-to` is not an array of strings. Hub reads these fields, so it checks them also when there is no `$schema`. REST gives one fixed message that does not echo the body. MCP names the field | `400` |
 | Reserved type | The old or new decorator `type` is reserved, and the caller is not one of its writers. Applies to create and update | `403` |
 | Schema check | The decorator `$schema` is one that Hub knows, and the decorator does not match it. The body lists the first 20 errors, each with its `location` (a JSON Pointer). If there are more, `moreErrors` gives how many. MCP gives the same list and "and n more" | `400` |
 | Hub-owned fields | The decorator has a top-level `creationDateTime`, `updateDateTime`, `supersededDateTime`, `supersedes` or `supersededBy`. Hub sets these fields and keeps them beside the decorator | `400` |
+| Keys the store cannot keep | MongoDB: a key has a NUL character. NitriteDB: a key named `_id` has a value that is not a whole number, or a key is empty or has an empty part before or between dots (`.a`, `a..b`). The message tells which rule applies | `400` |
 
 Hub knows the calm-schema decorator Standards that it bundles (`deployment`, `kubernetes`, `control-evaluation`) and the base decorator definition (`https://calm.finos.org/release/<version>/meta/decorators.json#/defs/decorator`). Hub accepts a decorator with any other `$schema` without a check. At startup, Hub checks that each `$ref` to `calm.finos.org` in a bundled schema resolves, also a nested one. A schema with a `$ref` that does not resolve stays unknown, and Hub logs a warning.
 
@@ -139,11 +141,11 @@ A reserved type is also append-only. An update of a reserved-type decorator does
 | `GET .../decorators/{id}` | Returns the decorator, current or superseded |
 | `GET .../decorators/{id}/history` | Returns the history that contains `{id}`, current first. Each entry has `id`, `supersedes`, `supersededBy`, `supersededDateTime` and `decorator` |
 | `PUT .../decorators/{id}` on a superseded decorator | `409 Conflict`. Update the current decorator (the id that the last write returned) |
-| `DELETE .../decorators/{id}` | Deletes the whole history. Needs `global_admin`. The caller does not have to be a writer of the reserved types in it. If another write supersedes the decorator during the delete, Hub returns `409 Conflict` and deletes nothing. Retry the delete |
+| `DELETE .../decorators/{id}` | Deletes the whole history. Needs `global_admin`. The caller does not have to be a writer of the reserved types in it. If another write supersedes the decorator during the delete, Hub returns `409 Conflict` and deletes nothing. Retry the delete. In GitHub mode, Hub returns `501`, as for all writes |
 
 The MCP tool `getDecoratorHistory` returns the same history.
 
-An update grows a history only when the old or new type is reserved. Then Hub adds a full copy of the decorator, and it does not remove old entries. Other updates change the decorator in place. In MongoDB, all decorators of a namespace are in one document, and MongoDB limits a document to 16 MB. At the limit, each write that makes that document larger fails with `500`, for all decorators in the namespace. To recover, a global admin deletes histories that are no longer necessary with `DELETE .../decorators/{id}`. This deletes the whole history, current decorator included, so the writer must then create the current result again. NitriteDB has no such limit, but its storage also grows.
+An update grows a history only when the old or new type is reserved. Then Hub adds a full copy of the decorator, and it does not remove old entries. Other updates change the decorator in place. In MongoDB, all decorators of a namespace are in one document, and MongoDB limits a document to 16 MB. At the limit, each write that makes that document larger fails with `413`, for all decorators in the namespace. To recover, a global admin deletes histories that are no longer necessary with `DELETE .../decorators/{id}`. This deletes the whole history, current decorator included, so the writer must then create the current result again. NitriteDB has no such limit, but its storage also grows.
 
 Hub records when it writes each decorator. Every read returns the times: `GET .../decorators/{id}`, `.../decorators/values`, each `decorator` in a history, and the MCP decorator tools.
 
