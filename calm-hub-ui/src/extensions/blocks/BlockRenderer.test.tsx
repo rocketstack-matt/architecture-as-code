@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { BlockRenderer } from './BlockRenderer.js';
-import { ScreenBlock } from '../../model/extensions.js';
+import { HubTarget, ScreenBlock } from '../../model/extensions.js';
 import { safeHref } from '../ScreenLink.js';
 import { ScreenErrorBoundary } from '../ScreenErrorBoundary.js';
 
@@ -48,6 +48,13 @@ describe('extension blocks', () => {
     it('encodes Hub target path segments', () => {
         draw({ type: 'links', items: [{ label: 'Hub', hub: { namespace: 'a/b', type: 'architectures', id: '1', version: '1.0.0' } }] });
         expect(screen.getByRole('link')).toHaveAttribute('href', '/a%2Fb/architectures/1/1.0.0');
+    });
+
+    it('shows a Hub link with a missing part as text', () => {
+        const partial = { namespace: 'a', type: 'architectures', id: '1' } as unknown as HubTarget;
+        draw({ type: 'links', items: [{ label: 'Partial', hub: partial }, { label: 'site', href: 'https://example.com' }] });
+        expect(screen.getByText('Partial').closest('a')).toBeNull();
+        expect(screen.getByRole('link')).toHaveTextContent('site');
     });
 
     it('shows a placeholder for a future block', () => {

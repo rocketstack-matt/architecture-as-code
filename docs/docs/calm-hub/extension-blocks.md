@@ -81,7 +81,7 @@ Each cell has one of these forms:
 | Number | `42` | The number |
 | Badge | `{ "badge": "released", "tone": "positive" }` | A coloured badge. `tone` is optional; the default is `neutral` |
 | External link | `{ "label": "Runbook", "href": "https://example.org" }` | A link that opens in a new tab, marked `↗` |
-| Hub link | `{ "label": "Architecture", "hub": { "namespace": "demo", "type": "architectures", "id": "1", "version": "1.0.0" } }` | A link to a Hub page. All four fields are required |
+| Hub link | `{ "label": "Architecture", "hub": { "namespace": "demo", "type": "architectures", "id": "1", "version": "1.0.0" } }` | A link to a Hub page. All four fields are required: a link without one shows its label as text |
 
 A link has a `label` and exactly one of `href` or `hub`. An `href` must start with `http://` or
 `https://`. The UI shows other URLs as plain text.
