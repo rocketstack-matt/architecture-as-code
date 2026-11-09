@@ -17,6 +17,7 @@ import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
+import org.finos.calm.domain.exception.StorageWriteException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -618,15 +619,16 @@ class TestMongoDecoratorStoreShould {
     }
 
     @Test
-    void propagate_non_duplicate_key_errors_when_creating_a_decorator() {
+    void map_non_duplicate_key_errors_when_creating_a_decorator() {
         String namespace = "finos";
         when(namespaceStore.namespaceExists(namespace)).thenReturn(true);
         when(counterStore.getNextDecoratorSequenceValue()).thenReturn(42);
         when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class), any(UpdateOptions.class)))
                 .thenThrow(new MongoWriteException(new WriteError(12, "some other error", new BsonDocument()), new ServerAddress(), List.of()));
 
-        assertThrows(MongoWriteException.class,
+        StorageWriteException e = assertThrows(StorageWriteException.class,
                 () -> decoratorStore.createDecorator(namespace, "{\"unique-id\": \"test-decorator\", \"type\": \"deployment\"}"));
+        assertFalse(e.isCapacityExceeded());
     }
 
     @Test
@@ -1119,6 +1121,68 @@ class TestMongoDecoratorStoreShould {
         verify(decoratorCollection, never()).updateOne(any(Bson.class), any(Bson.class), any(UpdateOptions.class));
     }
 
+
+    @Test
+    void map_a_too_large_namespace_document_to_the_capacity_error_on_create() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(counterStore.getNextDecoratorSequenceValue()).thenReturn(42);
+        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class), any(UpdateOptions.class))).thenThrow(tooLarge());
+
+        StorageWriteException e = assertThrows(StorageWriteException.class,
+                () -> decoratorStore.createDecorator("finos", "{\"type\": \"deployment\"}"));
+        assertTrue(e.isCapacityExceeded());
+    }
+
+    @Test
+    void map_a_too_large_namespace_document_to_the_capacity_error_on_update() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenThrow(tooLarge());
+
+        StorageWriteException e = assertThrows(StorageWriteException.class,
+                () -> decoratorStore.updateDecorator("finos", 1, "{\"type\": \"deployment\"}"));
+        assertTrue(e.isCapacityExceeded());
+        verify(decoratorCollection, never()).countDocuments(any(Bson.class));
+    }
+
+    @Test
+    void map_a_too_large_namespace_document_to_the_capacity_error_on_supersede() {
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(1L);
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(counterStore.getNextDecoratorSequenceValue()).thenReturn(5);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList())).thenThrow(tooLarge());
+
+        StorageWriteException e = assertThrows(StorageWriteException.class,
+                () -> decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}"));
+        assertTrue(e.isCapacityExceeded());
+    }
+
+    @Test
+    void map_other_write_errors_to_a_write_failure_on_supersede() {
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(1L);
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        when(counterStore.getNextDecoratorSequenceValue()).thenReturn(5);
+        when(decoratorCollection.updateOne(any(Bson.class), anyList()))
+                .thenThrow(new MongoWriteException(new WriteError(12, "some other error", new BsonDocument()), new ServerAddress(), List.of()));
+
+        StorageWriteException e = assertThrows(StorageWriteException.class,
+                () -> decoratorStore.supersedeDecorator("finos", 1, "{\"type\": \"control-evaluation\"}"));
+        assertFalse(e.isCapacityExceeded());
+    }
+
+    @Test
+    void map_a_write_error_on_delete() {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", currentEntry(1, null));
+        when(decoratorCollection.updateOne(any(Bson.class), any(Bson.class))).thenThrow(tooLarge());
+
+        StorageWriteException e = assertThrows(StorageWriteException.class,
+                () -> decoratorStore.deleteCurrentDecoratorHistory("finos", 1));
+        assertTrue(e.isCapacityExceeded());
+    }
+
+    private static MongoWriteException tooLarge() {
+        return new MongoWriteException(new WriteError(10334, "BSONObjectTooLarge", new BsonDocument()), new ServerAddress(), List.of());
+    }
     private static final String EXTENDED_JSON_DECORATOR = """
             {"type": "deployment", "data": {"n": {"$numberInt": "1"}, "k": {"$maxKey": 1},
              "list": [{"$numberLong": "2"}], "big": 123456789012345678901234567890,

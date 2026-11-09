@@ -1,10 +1,12 @@
 package org.finos.calm.store.mongo;
 
+import com.mongodb.MongoWriteException;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
 import jakarta.inject.Inject;
@@ -16,11 +18,13 @@ import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
+import org.finos.calm.domain.exception.StorageWriteException;
 import org.finos.calm.store.DecoratorStore;
 import org.finos.calm.store.util.DecoratorHistoryChain;
 import org.finos.calm.store.util.DecoratorJson;
 import org.finos.calm.store.util.DecoratorTimestamps;
 import org.finos.calm.store.util.MongoUpsertPush;
+import org.finos.calm.store.util.MongoWriteFailures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -143,9 +148,13 @@ public class MongoDecoratorStore implements DecoratorStore {
                 .append(CREATION_DATE_TIME_FIELD, now)
                 .append(UPDATE_DATE_TIME_FIELD, now);
 
-        MongoUpsertPush.pushWithDuplicateRetry(decoratorCollection,
-                Filters.eq("namespace", namespace),
-                "decorators", decoratorDocument);
+        try {
+            MongoUpsertPush.pushWithDuplicateRetry(decoratorCollection,
+                    Filters.eq("namespace", namespace),
+                    "decorators", decoratorDocument);
+        } catch (MongoWriteException e) {
+            throw writeFailure(namespace, e);
+        }
 
         LOG.debug("Created decorator with ID {} in namespace '{}'", id, namespace);
         return id;
@@ -158,12 +167,12 @@ public class MongoDecoratorStore implements DecoratorStore {
 
         Document parsedDecorator = toBsonDocument(DecoratorJson.parseObject(decoratorJson));
 
-        long matched = decoratorCollection.updateOne(
+        long matched = write(namespace, () -> decoratorCollection.updateOne(
                 currentEntryFilter(namespace, id),
                 Updates.combine(
                         Updates.set("decorators.$.decorator", parsedDecorator),
                         Updates.set("decorators.$." + UPDATE_DATE_TIME_FIELD, DecoratorTimestamps.now()))
-        ).getMatchedCount();
+        )).getMatchedCount();
 
         if (matched == 0) {
             throwSupersededOrNotFound(namespace, id);
@@ -201,7 +210,7 @@ public class MongoDecoratorStore implements DecoratorStore {
         List<Document> update = List.of(new Document("$set", new Document("decorators",
                 new Document("$concatArrays", List.of(marked,
                         new Document("$literal", List.of(successor)))))));
-        long modified = decoratorCollection.updateOne(currentEntryFilter(namespace, id), update).getModifiedCount();
+        long modified = write(namespace, () -> decoratorCollection.updateOne(currentEntryFilter(namespace, id), update)).getModifiedCount();
 
         if (modified == 0) {
             throwSupersededOrNotFound(namespace, id);
@@ -235,14 +244,28 @@ public class MongoDecoratorStore implements DecoratorStore {
             throw new DecoratorNotFoundException();
         }
 
-        long modified = decoratorCollection.updateOne(currentEntryFilter(namespace, currentId),
-                Updates.pull("decorators", Filters.in(DECORATOR_ID_FIELD, ids))).getModifiedCount();
+        long modified = write(namespace, () -> decoratorCollection.updateOne(currentEntryFilter(namespace, currentId),
+                Updates.pull("decorators", Filters.in(DECORATOR_ID_FIELD, ids)))).getModifiedCount();
 
         if (modified == 0) {
             throwSupersededOrNotFound(namespace, currentId);
         }
 
         LOG.debug("Deleted decorator with ID {} and its history in namespace '{}'", currentId, namespace);
+    }
+
+    // A namespace document near 16 MB fails a write on the server. Map it as the version stores do.
+    private static UpdateResult write(String namespace, Supplier<UpdateResult> update) {
+        try {
+            return update.get();
+        } catch (MongoWriteException e) {
+            throw writeFailure(namespace, e);
+        }
+    }
+
+    private static StorageWriteException writeFailure(String namespace, MongoWriteException e) {
+        LOG.error("Failed to write the decorators of namespace [{}]", namespace, e);
+        return MongoWriteFailures.toStorageWriteException(e);
     }
 
     private static Bson currentEntryFilter(String namespace, int id) {

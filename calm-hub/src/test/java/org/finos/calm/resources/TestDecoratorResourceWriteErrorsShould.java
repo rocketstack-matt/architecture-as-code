@@ -6,6 +6,7 @@ import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
+import org.finos.calm.domain.exception.StorageWriteException;
 import org.finos.calm.services.DecoratorWriteService;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +15,7 @@ import java.util.stream.IntStream;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
@@ -86,5 +88,35 @@ class TestDecoratorResourceWriteErrorsShould {
                 .body("errors.location", contains("/target-type"))
                 .body("errors.error", contains("required property is missing"))
                 .body("moreErrors", nullValue());
+    }
+
+    @Test
+    void return_413_when_a_supersede_meets_the_storage_capacity() throws Exception {
+        when(decoratorWriteService.updateDecorator(any(), eq("finos"), eq(1), anyString()))
+                .thenThrow(StorageWriteException.capacityExceeded(new RuntimeException("too large")));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(DECORATOR_JSON)
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(413)
+                .body(containsString("maximum storage size"));
+    }
+
+    @Test
+    void return_500_when_a_decorator_write_fails_for_another_reason() throws Exception {
+        when(decoratorWriteService.updateDecorator(any(), eq("finos"), eq(1), anyString()))
+                .thenThrow(StorageWriteException.writeFailed(new RuntimeException("write failed")));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(DECORATOR_JSON)
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(500)
+                .body(containsString("storage error"));
     }
 }
