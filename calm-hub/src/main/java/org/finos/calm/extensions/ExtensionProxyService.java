@@ -44,6 +44,7 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -164,12 +165,14 @@ public class ExtensionProxyService {
                 .orElseThrow(() -> new ExtensionProxyException(404, "The extension has no such route"));
         String method = request.method().toUpperCase(Locale.ROOT);
         String path = ExtensionPaths.checkPath(request.path());
-        ExtensionRouteMatcher.RouteMatch match = ExtensionRouteMatcher.match(extension.manifest(), method, path);
+        boolean readOnlyHub = registry.isReadOnly();
+        Predicate<ExtensionManifest.Route> accepted = r -> !readOnlyHub || "GET".equals(r.method()) || r.readOnly();
+        ExtensionRouteMatcher.RouteMatch match =
+                ExtensionRouteMatcher.match(extension.manifest(), method, path, accepted);
         ExtensionRouteMatcher.rejectEncodedLiterals(match, request.path());
         ExtensionManifest.Route route = match.route();
-        if (registry.isReadOnly() && !"GET".equals(method) && !route.readOnly()) {
-            String allow = ExtensionRouteMatcher.allowedMethods(extension.manifest(), path,
-                    r -> "GET".equals(r.method()) || r.readOnly());
+        if (!accepted.test(route)) {
+            String allow = ExtensionRouteMatcher.allowedMethods(extension.manifest(), path, accepted);
             throw new ExtensionProxyException(405, "This CALM Hub instance is read-only", Map.of("Allow", allow));
         }
         // Hub takes the namespace and the domain only from the matched path, never from the query or body.

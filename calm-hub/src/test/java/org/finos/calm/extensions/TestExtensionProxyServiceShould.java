@@ -339,7 +339,7 @@ class TestExtensionProxyServiceShould {
         assertThat(status(request("GET", "/admin", null, null)), is(404));
         assertThat(status(request("DELETE", "/screen", null, null)), is(405));
         assertThat(assertThrows(ExtensionProxyException.class, () -> service.call(alice,
-                request("DELETE", "/namespaces/finos/services", null, null))).headers(), equalTo(Map.of("Allow", "GET, POST")));
+                request("DELETE", "/namespaces/finos/services", null, null))).headers(), equalTo(Map.of("Allow", "GET, HEAD, POST")));
         assertThat(status(request("GET", "/%2e%2e/admin", null, null)), is(400));
         assertThat(backend.received(), nullValue());
     }
@@ -501,9 +501,24 @@ class TestExtensionProxyServiceShould {
         ExtensionProxyException refused = assertThrows(ExtensionProxyException.class,
                 () -> service.call(alice, request("POST", "/namespaces/finos/services", null, "{}")));
         assertThat(refused.status(), is(405));
-        assertThat(refused.headers(), equalTo(Map.of("Allow", "GET")));
+        assertThat(refused.headers(), equalTo(Map.of("Allow", "GET, HEAD")));
         assertThat(service.call(alice, request("POST", "/search", null, "{}")).status(), is(200));
         assertThat(service.call(alice, request("GET", "/screen", null, null)).status(), is(200));
+    }
+
+    @Test
+    void list_only_the_accepted_methods_for_a_method_mismatch_on_a_read_only_hub() {
+        when(registry.isReadOnly()).thenReturn(true);
+
+        ExtensionProxyException mismatch = assertThrows(ExtensionProxyException.class,
+                () -> service.call(alice, request("DELETE", "/namespaces/finos/services", null, null)));
+        assertThat(mismatch.status(), is(405));
+        assertThat(mismatch.getMessage(), is("The extension route does not allow this method"));
+        assertThat(mismatch.headers(), equalTo(Map.of("Allow", "GET, HEAD")));
+        assertThat(assertThrows(ExtensionProxyException.class,
+                () -> service.call(alice, request("DELETE", "/search", null, null))).headers(),
+                equalTo(Map.of("Allow", "POST")));
+        assertThat(backend.received(), nullValue());
     }
 
     @Test

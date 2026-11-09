@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Matches a checked path against the declared route templates only (ADR 0011). A {@code {name}}
@@ -22,6 +23,12 @@ final class ExtensionRouteMatcher {
     }
 
     static RouteMatch match(ExtensionManifest manifest, String method, String path) {
+        return match(manifest, method, path, route -> true);
+    }
+
+    /** {@code accepted} limits the {@code Allow} value of a 405 to the routes that Hub accepts now. */
+    static RouteMatch match(ExtensionManifest manifest, String method, String path,
+                            Predicate<ExtensionManifest.Route> accepted) {
         RouteMatch best = null;
         int bestLiterals = -1;
         boolean pathMatched = false;
@@ -42,16 +49,20 @@ final class ExtensionRouteMatcher {
         }
         throw pathMatched
                 ? new ExtensionProxyException(405, "The extension route does not allow this method",
-                        Map.of("Allow", allowedMethods(manifest, path, route -> true)))
+                        Map.of("Allow", allowedMethods(manifest, path, accepted)))
                 : new ExtensionProxyException(404, "The extension has no such route");
     }
 
-    /** The {@code Allow} value: the methods of the routes that match the path and pass {@code allowed}. */
+    /**
+     * The {@code Allow} value: the methods of the routes that match the path and pass {@code allowed}.
+     * JAX-RS answers {@code HEAD} with the {@code GET} resource method, so {@code HEAD} goes with {@code GET}.
+     */
     static String allowedMethods(ExtensionManifest manifest, String path, Predicate<ExtensionManifest.Route> allowed) {
         return manifest.routes().stream()
                 .filter(allowed)
                 .filter(route -> parameters(route.path(), path).isPresent())
                 .map(ExtensionManifest.Route::method)
+                .flatMap(method -> "GET".equals(method) ? Stream.of("GET", "HEAD") : Stream.of(method))
                 .distinct()
                 .sorted()
                 .collect(Collectors.joining(", "));

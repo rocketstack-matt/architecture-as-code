@@ -79,6 +79,20 @@ class TestExtensionProxyResourceReadOnlyShould {
 
     @Test
     @TestSecurity(user = "alice")
+    void list_only_the_methods_that_a_read_only_hub_accepts_on_a_method_mismatch() {
+        given().when().delete(BASE + "/namespaces/finos/services")
+                .then().statusCode(405)
+                .header("Allow", "GET, HEAD")
+                .body("error", equalTo("The extension route does not allow this method"));
+        given().when().delete(BASE + "/search")
+                .then().statusCode(405)
+                .header("Allow", "POST");
+
+        assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
     void apply_the_same_path_rule_as_a_hub_that_is_not_read_only() {
         given().when().get(BASE + "/services/architectures")
                 .then().statusCode(200);
@@ -98,7 +112,7 @@ class TestExtensionProxyResourceReadOnlyShould {
         given().contentType("application/json").body("{}")
                 .when().post(BASE + "/namespaces/finos/services")
                 .then().statusCode(405)
-                .header("Allow", "GET")
+                .header("Allow", "GET, HEAD")
                 .body("error", equalTo("This CALM Hub instance is read-only"));
         given().contentType("application/json").body("{}")
                 .when().post("/api/calm/namespaces")

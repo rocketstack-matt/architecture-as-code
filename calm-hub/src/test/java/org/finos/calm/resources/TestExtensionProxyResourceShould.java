@@ -223,11 +223,22 @@ class TestExtensionProxyResourceShould {
         given().contentType("application/json").body("{}").when().put(BASE + "/screen").then().statusCode(405);
         given().contentType("application/json").body("{}").when().patch(BASE + "/screen").then().statusCode(405);
         given().when().delete(BASE + "/screen").then().statusCode(405)
-                .header("Allow", "GET")
+                .header("Allow", "GET, HEAD")
                 .header("Content-Security-Policy", CSP)
                 .body("error", equalTo("The extension route does not allow this method"));
 
         assertThat(backend.received(), nullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "alice")
+    void answer_head_with_the_get_route_because_allow_lists_head() {
+        given().when().head(BASE + "/screen")
+                .then().statusCode(200)
+                .header("Content-Security-Policy", CSP);
+
+        assertThat(backend.received().method(), is("GET"));
+        assertThat(backend.received().pathAndQuery(), is("/base/screen"));
     }
 
     @Test
