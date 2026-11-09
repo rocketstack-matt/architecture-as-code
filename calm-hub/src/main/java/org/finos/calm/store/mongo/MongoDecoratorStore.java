@@ -10,6 +10,7 @@ import jakarta.enterprise.inject.Typed;
 import jakarta.inject.Inject;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.types.Decimal128;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
@@ -23,6 +24,7 @@ import org.finos.calm.store.util.MongoUpsertPush;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +51,7 @@ public class MongoDecoratorStore implements DecoratorStore {
     // Hub-owned history links and times, stored beside the decorator rather than in it.
     private static final String SUPERSEDES_FIELD = "supersedes";
     private static final String SUPERSEDED_BY_FIELD = "supersededBy";
+    private static final int DECIMAL128_DIGITS = 34;
     private final MongoCollection<Document> decoratorCollection;
     private final MongoNamespaceStore namespaceStore;
     private final MongoCounterStore counterStore;
@@ -306,15 +309,36 @@ public class MongoDecoratorStore implements DecoratorStore {
         if (value instanceof List<?> list) {
             return list.stream().map(MongoDecoratorStore::toBsonValue).collect(Collectors.toCollection(ArrayList::new));
         }
-        // BSON has no arbitrary-precision integer.
+        // BSON has no arbitrary-precision integer. Decimal128 keeps 34 digits exactly; a longer one becomes a double.
         if (value instanceof BigInteger big) {
-            return big.doubleValue();
+            return big.abs().toString().length() <= DECIMAL128_DIGITS ? new Decimal128(new BigDecimal(big)) : big.doubleValue();
+        }
+        return value;
+    }
+
+    // Jackson cannot write a Decimal128, so data gets a JDK number again.
+    private static Object fromBsonValue(Object value) {
+        if (value instanceof Document document) {
+            Document copy = new Document();
+            document.forEach((key, item) -> copy.append(key, fromBsonValue(item)));
+            return copy;
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(MongoDecoratorStore::fromBsonValue).collect(Collectors.toCollection(ArrayList::new));
+        }
+        if (value instanceof Decimal128 decimal && decimal.isFinite()) {
+            try {
+                BigDecimal number = decimal.bigDecimalValue();
+                return number.scale() <= 0 ? number.toBigIntegerExact() : number;
+            } catch (ArithmeticException negativeZero) {
+                return BigDecimal.ZERO;
+            }
         }
         return value;
     }
 
     private static Decorator toDecorator(Document entry) {
-        Decorator decorator = Decorator.fromDocument(entry.get("decorator", Document.class));
+        Decorator decorator = Decorator.fromDocument((Document) fromBsonValue(entry.get("decorator", Document.class)));
         return decorator == null ? null
                 : decorator.withTimestamps(entry.getString(CREATION_DATE_TIME_FIELD), entry.getString(UPDATE_DATE_TIME_FIELD));
     }

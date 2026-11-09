@@ -12,6 +12,7 @@ import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
+import org.bson.types.Decimal128;
 import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
@@ -23,7 +24,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
+import java.util.Map;
 
 import org.finos.calm.domain.Decorator;
 
@@ -901,6 +905,39 @@ class TestMongoDecoratorStoreShould {
     }
 
     @Test
+    void should_read_decimal128_data_as_jdk_numbers() throws NamespaceNotFoundException {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", new Document("decoratorId", 1).append("decorator", new Document("type", "deployment")
+                .append("data", new Document("big", Decimal128.parse("123456789012345678901234567890"))
+                        .append("exponent", Decimal128.parse("1E+3"))
+                        .append("decimal", Decimal128.parse("1.50"))
+                        .append("negativeZero", Decimal128.NEGATIVE_ZERO)
+                        .append("nan", Decimal128.NaN)
+                        .append("small", 3)
+                        .append("nested", new Document("n", Decimal128.parse("7")))
+                        .append("list", List.of(Decimal128.parse("8"), "text")))));
+
+        Map<?, ?> data = (Map<?, ?>) decoratorStore.getDecoratorById("finos", 1).orElseThrow().getData();
+
+        assertEquals(new BigInteger("123456789012345678901234567890"), data.get("big"));
+        assertEquals(BigInteger.valueOf(1000), data.get("exponent"));
+        assertEquals(new BigDecimal("1.50"), data.get("decimal"));
+        assertEquals(BigDecimal.ZERO, data.get("negativeZero"));
+        assertEquals(Decimal128.NaN, data.get("nan"));
+        assertEquals(3, data.get("small"));
+        assertEquals(BigInteger.valueOf(7), ((Map<?, ?>) data.get("nested")).get("n"));
+        assertEquals(List.of(BigInteger.valueOf(8), "text"), data.get("list"));
+    }
+
+    @Test
+    void should_read_a_decorator_with_no_data() throws NamespaceNotFoundException {
+        when(namespaceStore.namespaceExists("finos")).thenReturn(true);
+        mockNamespaceDocument("finos", new Document("decoratorId", 1).append("decorator", new Document("type", "deployment")));
+
+        assertNull(decoratorStore.getDecoratorById("finos", 1).orElseThrow().getData());
+    }
+
+    @Test
     void should_filter_past_a_decorator_stored_with_wrong_field_types() throws NamespaceNotFoundException {
         when(namespaceStore.namespaceExists("finos")).thenReturn(true);
         mockNamespaceDocument("finos",
@@ -1084,7 +1121,8 @@ class TestMongoDecoratorStoreShould {
 
     private static final String EXTENDED_JSON_DECORATOR = """
             {"type": "deployment", "data": {"n": {"$numberInt": "1"}, "k": {"$maxKey": 1},
-             "list": [{"$numberLong": "2"}], "big": 123456789012345678901234567890, "small": 3}}
+             "list": [{"$numberLong": "2"}], "big": 123456789012345678901234567890,
+             "negative": -123456789012345678901234567890, "huge": 1234567890123456789012345678901234567890, "small": 3}}
             """;
 
     private static void assertStoredAsPlainData(BsonDocument decorator) {
@@ -1092,7 +1130,9 @@ class TestMongoDecoratorStoreShould {
         assertEquals("1", data.getDocument("n").getString("$numberInt").getValue());
         assertEquals(1, data.getDocument("k").getInt32("$maxKey").getValue());
         assertEquals("2", data.getArray("list").getFirst().asDocument().getString("$numberLong").getValue());
-        assertEquals(1.2345678901234568E29, data.getDouble("big").getValue());
+        assertEquals(Decimal128.parse("123456789012345678901234567890"), data.getDecimal128("big").getValue());
+        assertEquals(Decimal128.parse("-123456789012345678901234567890"), data.getDecimal128("negative").getValue());
+        assertEquals(1.2345678901234568E39, data.getDouble("huge").getValue());
         assertEquals(3, data.getInt32("small").getValue());
     }
 

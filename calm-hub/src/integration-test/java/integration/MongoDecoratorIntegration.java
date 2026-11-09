@@ -61,7 +61,8 @@ public class MongoDecoratorIntegration {
                     "start-time": "2026-02-23T10:00:00Z",
                     "status": "in-progress",
                     "notes": "Integration test decorator",
-                    "extended-json": {"$numberInt": "1", "nested": {"$maxKey": 1}}
+                    "extended-json": {"$numberInt": "1", "nested": {"$maxKey": 1}},
+                    "big": 123456789012345678901234567890
                 }
             }
             """.formatted(DEPLOYMENT_STANDARD);
@@ -161,7 +162,8 @@ public class MongoDecoratorIntegration {
                 .body("appliesTo[0]", equalTo("example-node"))
                 .body("schema", equalTo(DEPLOYMENT_STANDARD))
                 .body("data.'extended-json'.'$numberInt'", equalTo("1"))
-                .body("data.'extended-json'.nested.'$maxKey'", equalTo(1));
+                .body("data.'extended-json'.nested.'$maxKey'", equalTo(1))
+                .body(containsString("\"big\":123456789012345678901234567890"));
     }
 
     @Test

@@ -116,6 +116,8 @@ The decorator endpoints (`/api/calm/namespaces/{namespace}/decorators`) and the 
 
 Hub knows the calm-schema decorator Standards that it bundles (`deployment`, `kubernetes`, `control-evaluation`) and the base decorator definition (`https://calm.finos.org/release/<version>/meta/decorators.json#/defs/decorator`). Hub accepts a decorator with any other `$schema` without a check. At startup, Hub checks that each `$ref` to `calm.finos.org` in a bundled schema resolves, also a nested one. A schema with a `$ref` that does not resolve stays unknown, and Hub logs a warning.
 
+Hub stores the decorator as it checked it. A key such as `$numberInt` stays plain data. An integer larger than a 64-bit integer reads back with all of its digits, up to 34 digits on MongoDB. MongoDB stores a longer integer as a double, so it loses precision.
+
 No type is reserved by default. Reserve a type in `application.properties`:
 
 ```properties
