@@ -1,6 +1,7 @@
 package org.finos.calm.domain.exception;
 
 import org.finos.calm.domain.DecoratorSchemaError;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -24,7 +25,7 @@ class TestDecoratorSchemaValidationExceptionShould {
     void keep_the_first_errors_and_count_the_rest() {
         DecoratorSchemaValidationException exception = new DecoratorSchemaValidationException(errors(25));
 
-        assertThat(exception.getErrors(), hasSize(DecoratorSchemaValidationException.MAX_ERRORS));
+        assertThat(exception.getErrors(), hasSize(SchemaValidationLimits.MAX_ERRORS));
         assertThat(exception.getErrors().getFirst().location(), is("/0"));
         assertThat(exception.getErrors().getLast().location(), is("/19"));
         assertThat(exception.getMoreErrors(), is(5));

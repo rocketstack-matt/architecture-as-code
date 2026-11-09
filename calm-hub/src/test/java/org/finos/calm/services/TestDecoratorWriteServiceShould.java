@@ -29,7 +29,9 @@ import java.util.Optional;
 import java.util.logging.Level;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -78,7 +80,8 @@ class TestDecoratorWriteServiceShould {
         when(mockConfig.reserved()).thenReturn(Map.of("validation", twoWriters, "control-evaluation", oneWriter));
 
         assertThat(infoLogs(() -> service.logReservedTypes(null)),
-                contains("Reserved decorator types: control-evaluation (1 writers), validation (2 writers)"));
+                contains(allOf(containsString("Reserved decorator types"),
+                        containsString("control-evaluation (1 writers), validation (2 writers)"))));
     }
 
     @Test

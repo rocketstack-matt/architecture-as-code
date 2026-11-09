@@ -22,6 +22,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.interceptor.Interceptor;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.extensions.ExtensionManifest;
 import org.finos.calm.extensions.ExtensionManifestLoader;
 import org.finos.calm.extensions.ExtensionProxyException;
@@ -87,7 +88,6 @@ public class ExtensionTools {
     static final int MAX_ARGUMENTS_BYTES = 1024 * 1024;
     // The Vert.x limit on the request line of a REST call, which an MCP call must not get past.
     static final int MAX_PATH_AND_QUERY_LENGTH = 4096;
-    static final int MAX_VALIDATION_ERRORS = 20;
     // Hub refuses these parts of a path (ADR 0011). The same rule as @finos/calm-shared buildExtensionRequest.
     private static final Pattern REFUSED_PATH_VALUE = Pattern.compile("\\.\\.|[/\\\\%@\\x00-\\x1f\\x7f]");
     private static final String META_SCHEMA_BASE = "https://json-schema.org/draft/2020-12/";
@@ -728,12 +728,12 @@ public class ExtensionTools {
         }
         List<OutputUnit> errors = result.getErrors() == null || result.getErrors().isEmpty() ? List.of(result) : result.getErrors();
         StringBuilder sb = new StringBuilder("Error: The input does not match the schema of this command:");
-        for (OutputUnit error : errors.subList(0, Math.min(errors.size(), MAX_VALIDATION_ERRORS))) {
+        for (OutputUnit error : errors.subList(0, Math.min(errors.size(), SchemaValidationLimits.MAX_ERRORS))) {
             String location = error.getInstanceLocation() == null ? "" : error.getInstanceLocation().replaceFirst("^#", "");
             sb.append("\n- ").append(location.isEmpty() ? "/" : location).append(": ").append(error.getError());
         }
-        if (errors.size() > MAX_VALIDATION_ERRORS) {
-            sb.append("\n- and ").append(errors.size() - MAX_VALIDATION_ERRORS).append(" more");
+        if (errors.size() > SchemaValidationLimits.MAX_ERRORS) {
+            sb.append("\n- and ").append(errors.size() - SchemaValidationLimits.MAX_ERRORS).append(" more");
         }
         return sb.toString();
     }

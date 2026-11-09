@@ -61,7 +61,7 @@ public class DecoratorWriteService {
         String types = new TreeMap<>(config.reserved()).entrySet().stream()
                 .map(entry -> entry.getKey() + " (" + entry.getValue().writers().size() + " writers)")
                 .collect(Collectors.joining(", "));
-        LOG.info("Reserved decorator types: " + types);
+        LOG.info("Reserved decorator types: {}", types);
     }
 
     public static String principalName(SecurityIdentity identity) {
