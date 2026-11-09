@@ -12,9 +12,11 @@ import org.bson.json.JsonParseException;
 import org.finos.calm.config.DecoratorConfig;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorSchemaError;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
+import org.finos.calm.domain.exception.DecoratorTooLargeException;
 import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
@@ -23,6 +25,7 @@ import org.finos.calm.store.util.DecoratorTimestamps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -74,7 +77,8 @@ public class DecoratorWriteService {
 
     public int createDecorator(String principal, String namespace, String decoratorJson)
             throws NamespaceNotFoundException, ReservedDecoratorTypeException, DecoratorSchemaValidationException,
-            HubOwnedDecoratorFieldException {
+            HubOwnedDecoratorFieldException, DecoratorTooLargeException {
+        requireSize(decoratorJson);
         JsonObject decorator = parse(decoratorJson);
         rejectHubOwnedFields(decorator);
         requireFieldTypes(decorator);
@@ -91,7 +95,9 @@ public class DecoratorWriteService {
      */
     public int updateDecorator(String principal, String namespace, int id, String decoratorJson)
             throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException,
-            ReservedDecoratorTypeException, DecoratorSchemaValidationException, HubOwnedDecoratorFieldException {
+            ReservedDecoratorTypeException, DecoratorSchemaValidationException, HubOwnedDecoratorFieldException,
+            DecoratorTooLargeException {
+        requireSize(decoratorJson);
         JsonObject decorator = parse(decoratorJson);
         rejectHubOwnedFields(decorator);
         requireFieldTypes(decorator);
@@ -122,6 +128,15 @@ public class DecoratorWriteService {
         decoratorStore.requireWritable();
         int currentId = decoratorStore.getDecoratorHistory(namespace, id).getFirst().getId();
         decoratorStore.deleteCurrentDecoratorHistory(namespace, currentId);
+    }
+
+    // The caller controls the size, and the schema check makes every error before Hub keeps the first ones.
+    // A char is at least one UTF-8 byte, so a long string is refused without a copy.
+    private static void requireSize(String decoratorJson) throws DecoratorTooLargeException {
+        if (decoratorJson != null && (decoratorJson.length() > SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES
+                || decoratorJson.getBytes(StandardCharsets.UTF_8).length > SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES)) {
+            throw new DecoratorTooLargeException();
+        }
     }
 
     private static void rejectHubOwnedFields(JsonObject decorator) throws HubOwnedDecoratorFieldException {

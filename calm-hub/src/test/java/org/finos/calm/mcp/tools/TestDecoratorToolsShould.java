@@ -6,6 +6,7 @@ import org.finos.calm.config.DecoratorConfig;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.DecoratorSchemaError;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
@@ -425,6 +426,29 @@ class TestDecoratorToolsShould {
 
         assertThat(response.isError(), is(true));
         assertThat(text(response), is("Error: " + DecoratorKeyRefusedException.idWithAnotherValue().getMessage() + "."));
+    }
+
+    @Test
+    void return_error_when_a_decorator_has_more_characters_than_the_size_limit() {
+        String json = "{\"data\": \"" + "x".repeat(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES) + "\"}";
+
+        ToolResponse response = decoratorTools.createDecorator("workshop", json);
+
+        assertThat(response.isError(), is(true));
+        assertThat(text(response), containsString("must not exceed " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES));
+        verifyNoInteractions(decoratorStore);
+    }
+
+    @Test
+    void return_error_when_a_decorator_has_more_utf8_bytes_than_the_size_limit() {
+        String json = "{\"data\": \"" + "é".repeat(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES / 2) + "\"}";
+
+        ToolResponse create = decoratorTools.createDecorator("workshop", json);
+        ToolResponse update = decoratorTools.updateDecorator("workshop", 1, json);
+
+        assertThat(text(create), is("Error: Decorator JSON is larger than " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + " bytes."));
+        assertThat(text(update), is(text(create)));
+        verifyNoInteractions(decoratorStore);
     }
 
     // --- write rules ---

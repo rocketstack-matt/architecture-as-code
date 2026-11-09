@@ -11,10 +11,12 @@ import org.bson.json.JsonParseException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
+import org.finos.calm.domain.exception.DecoratorTooLargeException;
 import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
@@ -132,7 +134,7 @@ public class DecoratorTools {
                 () -> McpValidationHelper.checkEnabled(mcpEnabled),
                 () -> McpValidationHelper.validateNamespace(namespace),
                 () -> McpValidationHelper.validateNotBlank(decoratorJson, "Decorator JSON"),
-                () -> McpValidationHelper.validateMaxLength(decoratorJson, McpValidationHelper.MAX_JSON_PAYLOAD_LENGTH, "Decorator JSON"),
+                () -> McpValidationHelper.validateMaxLength(decoratorJson, SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES, "Decorator JSON"),
                 () -> McpValidationHelper.validateJson(decoratorJson, "Decorator JSON"));
         if (err.isPresent()) return err.get();
 
@@ -146,6 +148,8 @@ public class DecoratorTools {
         } catch (JsonParseException e) {
             return ToolResponse.error("Error: " + e.getMessage() + ".");
         } catch (DecoratorKeyRefusedException e) {
+            return ToolResponse.error("Error: " + e.getMessage() + ".");
+        } catch (DecoratorTooLargeException e) {
             return ToolResponse.error("Error: " + e.getMessage() + ".");
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
@@ -168,7 +172,7 @@ public class DecoratorTools {
                 () -> McpValidationHelper.validateNamespace(namespace),
                 () -> McpValidationHelper.validatePositiveId(decoratorId, "Decorator ID"),
                 () -> McpValidationHelper.validateNotBlank(decoratorJson, "Decorator JSON"),
-                () -> McpValidationHelper.validateMaxLength(decoratorJson, McpValidationHelper.MAX_JSON_PAYLOAD_LENGTH, "Decorator JSON"),
+                () -> McpValidationHelper.validateMaxLength(decoratorJson, SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES, "Decorator JSON"),
                 () -> McpValidationHelper.validateJson(decoratorJson, "Decorator JSON"));
         if (err.isPresent()) return err.get();
 
@@ -201,6 +205,8 @@ public class DecoratorTools {
         } catch (JsonParseException e) {
             return ToolResponse.error("Error: " + e.getMessage() + ".");
         } catch (DecoratorKeyRefusedException e) {
+            return ToolResponse.error("Error: " + e.getMessage() + ".");
+        } catch (DecoratorTooLargeException e) {
             return ToolResponse.error("Error: " + e.getMessage() + ".");
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");

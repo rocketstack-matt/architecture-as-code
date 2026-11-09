@@ -6,9 +6,11 @@ import org.finos.calm.config.DecoratorConfig;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.DecoratorSchemaError;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
+import org.finos.calm.domain.exception.DecoratorTooLargeException;
 import org.finos.calm.domain.exception.GitHubWriteNotSupportedException;
 import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
@@ -376,6 +378,38 @@ class TestDecoratorWriteServiceShould {
 
         verify(mockDecoratorStore, never()).getDecoratorHistory(anyString(), anyInt());
         verify(mockDecoratorStore, never()).deleteCurrentDecoratorHistory(anyString(), anyInt());
+    }
+
+    @Test
+    void accept_a_decorator_of_exactly_the_size_limit() throws Exception {
+        String json = decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES);
+        when(mockDecoratorStore.createDecorator(NAMESPACE, json)).thenReturn(1);
+
+        assertThat(service.createDecorator("alice", NAMESPACE, json), is(1));
+    }
+
+    @Test
+    void refuse_a_decorator_over_the_size_limit_before_any_other_check() {
+        String json = decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + 1);
+
+        assertThrows(DecoratorTooLargeException.class, () -> service.createDecorator("alice", NAMESPACE, json));
+        assertThrows(DecoratorTooLargeException.class, () -> service.updateDecorator("alice", NAMESPACE, 1, json));
+        verifyNoInteractions(mockDecoratorStore, mockSchemaValidator);
+    }
+
+    @Test
+    void count_the_size_limit_in_utf8_bytes() {
+        String json = "{\"data\": \"" + "\u00e9".repeat(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES / 2) + "\"}";
+
+        assertThrows(DecoratorTooLargeException.class, () -> service.createDecorator("alice", NAMESPACE, json));
+        verifyNoInteractions(mockDecoratorStore);
+    }
+
+    // A {"data": "..."} decorator of the given size in UTF-8 bytes.
+    static String decoratorOfBytes(int bytes) {
+        String prefix = "{\"data\": \"";
+        String suffix = "\"}";
+        return prefix + "x".repeat(bytes - prefix.length() - suffix.length()) + suffix;
     }
 
     private static GitHubDecoratorStore gitHubStore() {

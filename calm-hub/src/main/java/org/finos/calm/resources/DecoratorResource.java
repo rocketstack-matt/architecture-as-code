@@ -14,11 +14,13 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.ValueWrapper;
 import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
+import org.finos.calm.domain.exception.DecoratorTooLargeException;
 import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
@@ -44,6 +46,8 @@ public class DecoratorResource {
     private static final String BAD_DECORATOR = "The JSON does not parse, a field that Hub reads has the wrong type, the body sends a "
             + "Hub-owned field, the decorator does not match a $schema that Hub knows, or the store cannot keep a key of the "
             + "decorator. A $schema mismatch lists at most 20 errors, and moreErrors counts the rest";
+    private static final String TOO_LARGE = "The decorator JSON is larger than " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES
+            + " bytes (1 MiB), or the namespace has reached the maximum storage size";
 
     private final DecoratorStore decoratorStore;
     private final DecoratorWriteService decoratorWriteService;
@@ -193,7 +197,8 @@ public class DecoratorResource {
             @APIResponse(responseCode = "201", description = "Created. The body has the new id, and Location names the decorator"),
             @APIResponse(responseCode = "400", description = BAD_DECORATOR),
             @APIResponse(responseCode = "403", description = "The type is reserved, and the caller is not one of its writers"),
-            @APIResponse(responseCode = "404", description = "The namespace does not exist")
+            @APIResponse(responseCode = "404", description = "The namespace does not exist"),
+            @APIResponse(responseCode = "413", description = TOO_LARGE)
     })
     @PermissionsAllowed(CalmHubScopes.WRITE)
     public Response createDecoratorForNamespace(
@@ -210,6 +215,9 @@ public class DecoratorResource {
         } catch (DecoratorKeyRefusedException e) {
             logger.warn("Refused a decorator key that the store cannot keep in namespace [{}]", namespace);
             return CalmResourceErrorResponses.decoratorKeyRefusedResponse(e);
+        } catch (DecoratorTooLargeException e) {
+            logger.warn("Refused a decorator larger than the limit in namespace [{}]", namespace);
+            return CalmResourceErrorResponses.decoratorTooLargeResponse();
         } catch (NamespaceNotFoundException e) {
             logger.error("Invalid namespace [{}] when creating decorator", namespace, e);
             return CalmResourceErrorResponses.invalidNamespaceResponse(namespace);
@@ -250,7 +258,8 @@ public class DecoratorResource {
             @APIResponse(responseCode = "400", description = BAD_DECORATOR),
             @APIResponse(responseCode = "403", description = "The old or new type is reserved, and the caller is not one of its writers"),
             @APIResponse(responseCode = "404", description = "The namespace or the decorator does not exist"),
-            @APIResponse(responseCode = "409", description = "The decorator has been superseded. Update the current decorator in its history")
+            @APIResponse(responseCode = "409", description = "The decorator has been superseded. Update the current decorator in its history"),
+            @APIResponse(responseCode = "413", description = TOO_LARGE)
     })
     @PermissionsAllowed(CalmHubScopes.WRITE)
     public Response updateDecoratorForNamespace(
@@ -271,6 +280,9 @@ public class DecoratorResource {
         } catch (DecoratorKeyRefusedException e) {
             logger.warn("Refused a decorator key that the store cannot keep for decorator [{}] in namespace [{}]", id, namespace);
             return CalmResourceErrorResponses.decoratorKeyRefusedResponse(e);
+        } catch (DecoratorTooLargeException e) {
+            logger.warn("Refused a decorator larger than the limit in namespace [{}]", namespace);
+            return CalmResourceErrorResponses.decoratorTooLargeResponse();
         } catch (DecoratorNotFoundException e) {
             logger.error("Decorator [{}] not found in namespace [{}] when updating", id, namespace, e);
             return CalmResourceErrorResponses.decoratorNotFoundResponse(namespace, id);

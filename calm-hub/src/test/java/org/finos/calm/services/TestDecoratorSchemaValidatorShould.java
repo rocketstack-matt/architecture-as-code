@@ -11,6 +11,12 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -140,6 +146,29 @@ class TestDecoratorSchemaValidatorShould {
         assertThat(fixtureValidator.isKnown(schema), is(true));
         assertThat(fixtureValidator.validate(new JsonObject().put("$schema", schema).putNull("data")), is(empty()));
         assertThat(fixtureValidator.validate(new JsonObject().put("$schema", schema).put("data", 42)), is(not(empty())));
+    }
+
+    @Test
+    void validate_on_many_threads_at_once() throws Exception {
+        DecoratorSchemaValidator fixtureValidator = new DecoratorSchemaValidator(List.of("9.6"), "no-such-path/");
+        String schema = "https://calm.finos.org/release/9.6/meta/decorators.json#/defs/decorator";
+        ExecutorService pool = Executors.newFixedThreadPool(8);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Boolean>> results = IntStream.range(0, 400).mapToObj(i -> pool.submit(() -> {
+                start.await();
+                boolean valid = i % 2 == 0;
+                JsonObject decorator = new JsonObject().put("$schema", schema).put("data", valid ? new JsonObject() : 5);
+                return fixtureValidator.validate(decorator).isEmpty() == valid;
+            })).toList();
+            start.countDown();
+
+            for (Future<Boolean> result : results) {
+                assertThat(result.get(30, TimeUnit.SECONDS), is(true));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     @Test

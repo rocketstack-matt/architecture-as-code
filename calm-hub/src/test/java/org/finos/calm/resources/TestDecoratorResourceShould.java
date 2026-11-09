@@ -7,6 +7,7 @@ import io.restassured.http.ContentType;
 import org.bson.json.JsonParseException;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
@@ -777,6 +778,53 @@ public class TestDecoratorResourceShould {
                 .then()
                 .statusCode(400)
                 .body(equalTo(DecoratorKeyRefusedException.emptyKeyPart().getMessage()));
+    }
+
+    @Test
+    void return_413_when_a_created_decorator_is_over_the_size_limit() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body(decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + 1))
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(413)
+                .body(equalTo("The decorator JSON is larger than 1048576 bytes"));
+
+        verify(decoratorStore, never()).createDecorator(anyString(), anyString());
+    }
+
+    @Test
+    void return_413_when_an_updated_decorator_is_over_the_size_limit() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body(decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + 1))
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(413);
+
+        verify(decoratorStore, never()).getDecoratorById(anyString(), anyInt());
+        verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void accept_a_decorator_of_exactly_the_size_limit() throws Exception {
+        when(decoratorStore.createDecorator(anyString(), anyString())).thenReturn(1);
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(decoratorOfBytes(SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES))
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(201);
+    }
+
+    private static String decoratorOfBytes(int bytes) {
+        String prefix = "{\"data\": \"";
+        String suffix = "\"}";
+        return prefix + "x".repeat(bytes - prefix.length() - suffix.length()) + suffix;
     }
 
     @Test

@@ -21,9 +21,11 @@ class TestDecoratorResourceOpenApiShould {
                 .statusCode(200)
                 .body(DECORATORS + ".post.responses", hasKey("400"))
                 .body(DECORATORS + ".post.responses", hasKey("403"))
+                .body(DECORATORS + ".post.responses", hasKey("413"))
                 .body(DECORATOR + ".put.responses", hasKey("201"))
                 .body(DECORATOR + ".put.responses", hasKey("400"))
                 .body(DECORATOR + ".put.responses", hasKey("409"))
+                .body(DECORATOR + ".put.responses", hasKey("413"))
                 .body(DECORATOR + ".delete.responses", hasKey("409"));
     }
 }

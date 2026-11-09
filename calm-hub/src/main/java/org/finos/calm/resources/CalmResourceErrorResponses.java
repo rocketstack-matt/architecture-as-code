@@ -2,6 +2,7 @@ package org.finos.calm.resources;
 
 import jakarta.ws.rs.core.Response;
 import org.finos.calm.domain.ResourceType;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 
@@ -42,6 +43,12 @@ public class CalmResourceErrorResponses {
 
     public static Response decoratorKeyRefusedResponse(DecoratorKeyRefusedException exception) {
         return Response.status(Response.Status.BAD_REQUEST).entity(exception.getMessage()).build();
+    }
+
+    public static Response decoratorTooLargeResponse() {
+        return Response.status(Response.Status.REQUEST_ENTITY_TOO_LARGE)
+                .entity("The decorator JSON is larger than " + SchemaValidationLimits.MAX_DECORATOR_JSON_BYTES + " bytes")
+                .build();
     }
 
     public static Response decoratorSupersededResponse(String namespace, int id) {
