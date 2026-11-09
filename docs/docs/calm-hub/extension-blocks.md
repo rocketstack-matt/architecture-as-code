@@ -41,7 +41,9 @@ signed-in user. CALM Hub does not check a reply against it: the UI checks only `
 
 GitHub-flavoured Markdown. Hub ignores raw HTML, shows an image as its alt text, and shows a link
 that is not `http` or `https` as plain text. Links open in a new tab. A Markdown heading goes
-one level below the slot heading, so `#` in a node details panel is not a page title.
+one level below the slot heading, so `#` in a node details panel is not a page title. HTML has
+no level below `h6`, so in a node details panel, where the slot heading is `h6`, each Markdown
+heading is an `h6`. The size of the text still follows the Markdown level.
 
 ### keyValue
 
