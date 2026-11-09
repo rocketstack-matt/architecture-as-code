@@ -30,6 +30,13 @@ function isRegistryEntry(value: unknown): value is RegistryEntry {
         });
 }
 
+function keepRegistryEntry(value: unknown): value is RegistryEntry {
+    if (isRegistryEntry(value)) return true;
+    const id = isObject(value) && typeof value.id === 'string' ? value.id : undefined;
+    console.warn('%s', id === undefined ? 'Dropped an extension registry entry with no id' : `Dropped extension registry entry: ${id}`);
+    return false;
+}
+
 /** A failed registry load. `signedOut` is true for a 401, which opens the sign-in prompt. */
 export class ExtensionRegistryError extends Error {
     constructor(message: string, readonly signedOut: boolean) {
@@ -85,7 +92,7 @@ export class ExtensionService {
         this.registry ??= getAuthHeaders()
             .then((headers) => this.ax.get<{ values?: unknown }>('/api/calm/extensions', { headers }))
             .then((res) => (Array.isArray(res.data?.values) ? (res.data.values as unknown[]) : []))
-            .then((values) => values.filter(isRegistryEntry))
+            .then((values) => values.filter(keepRegistryEntry))
             .catch((error) => {
                 this.registry = undefined;
                 // The registry is a Hub call, so a 401 means the Hub session ended. An extension call keeps its 401 in its slot.

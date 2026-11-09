@@ -145,6 +145,16 @@ describe('ExtensionService', () => {
         expect((await service.fetchExtensions()).map((e) => e.id)).toEqual(['good', 'good-views', 'good-screen']);
         expect((await service.fetchDecoratorViews()).map((v) => v.id)).toEqual(['risk']);
     });
+    it('logs one warning for each dropped registry entry, with its id if it has one', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mock.onGet('/api/calm/extensions').reply(200, { values: [entry('good'), entry('bad', { routes: {} }), null] });
+        expect((await new ExtensionService(ax).fetchExtensions()).map((e) => e.id)).toEqual(['good']);
+        expect(warn.mock.calls).toEqual([
+            ['%s', 'Dropped extension registry entry: bad'],
+            ['%s', 'Dropped an extension registry entry with no id'],
+        ]);
+        warn.mockRestore();
+    });
     it('skips a decorator-views value that is not a list, and keeps the other views', async () => {
         mock.onGet('/api/calm/extensions').reply(200, { values: [
             entry('object', { contributes: { 'decorator-views': { id: 'risk' } } }),
