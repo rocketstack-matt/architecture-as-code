@@ -195,9 +195,9 @@ the sign-in prompt. `ExtensionsProvider` (`extensions/ExtensionsContext.tsx`) ow
 Get it with `useExtensionService()`, not `new ExtensionService()` or a module singleton: the registry, the
 decorator views and the slots then share one registry request, and a test can inject a service. The service
 drops registry entries whose `hubApi` the UI does not support, for both paths. After a failed load the provider
-tries again with a backoff (5 s, doubled, up to 60 s; a new service starts it again), but not after a `401`. `useExtensionsStatus()` gives
-`loading`, `loaded`, `failed` or `signed-out`. Use it where an empty list must not mean "no extension", for
-example `ExtensionScreenPage` on a deep link.
+tries again with a backoff (5 s, doubled, up to 60 s; a new service starts it again), but not after a `401`.
+`useExtensionsStatus()` gives `loading`, `loaded`, `failed` or `signed-out`. Use it where an empty list must not
+mean "no extension", for example `ExtensionScreenPage` on a deep link.
 
 ### Extension UI layout
 
@@ -211,11 +211,12 @@ per-extension toolbar button or tab: it does not scale to many extensions.
   to it keeps the tab. `resourceExtensions()` decides if it shows.
 - Actions: `ExtensionActionButton`. A route that is not `readOnly` asks in `ConfirmActionDialog`, not
   `window.confirm`. The dialog opens with `showModal()` and names the target context. Do not abort a confirmed
-  write: the backend can still finish it, so a retry can write twice. The busy state and the last result live in the
-  provider's `ActionRuns` (`extensions/actionRuns.ts`), not in the button, so a remount cannot enable a write in flight or lose
-  its result. A call in flight disables each button of the action (key: extension and contribution); a result
-  shows only on the button that ran it (key: also the `placement` prop, which must be stable across a remount). An action slot key leaves out the context, so a change of selection does not remount it. A change of
-  context clears the result. The button uses `aria-disabled`, not `disabled`, so focus can go back to it after the
+  write: the backend can still finish it, so a retry can write twice. The busy state and the last result live in
+  the provider's `ActionRuns` (`extensions/actionRuns.ts`), not in the button, so a remount cannot enable a write
+  in flight or lose its result. A call in flight disables each button of the action (key: extension and
+  contribution); a result shows only on the button that ran it (key: also the `placement` prop, which must be
+  stable across a remount). An action slot key leaves out the context, so a change of selection does not remount
+  it. A change of context clears the result. The button uses `aria-disabled`, not `disabled`, so focus can go back to it after the
   dialog. While the dialog is modal the page is inert and `focus()` outside it does nothing: the dialog calls
   `close()` before its callback, and the button takes focus in an effect after the dialog unmounts. jsdom has no
   modal dialogs, so a test that checks focus must model inertness (see `ExtensionSlot.test.tsx`).
@@ -223,8 +224,10 @@ per-extension toolbar button or tab: it does not scale to many extensions.
 - Both use `ExtensionSections`: the first section is open, a choice is kept in `localStorage` per extension, and a
   closed section renders nothing, so it sends no request.
   Give `ExtensionSections` and `ExtensionSlot` a `headingLevel` one below the heading of the place that holds
-  them: `h3`/`h4` in the Extensions tab, `h5`/`h6` in the node details, `h1` on a screen page (nothing else there is an `h1`).
-  A block slot shows its title in every state (loading, failed, a reply it cannot show), and the screen page has
+  them: `h3`/`h4` in the Extensions tab, `h5`/`h6` in the node details, `h1` on a screen page (nothing else
+  there is an `h1`).
+  A block slot shows its title and its named region in every state (loading, failed, a reply it cannot show:
+  the error boundary takes a `frame`), and the screen page has
   an `h1` before the registry loads, so the outline does not change.
 - Overlays: `fetchDecoratorViews()` adds `source` (the extension) to each view. Key a view with `viewKey()`, never
   `view.id` alone. Hub does not start when two enabled extensions declare the same view id, but a disabled
