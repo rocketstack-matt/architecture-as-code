@@ -137,8 +137,8 @@ A button in the extension's section of the **Extensions** tab.
 - The action shows only when the context gives a value for each placeholder in the route path.
   An action that needs only `{selectedElement}` shows disabled until a link names a node.
 - An action does not accept user input, and Hub does not show its reply. A call that succeeds
-  shows "<title>: done.", and a failed call shows "Extension request failed." The message goes
-  when the context changes.
+  shows "<title>: done.", and a failed call shows "Extension request failed." The message stays
+  when the section closes and opens again, and goes when the context changes.
 - A read-only Hub leaves out an action whose route changes data and is not `readOnly`.
 
 ## decorator-views

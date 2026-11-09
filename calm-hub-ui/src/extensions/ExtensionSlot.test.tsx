@@ -62,7 +62,7 @@ describe('ExtensionSlot', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
         fireEvent.click(screen.getByRole('button', { name: 'Run' }));
         expect(await screen.findByRole('alert')).toHaveTextContent('failed');
-        expect(screen.getByRole('button', { name: 'Summary' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'false');
     });
     it('does not confirm read-only actions and reports failures', async () => {
         vi.spyOn(ExtensionService.prototype, 'call').mockRejectedValue(new Error());
@@ -125,9 +125,9 @@ it('keeps a confirmed write running when the context changes', async () => {
     view.rerender(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={{ version: '2' }} />);
     expect(spy.mock.calls[0][3]).toBeUndefined();
     expect(spy.mock.calls[0][2]).toEqual({ version: '1' });
-    expect(screen.getByRole('button', { name: 'Summary' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'true');
     complete(undefined);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Summary' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'false'));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
@@ -164,12 +164,12 @@ describe('ExtensionSlot actions', () => {
         view.rerender(page(false));
         view.rerender(page(true));
         const button = screen.getByRole('button', { name: 'Summary' });
-        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute('aria-disabled', 'true');
         fireEvent.click(button);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
         await act(async () => complete(undefined));
-        expect(screen.getByRole('button', { name: 'Summary' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Summary' })).toHaveAttribute('aria-disabled', 'false');
         expect(spy).toHaveBeenCalledOnce();
     });
 
@@ -181,6 +181,44 @@ describe('ExtensionSlot actions', () => {
 
         view.rerender(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '2' }} />);
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+        view.rerender(<ExtensionSlot action extension={extension} contribution={contribution} context={{ version: '1' }} />);
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('shows the result of a write that ends while the button is not on screen', async () => {
+        let complete: (value: unknown) => void = () => {};
+        vi.spyOn(ExtensionService.prototype, 'call').mockReturnValue(new Promise((resolve) => (complete = resolve)));
+        const service = providerService();
+        const page = (shown: boolean) => (
+            <ExtensionsProvider service={service}>
+                {shown && <ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />}
+            </ExtensionsProvider>
+        );
+        const view = render(page(true));
+        fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+        view.rerender(page(false));
+        await act(async () => complete(undefined));
+        view.rerender(page(true));
+        expect(screen.getByRole('status')).toHaveTextContent('Summary: done.');
+    });
+
+    it('gives focus back to the action button when the dialog closes', async () => {
+        vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue(undefined);
+        render(<ExtensionSlot action extension={writeExtension} contribution={contribution} context={target} />);
+        const button = screen.getByRole('button', { name: 'Summary' });
+        fireEvent.click(button);
+        screen.getByRole('button', { name: 'Cancel' }).focus();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(button).toHaveFocus();
+
+        fireEvent.click(button);
+        screen.getByRole('button', { name: 'Run' }).focus();
+        fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+        expect(button).toHaveFocus();
+        expect(await screen.findByRole('status')).toBeInTheDocument();
     });
 
     it('says when an action is done, until the context changes', async () => {
