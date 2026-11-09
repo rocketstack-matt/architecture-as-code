@@ -14,11 +14,13 @@ vi.spyOn(axios, 'create').mockReturnValue(ax);
 const mock = new AxiosMockAdapter(ax as never);
 const route: ExtensionRoute = { id: 'summary', method: 'GET', path: '/summary/{namespace}', scope: 'read', readOnly: true };
 afterEach(() => mock.reset());
+const entry = (id: string, fields: object = {}) => ({ id, hubApi: 0, routes: [], contributes: {}, ...fields });
+const views = (...list: object[]) => ({ contributes: { 'decorator-views': list } });
 
 describe('ExtensionService', () => {
     it('loads the registry', async () => {
-        mock.onGet('/api/calm/extensions').reply(200, { values: [{ id: 'test', hubApi: 0 }] });
-        expect(await new ExtensionService(ax).fetchExtensions()).toEqual([{ id: 'test', hubApi: 0 }]);
+        mock.onGet('/api/calm/extensions').reply(200, { values: [entry('test')] });
+        expect(await new ExtensionService(ax).fetchExtensions()).toEqual([entry('test')]);
     });
     it('treats an absent registry values list as empty', async () => {
         mock.onGet('/api/calm/extensions').reply(200, {});
@@ -34,18 +36,17 @@ describe('ExtensionService', () => {
         const first = { id: 'scanner', match: { type: 'scan' }, label: 'Scan' };
         const second = { id: 'audit', match: { schema: 'https://example.org/audit' }, label: 'Audit' };
         mock.onGet('/api/calm/extensions').reply(200, { values: [
-            { hubApi: 0, contributes: { 'decorator-views': [first, second] } }, { hubApi: 0 },
-            { hubApi: 0, contributes: { 'decorator-views': [second] } },
+            entry('a', views(first, second)), entry('b'), entry('c', views(second)),
         ] });
-        expect(await new ExtensionService(ax).fetchDecoratorViews()).toEqual([first, second, second]);
+        expect(await new ExtensionService(ax).fetchDecoratorViews()).toMatchObject([first, second, second]);
         expect(mock.history.get[0].headers?.Authorization).toBe('test');
     });
     it('tags each decorator view with its extension, and marks built-in ones', async () => {
         const view = { id: 'risk', match: { type: 'risk' }, label: 'Risk' };
         mock.onGet('/api/calm/extensions').reply(200, { values: [
-            { id: 'release-tracker', name: 'Release tracker', hubApi: 0, contributes: { 'decorator-views': [view] } },
-            { id: 'deployment', name: 'Deployments', hubApi: 0, contributes: { 'decorator-views': [view] } },
-            { id: 'nameless', hubApi: 0, contributes: { 'decorator-views': [view] } },
+            entry('release-tracker', { name: 'Release tracker', ...views(view) }),
+            entry('deployment', { name: 'Deployments', ...views(view) }),
+            entry('nameless', views(view)),
         ] });
         expect((await new ExtensionService(ax).fetchDecoratorViews()).map((v) => v.source)).toEqual([
             { id: 'release-tracker', name: 'Release tracker', builtIn: false },
@@ -59,16 +60,16 @@ describe('ExtensionService', () => {
         await expect(new ExtensionService(ax).fetchDecoratorViews()).rejects.toThrow('Error fetching decorator views:');
     });
     it('shares one registry request between extensions and decorator views', async () => {
-        mock.onGet('/api/calm/extensions').reply(200, { values: [{ id: 'test', hubApi: 0 }] });
+        mock.onGet('/api/calm/extensions').reply(200, { values: [entry('test')] });
         const service = new ExtensionService(ax);
         await Promise.all([service.fetchExtensions(), service.fetchDecoratorViews(), service.fetchExtensions()]);
         expect(mock.history.get).toHaveLength(1);
     });
     it('retries the registry after a failure', async () => {
-        mock.onGet('/api/calm/extensions').replyOnce(500).onGet('/api/calm/extensions').reply(200, { values: [{ id: 'test', hubApi: 0 }] });
+        mock.onGet('/api/calm/extensions').replyOnce(500).onGet('/api/calm/extensions').reply(200, { values: [entry('test')] });
         const service = new ExtensionService(ax);
         await expect(service.fetchExtensions()).rejects.toThrow();
-        expect(await service.fetchExtensions()).toEqual([{ id: 'test', hubApi: 0 }]);
+        expect(await service.fetchExtensions()).toEqual([entry('test')]);
     });
     it('sends context through the proxy with auth', async () => {
         mock.onGet('/api/calm/extensions/test/api/summary/a%20b').reply((config) => {
@@ -118,13 +119,40 @@ describe('ExtensionService', () => {
     it('drops registry entries of an unsupported contract from extensions and decorator views alike', async () => {
         const view = { id: 'risk', match: { type: 'risk' }, label: 'Risk' };
         mock.onGet('/api/calm/extensions').reply(200, { values: [
-            { id: 'now', hubApi: 0, contributes: { 'decorator-views': [view] } },
-            { id: 'future', hubApi: 1, contributes: { 'decorator-views': [{ ...view, id: 'future-risk' }] } },
+            entry('now', views(view)),
+            entry('future', { hubApi: 1, ...views({ ...view, id: 'future-risk' }) }),
             null,
         ] });
         const service = new ExtensionService(ax);
         expect((await service.fetchExtensions()).map((e) => e.id)).toEqual(['now']);
         expect((await service.fetchDecoratorViews()).map((v) => v.id)).toEqual(['risk']);
+    });
+    it('drops a malformed registry entry, so a page does not read a missing field', async () => {
+        const route = { id: 'r', method: 'GET', path: '/x', scope: 'read', readOnly: true };
+        mock.onGet('/api/calm/extensions').reply(200, { values: [
+            entry('good'), entry('good-views', views({ id: 'risk' })),
+            entry('good-screen', { routes: [route], contributes: { screen: [{ id: 's', title: 'S', route: 'r' }], future: 'kept' } }),
+            { hubApi: 0, routes: [], contributes: {} }, entry('numeric', { id: 7 }),
+            entry('no-routes', { routes: undefined }), entry('object-routes', { routes: {} }),
+            entry('no-contributes', { contributes: undefined }), entry('list-contributes', { contributes: [] }),
+            entry('null-contributes', { contributes: null }), 'scanner', [],
+            entry('null-route', { routes: [null] }), entry('route-no-path', { routes: [{ id: 'r', method: 'GET' }] }),
+            entry('object-screen', { contributes: { screen: { id: 's' } } }),
+            entry('null-action', { contributes: { action: [null] } }),
+            entry('tab-no-title', { contributes: { 'designer-tab': [{ id: 't', route: 'r' }] } }),
+        ] });
+        const service = new ExtensionService(ax);
+        expect((await service.fetchExtensions()).map((e) => e.id)).toEqual(['good', 'good-views', 'good-screen']);
+        expect((await service.fetchDecoratorViews()).map((v) => v.id)).toEqual(['risk']);
+    });
+    it('skips a decorator-views value that is not a list, and keeps the other views', async () => {
+        mock.onGet('/api/calm/extensions').reply(200, { values: [
+            entry('object', { contributes: { 'decorator-views': { id: 'risk' } } }),
+            entry('text', { contributes: { 'decorator-views': 'risk' } }),
+            entry('null', { contributes: { 'decorator-views': null } }),
+            entry('good', views({ id: 'audit' })),
+        ] });
+        expect((await new ExtensionService(ax).fetchDecoratorViews()).map((v) => v.id)).toEqual(['audit']);
     });
     it('rejects missing route context', () => {
         expect(() => extensionRequest('test', route, {})).toThrow('Missing extension context');
