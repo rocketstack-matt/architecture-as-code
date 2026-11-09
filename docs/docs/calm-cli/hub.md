@@ -452,7 +452,7 @@ echo '{"namespace":"finos","name":"payments"}' | calm hub ext example-services a
 
 - **`--input <file>`**: A JSON file with the command input object, or `-` to read it from stdin.
 - **`--arg <key=value>`**: Sets a top-level input property. You can use it more than once, and it overrides `--input`. The value gets the type that the input schema declares for the property, so `--arg limit=5` sends a number. A number converts only when it is written as it is sent, so `0x10`, `1e3`, `1.0` and an integer above 2^53 stay strings, for the extension to reject. `--arg` cannot set `__proto__`: put it in the `--input` file.
-- **`--timeout <seconds>`**: Stops waiting for the reply after this many seconds. With no `--timeout`, the CLI waits until CALM Hub ends the call at the `request-timeout-seconds` of the extension. If the CLI stops waiting on a write, CALM Hub and the extension can still complete the write, so check before you run the command again.
+- **`--timeout <seconds>`**: Stops waiting for the reply after this many seconds, written as a decimal number up to 2147483. With no `--timeout`, the CLI waits until CALM Hub ends the call at the `request-timeout-seconds` of the extension. If the CLI stops waiting on a write, CALM Hub and the extension can still complete the write, so check before you run the command again.
 - **`-c, --calm-hub-url <url>`**: URL to the CALM Hub instance.
 - **`-f, --format <format>`**: Error format, `json` (default) or `pretty`.
 

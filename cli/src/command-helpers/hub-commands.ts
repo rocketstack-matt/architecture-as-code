@@ -1333,12 +1333,16 @@ function parseExtensionArgs(args: string[], request: string, format: OutputForma
     });
 }
 
+// Node runs a timer above 2^31-1 ms after 1 ms, which would stop waiting at once.
+const MAX_TIMEOUT_SECONDS = 2147483;
+const DECIMAL_SECONDS = /^(\d+(\.\d*)?|\.\d+)$/;
+
 function parseExtensionTimeout(timeout: string | undefined, request: string, format: OutputFormat): number | undefined {
     if (timeout === undefined) {
         return undefined;
     }
     const seconds = Number(timeout);
-    if (timeout.trim() === '' || !Number.isFinite(seconds) || seconds <= 0) {
+    if (!DECIMAL_SECONDS.test(timeout.trim()) || seconds <= 0 || seconds > MAX_TIMEOUT_SECONDS) {
         printError(0, `--timeout must be a positive number of seconds: ${timeout}`, request, format);
         process.exit(1);
     }

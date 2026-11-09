@@ -825,8 +825,8 @@ calm hub ext <id> <command> [--input <file|->] [--arg key=value]... [--timeout <
 | Option | Applies to | Description |
 |--------|------------|-------------|
 | `--input <file>` | `ext` | JSON file with the command input object, or `-` for stdin. |
-| `--arg <key=value>` | `ext` | Sets a top-level input property. Repeatable, and overrides `--input`. The value gets the type that the input schema declares for the property. A number converts only when it is written as it is sent, so `0x10`, `1e3` and an integer above 2^53 stay strings. It cannot set `__proto__`. |
-| `--timeout <seconds>` | `ext` | Stops waiting for the reply. With none, CalmHub ends the call at the `request-timeout-seconds` of the extension. A write can still complete after the CLI stops waiting. |
+| `--arg <key=value>` | `ext` | Sets a top-level input property. Repeatable, and overrides `--input`. The value gets the type that the input schema declares for the property. A number converts only when it is written as it is sent, so `0x10`, `1e3`, `1.0` and an integer above 2^53 stay strings. It cannot set `__proto__`. |
+| `--timeout <seconds>` | `ext` | Stops waiting for the reply, after a decimal number of seconds up to 2147483. With none, CalmHub ends the call at the `request-timeout-seconds` of the extension. A write can still complete after the CLI stops waiting. |
 | `-c, --calm-hub-url <url>` | all | CalmHub instance. |
 | `-f, --format <format>` | all | Output format: `json` (default) or `pretty`. For `ext`, it changes only the error format. |
 

@@ -2498,7 +2498,7 @@ describe('hub-commands', () => {
                 expect(input.name).toBe('a');
             });
 
-            it.each([['90', 90000], ['0.5', 500], ['1.0001', 1001]])('passes --timeout %s as %d ms', async (timeout, timeoutMs) => {
+            it.each([['90', 90000], ['0.5', 500], ['1.0001', 1001], [' 2147483 ', 2147483000]])('passes --timeout %s as %d ms', async (timeout, timeoutMs) => {
                 const { mockClient } = await getSharedMocks();
 
                 await runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services', timeout });
@@ -2506,7 +2506,7 @@ describe('hub-commands', () => {
                 expect(mockClient.callExtension).toHaveBeenCalledWith('example', extension.routes[0], {}, { timeoutMs });
             });
 
-            it.each(['0', '-1', 'soon', '', 'Infinity'])('exits without a call when --timeout is %j', async (timeout) => {
+            it.each(['0', '-1', 'soon', '', 'Infinity', '2147483.001', '2147484', '0x10', '1e3'])('exits without a call when --timeout is %j', async (timeout) => {
                 const { mockClient } = await getSharedMocks();
 
                 await expect(runExtensionCommand({ calmHubOptions: hub, id: 'example', command: 'list-services', timeout }))
