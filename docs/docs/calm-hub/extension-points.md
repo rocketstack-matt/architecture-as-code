@@ -31,7 +31,7 @@ Each extension point, except `decorator-views`, is a list of entries with these 
 | Field | Required | Rule |
 |---|---|---|
 | `id` | Yes | Lowercase letters, digits and `-`, starting with a letter. Unique in its extension point |
-| `title` | Yes | The label that the UI shows. A blocks reply can replace it with its own `title` |
+| `title` | Yes | The label that the UI shows. It is the heading of the slot. A blocks reply `title` shows under it |
 | `route` | Yes | The `id` of a route in `routes` |
 
 CALM Hub does not start if an entry names a route that is not declared, or if a `screen`,
@@ -136,12 +136,14 @@ A button in the extension's section of the **Extensions** tab.
   in the JSON body.
 - Hub asks the user to confirm when the route is not `readOnly`. The dialog shows the namespace,
   resource, version and element that the call will send. These are the values at the time of the
-  click, also when the page changes before the user confirms.
+  click, also when the page changes before the user confirms. Cancel has the focus when the dialog
+  opens, so Enter does not run the call.
 - Hub does not cancel a confirmed call when the user changes the selection or leaves the page. The
   button stays disabled until the call ends, also when its section closes and opens again.
 - The action shows only when the context gives a value for each placeholder in the route path.
   An action that needs only `{selectedElement}` shows disabled until a link names a node. It also shows disabled when Hub refuses the node id in a path, for example an id with `/`, `@` or `%`.
-- An action does not accept user input, and Hub does not show its reply. A call that succeeds
+- An action does not accept user input, and Hub does not show its reply. A call in flight
+  shows `<title>: running…`. A call that succeeds
   shows `<title>: done.`, and a failed call shows "Extension request failed." The message stays
   when the section closes and opens again, and goes when the context changes.
 - A read-only Hub leaves out an action whose route changes data and is not `readOnly`.
