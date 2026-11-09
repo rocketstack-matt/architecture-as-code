@@ -11,6 +11,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -22,45 +23,49 @@ import static org.mockito.Mockito.when;
 
 class TestReadOnlyHubGuardInterceptorShould {
 
+    // Quarkus indexes this fixture as a real MCP tool bean: each @Tool needs a unique name, each
+    // @PermissionsAllowed method needs the parameter its checker takes, and the guard keeps the
+    // bean loop in TestMcpToolsReadOnlyShould from calling a write here unguarded.
     @SuppressWarnings("unused")
+    @ReadOnlyHubGuard
     static class SampleTools {
-        @Tool(description = "read")
+        @Tool(name = "test_read_only_guard_read", description = "read")
         @PermissionsAllowed(CalmHubScopes.READ)
-        public ToolResponse read() {
+        public ToolResponse read(String namespace) {
             return null;
         }
 
-        @Tool(description = "domain read")
+        @Tool(name = "test_read_only_guard_domain_read", description = "domain read")
         @PermissionsAllowed(CalmHubScopes.DOMAIN_READ)
-        public ToolResponse domainRead() {
+        public ToolResponse domainRead(String domain) {
             return null;
         }
 
-        @Tool(description = "search")
+        @Tool(name = "test_read_only_guard_search", description = "search")
         @Authenticated
         public ToolResponse search() {
             return null;
         }
 
-        @Tool(description = "write")
+        @Tool(name = "test_read_only_guard_write", description = "write")
         @PermissionsAllowed(CalmHubScopes.WRITE)
-        public ToolResponse write() {
+        public ToolResponse write(String namespace) {
             return null;
         }
 
-        @Tool(description = "read or write")
+        @Tool(name = "test_read_only_guard_read_or_write", description = "read or write")
         @PermissionsAllowed({CalmHubScopes.READ, CalmHubScopes.WRITE})
-        public ToolResponse readOrWrite() {
+        public ToolResponse readOrWrite(String namespace) {
             return null;
         }
 
-        @Tool(description = "admin")
+        @Tool(name = "test_read_only_guard_admin", description = "admin")
         @PermissionsAllowed(CalmHubScopes.GLOBAL_ADMIN)
         public ToolResponse admin() {
             return null;
         }
 
-        @Tool(description = "no annotation")
+        @Tool(name = "test_read_only_guard_unannotated", description = "no annotation")
         public ToolResponse unannotated() {
             return null;
         }
@@ -127,6 +132,9 @@ class TestReadOnlyHubGuardInterceptorShould {
     }
 
     private static Method method(String name) throws NoSuchMethodException {
-        return SampleTools.class.getMethod(name);
+        return Arrays.stream(SampleTools.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals(name))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchMethodException(name));
     }
 }
