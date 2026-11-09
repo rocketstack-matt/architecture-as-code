@@ -439,7 +439,7 @@ calm hub extensions describe example-services
 calm hub extensions describe example-services list-services
 ```
 
-With a command name, the output shows the method, path and scope of the command's route, and the input and output JSON Schemas.
+With a command name, the output shows the method, path and scope of the command's route, and the input and output JSON Schemas. `readOnly` is `true` for a `GET` route and for a route that the manifest marks `readOnly`, as the MCP `readOnlyHint` is.
 
 ### Run a command
 
@@ -451,11 +451,12 @@ echo '{"namespace":"finos","name":"payments"}' | calm hub ext example-services a
 **Options:**
 
 - **`--input <file>`**: A JSON file with the command input object, or `-` to read it from stdin.
-- **`--arg <key=value>`**: Sets a top-level input property. You can use it more than once, and it overrides `--input`. The value gets the type that the input schema declares for the property, so `--arg limit=5` sends a number.
+- **`--arg <key=value>`**: Sets a top-level input property. You can use it more than once, and it overrides `--input`. The value gets the type that the input schema declares for the property, so `--arg limit=5` sends a number. A number converts only when it is written as it is sent, so `0x10`, `1e3`, `1.0` and an integer above 2^53 stay strings, for the extension to reject. `--arg` cannot set `__proto__`: put it in the `--input` file.
+- **`--timeout <seconds>`**: Stops waiting for the reply after this many seconds. With no `--timeout`, the CLI waits until CALM Hub ends the call at the `request-timeout-seconds` of the extension. If the CLI stops waiting on a write, CALM Hub and the extension can still complete the write, so check before you run the command again.
 - **`-c, --calm-hub-url <url>`**: URL to the CALM Hub instance.
 - **`-f, --format <format>`**: Error format, `json` (default) or `pretty`.
 
-Input properties that match a `{param}` in the route path fill the path. Such a value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@` or a control character, because CALM Hub refuses these in a path. The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. A JSON reply is printed as JSON, and a text reply as text.
+Input properties that match a `{param}` in the route path fill the path. Such a value must not be empty or `.`, or contain `..`, `/`, `\`, `%`, `@`, a look-alike of `/` or `\` (such as `∕` U+2215 or `＼` U+FF3C), a control character or a lone surrogate, because CALM Hub refuses these in a path. The other properties go to the query for `GET` and `DELETE`, and to the JSON body for other methods. A query name or value must not contain a control character or a lone surrogate. A number fills the path or the query in plain notation, as for an MCP tool, so `1e21` gives `1000000000000000000000`. A JSON reply is printed as JSON, and a text reply as text.
 
 CALM Hub checks the route, the path and the scope. It does not check the input against the input schema, as it does for an MCP tool: the extension checks it. If CALM Hub or the extension rejects the call, the CLI exits with code 1 and prints the error with the body as CALM Hub sent it. If the extension replies with a 3xx, 401, 407 or 5xx status, or with a content type that CALM Hub does not pass on, CALM Hub sends a generic `502` with the error `The extension failed` in its place:
 
