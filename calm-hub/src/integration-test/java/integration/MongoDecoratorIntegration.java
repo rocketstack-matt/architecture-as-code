@@ -8,6 +8,7 @@ import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import org.bson.Document;
+import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.store.mongo.MongoDecoratorStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -373,6 +374,18 @@ public class MongoDecoratorIntegration {
                 .then()
                 .statusCode(200)
                 .body("values", hasSize(2));
+    }
+
+    @Test
+    @Order(13)
+    void end_to_end_refuse_a_key_with_a_nul_character() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": \"deployment\", \"data\": {\"a\\u0000b\": 1}}")
+                .when().post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body(equalTo(DecoratorKeyRefusedException.nulCharacter().getMessage()));
     }
 
     private static String reservedDecorator(String status) {
