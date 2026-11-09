@@ -34,6 +34,7 @@ For the fields of each part, see the [extension point reference](../../calm-hub/
 - A clone of `finos/architecture-as-code`, with `npm ci` done at the root
 - Node.js 26 (see `.nvmrc`) and JDK 21
 - `openssl` and `curl`
+- Docker, only for the [Docker option](#with-docker) of step 4
 - The CALM CLI, built from the clone: `npm run build:cli`. This tutorial runs it as
   `node cli/dist/index.js`. If you use `npm run link:cli`, type `calm` instead
 
@@ -216,7 +217,7 @@ In `application.properties`, quote the extension id: `calm.extensions."release-t
 
 The published `finos/calm-hub:latest-read-only-static` image has no extensions until a build that
 includes them is published. Until then, build the image from your checkout. The script runs the
-Maven build first:
+Maven build and the unit tests first, so it takes some minutes:
 
 ```bash
 bash build-readonly-image.sh
@@ -224,10 +225,12 @@ bash build-readonly-image.sh
 
 The image runs as user `185`, so that user must be able to read the keys. `openssl genpkey` writes
 the private key with mode `600`, and CALM Hub then stops at start with `Cannot read the key file`.
-For local development only, let all users read the key:
+With a strict umask such as `077`, the folder and the public key are closed to other users too.
+For local development only, let all users read the folder and the keys:
 
 ```bash
-chmod 644 ../sandbox/keys/hub-private.pem
+chmod 755 ../sandbox/keys
+chmod 644 ../sandbox/keys/hub-private.pem ../sandbox/keys/hub-public.pem
 ```
 
 Do not do this in production: give the key to user `185`, for example with a secret mount.
