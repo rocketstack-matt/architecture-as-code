@@ -40,6 +40,7 @@ import org.finos.calm.domain.Decorator;
 
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -1233,6 +1234,11 @@ class TestMongoDecoratorStoreShould {
 
         assertThrows(BsonSerializationException.class,
                 () -> new DocumentCodec().encode(writer, new Document("a\0b", 1), EncoderContext.builder().build()));
+    }
+
+    @Test
+    void allow_a_write_because_mongo_can_write() {
+        assertDoesNotThrow(() -> decoratorStore.requireWritable());
     }
 
     private static final String NUL_KEY_DECORATOR = "{\"type\": \"deployment\", \"data\": {\"list\": [{\"a\\u0000b\": 1}]}}";
