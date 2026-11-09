@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { ExtensionContext, ExtensionContribution, ExtensionScreen, ExtensionSummary } from '../model/extensions.js';
 import { ExtensionActionButton } from './ExtensionActionButton.js';
 import { Heading, HeadingLevel } from './Heading.js';
@@ -54,18 +54,20 @@ function SlotContent({ extension, contribution, context = {}, action, headingLev
         <p role="status">Loading extension…</p>
     ) : undefined;
     return (
-        <section className="@container flex flex-col gap-4 min-w-0 overflow-auto" aria-label={contribution.title}>
-            <SlotTitle level={headingLevel}>{result?.title ?? contribution.title}</SlotTitle>
+        <SlotFrame label={contribution.title} title={result?.title ?? contribution.title} level={headingLevel}>
             {state ?? result?.blocks.map((block, index) => <BlockRenderer key={index} block={block} headingLevel={headingLevel} />)}
-        </section>
+        </SlotFrame>
     );
 }
 
-function SlotTitle({ level, children }: { level: HeadingLevel; children: string }) {
+function SlotFrame({ label, title, level, children }: { label: string; title: string; level: HeadingLevel; children: ReactNode }) {
     return (
-        <Heading level={level} className="text-lg font-bold">
+        <section className="@container flex flex-col gap-4 min-w-0 overflow-auto" aria-label={label}>
+            <Heading level={level} className="text-lg font-bold">
+                {title}
+            </Heading>
             {children}
-        </Heading>
+        </section>
     );
 }
 
@@ -75,7 +77,15 @@ export function ExtensionSlot(props: ExtensionSlotProps) {
     return (
         <ScreenErrorBoundary
             key={key}
-            heading={props.action ? undefined : <SlotTitle level={props.headingLevel ?? 2}>{props.contribution.title}</SlotTitle>}
+            frame={
+                props.action
+                    ? undefined
+                    : (content) => (
+                          <SlotFrame label={props.contribution.title} title={props.contribution.title} level={props.headingLevel ?? 2}>
+                              {content}
+                          </SlotFrame>
+                      )
+            }
         >
             <SlotContent key={key} {...props} />
         </ScreenErrorBoundary>

@@ -139,6 +139,16 @@ it('loads a GET block route without the optional readOnly flag', async () => {
     expect(await screen.findByRole('heading', { name: 'Summary' })).toBeInTheDocument();
 });
 
+it('keeps the named region and its heading when the reply cannot be shown', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(ExtensionService.prototype, 'call').mockResolvedValue({ hubApi: 0, blocks: [{ type: 'table', columns: 'bad', rows: [] }] });
+    render(<ExtensionSlot extension={extension} contribution={contribution} headingLevel={4} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('cannot show');
+    const region = screen.getByRole('region', { name: 'Summary' });
+    expect(within(region).getByRole('alert')).toBeInTheDocument();
+    expect(within(region).getByRole('heading', { level: 4, name: 'Summary' })).toBeInTheDocument();
+});
+
 describe('ExtensionSlot actions', () => {
     const target = { namespace: 'finos', resource: 'architecture/trading', version: '1.0.0', selectedElement: 'web-app' };
     function providerService() {

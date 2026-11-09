@@ -1,7 +1,10 @@
 import { Component, ReactNode } from 'react';
 
 /** Bad data from an extension must not break the Hub page around it. */
-export class ScreenErrorBoundary extends Component<{ children: ReactNode; heading?: ReactNode }, { failed: boolean }> {
+export class ScreenErrorBoundary extends Component<
+    { children: ReactNode; frame?: (content: ReactNode) => ReactNode },
+    { failed: boolean }
+> {
     state = { failed: false };
 
     static getDerivedStateFromError() {
@@ -14,14 +17,12 @@ export class ScreenErrorBoundary extends Component<{ children: ReactNode; headin
 
     render() {
         if (this.state.failed) {
-            return (
-                <>
-                    {this.props.heading}
-                    <div role="alert" className="alert alert-error alert-soft">
-                        <span>This extension sent content that CALM Hub cannot show.</span>
-                    </div>
-                </>
+            const alert = (
+                <div role="alert" className="alert alert-error alert-soft">
+                    <span>This extension sent content that CALM Hub cannot show.</span>
+                </div>
             );
+            return this.props.frame ? this.props.frame(alert) : alert;
         }
         return this.props.children;
     }
