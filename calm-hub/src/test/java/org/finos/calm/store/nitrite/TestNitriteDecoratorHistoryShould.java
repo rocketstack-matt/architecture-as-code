@@ -89,7 +89,7 @@ class TestNitriteDecoratorHistoryShould {
         store.createDecorator(NAMESPACE, decorator("first"));
         store.supersedeDecorator(NAMESPACE, 1, decorator("second"));
 
-        assertThrows(DecoratorNotFoundException.class,
+        assertThrows(DecoratorSupersededException.class,
                 () -> store.updateDecorator(NAMESPACE, 1, decorator("changed")));
 
         assertThat(store.getDecoratorById(NAMESPACE, 1).orElseThrow().getUniqueId(), is("first"));
@@ -137,7 +137,7 @@ class TestNitriteDecoratorHistoryShould {
         store.supersedeDecorator(NAMESPACE, 1, decorator("second"));
         store.createDecorator(NAMESPACE, decorator("other"));
 
-        store.deleteDecorator(NAMESPACE, 2);
+        store.deleteCurrentDecoratorHistory(NAMESPACE, 2);
 
         assertThat(store.getDecoratorsForNamespace(NAMESPACE, null, null), contains(3));
         assertThat(store.getDecoratorById(NAMESPACE, 1).isPresent(), is(false));

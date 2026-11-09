@@ -18,12 +18,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -41,11 +44,15 @@ public class DecoratorSchemaValidator {
     private static final String DECORATOR_DEFINITION = "#/defs/decorator";
     private static final Logger LOG = LoggerFactory.getLogger(DecoratorSchemaValidator.class);
 
-    private final SchemaRepository repository = SchemaRepository.create(new JsonSchemaOptions()
+    private static final JsonSchemaOptions OPTIONS = new JsonSchemaOptions()
             .setDraft(Draft.DRAFT202012)
             .setBaseUri("https://calm.finos.org/")
-            .setOutputFormat(OutputFormat.Basic));
+            .setOutputFormat(OutputFormat.Basic);
+
+    private final SchemaRepository repository = SchemaRepository.create(OPTIONS);
     private final Set<String> registered = new HashSet<>();
+    private final Map<String, JsonObject> documents = new HashMap<>();
+    private final Set<String> resolvedRefs = new HashSet<>();
     private final Set<String> knownSchemas = new HashSet<>();
 
     @Inject
@@ -105,10 +112,45 @@ public class DecoratorSchemaValidator {
         }
         try {
             repository.validator(id).validate(new JsonObject());
+            requireRefsResolve(id);
             knownSchemas.add(id);
-        } catch (SchemaException | IllegalArgumentException e) {
+        } catch (RuntimeException e) {
             LOG.warn("Decorators with $schema [{}] are not validated on write: {}", id, e.getMessage());
         }
+    }
+
+    // An empty object does not reach a $ref under properties or items, so check each $ref of each bundled
+    // schema that the id reaches. Otherwise a broken nested $ref fails only when a decorator reaches it.
+    private void requireRefsResolve(String id) {
+        Deque<String> uris = new ArrayDeque<>(List.of(documentUri(id)));
+        Set<String> visited = new HashSet<>();
+        while (!uris.isEmpty()) {
+            String uri = uris.poll();
+            JsonObject document = documents.get(uri);
+            if (document == null || !visited.add(uri)) {
+                continue;
+            }
+            for (String ref : refs(document)) {
+                String target = URI.create(uri).resolve(ref).toString();
+                // Hub bundles only calm.finos.org schemas, so it leaves other $refs as they were.
+                if (!target.startsWith(OPTIONS.getBaseUri())) {
+                    continue;
+                }
+                // The first pass loads only the absolute release $refs.
+                if (target.startsWith(RELEASE_BASE_URI)) {
+                    registerMetaSchema(target, new ArrayDeque<>());
+                }
+                if (!resolvedRefs.contains(target)) {
+                    repository.validator(JsonSchema.of(new JsonObject().put("$ref", target)), OPTIONS).validate(new JsonObject());
+                    resolvedRefs.add(target);
+                }
+                uris.add(documentUri(target));
+            }
+        }
+    }
+
+    private static String documentUri(String ref) {
+        return ref.contains("#") ? ref.substring(0, ref.indexOf('#')) : ref;
     }
 
     private boolean registerMetaSchema(String ref, Deque<JsonObject> pending) {
@@ -140,6 +182,7 @@ public class DecoratorSchemaValidator {
         try {
             repository.dereference(id, JsonSchema.of(schema.copy()));
             registered.add(id);
+            documents.put(id, schema);
             return id;
         } catch (SchemaException e) {
             LOG.warn("Ignoring bundled schema [{}]: {}", id, e.getMessage());

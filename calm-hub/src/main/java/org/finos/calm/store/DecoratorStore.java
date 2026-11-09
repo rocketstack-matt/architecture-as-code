@@ -64,8 +64,10 @@ public interface DecoratorStore {
      * @param decoratorJson the updated decorator as a raw JSON string
      * @throws NamespaceNotFoundException  if the namespace does not exist
      * @throws DecoratorNotFoundException  if no decorator with the given ID exists
+     * @throws DecoratorSupersededException if the decorator exists but has been superseded
      */
-    void updateDecorator(String namespace, int id, String decoratorJson) throws NamespaceNotFoundException, DecoratorNotFoundException;
+    void updateDecorator(String namespace, int id, String decoratorJson)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException;
 
     /**
      * Store a new decorator that supersedes an existing one, for an append-only (reserved) type. The
@@ -102,14 +104,4 @@ public interface DecoratorStore {
      */
     void deleteCurrentDecoratorHistory(String namespace, int currentId)
             throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException;
-
-    /**
-     * Delete an existing decorator in the given namespace, with its whole history.
-     *
-     * @param namespace the namespace containing the decorator
-     * @param id        the ID of any decorator in the history to delete
-     * @throws NamespaceNotFoundException if the namespace does not exist
-     * @throws DecoratorNotFoundException if no decorator with the given ID exists
-     */
-    void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException;
 }

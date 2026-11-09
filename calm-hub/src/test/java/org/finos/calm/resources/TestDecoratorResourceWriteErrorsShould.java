@@ -6,21 +6,20 @@ import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.finos.calm.domain.DecoratorSchemaError;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
-import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.services.DecoratorWriteService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 // The write service is mocked: the schema tests in TestDecoratorResourceShould skip when the
@@ -53,6 +52,24 @@ class TestDecoratorResourceWriteErrorsShould {
     }
 
     @Test
+    void return_the_first_20_schema_errors_and_the_count_of_the_rest() throws Exception {
+        when(decoratorWriteService.createDecorator(any(), eq("finos"), anyString()))
+                .thenThrow(new DecoratorSchemaValidationException(IntStream.range(0, 23)
+                        .mapToObj(i -> new DecoratorSchemaError("/target-type/" + i, "must be one of the enum values")).toList()));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(DECORATOR_JSON)
+                .when()
+                .post("/api/calm/namespaces/finos/decorators")
+                .then()
+                .statusCode(400)
+                .body("errors", hasSize(20))
+                .body("errors[19].location", equalTo("/target-type/19"))
+                .body("moreErrors", equalTo(3));
+    }
+
+    @Test
     void return_400_with_the_errors_when_update_does_not_match_its_schema() throws Exception {
         when(decoratorWriteService.updateDecorator(any(), eq("finos"), eq(1), anyString()))
                 .thenThrow(new DecoratorSchemaValidationException(List.of(
@@ -67,19 +84,7 @@ class TestDecoratorResourceWriteErrorsShould {
                 .statusCode(400)
                 .body("error", equalTo("Decorator does not match its $schema"))
                 .body("errors.location", contains("/target-type"))
-                .body("errors.error", contains("required property is missing"));
-    }
-
-    @Test
-    void return_403_when_delete_refuses_a_reserved_type() throws Exception {
-        doThrow(new ReservedDecoratorTypeException("control-evaluation"))
-                .when(decoratorWriteService).deleteDecorator(any(), anyBoolean(), eq("finos"), anyInt());
-
-        given()
-                .when()
-                .delete("/api/calm/namespaces/finos/decorators/1")
-                .then()
-                .statusCode(403)
-                .body(equalTo("Decorator type is reserved and the caller may not write it: control-evaluation"));
+                .body("errors.error", contains("required property is missing"))
+                .body("moreErrors", nullValue());
     }
 }

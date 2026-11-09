@@ -12,6 +12,7 @@ import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.HubOwnedDecoratorFieldException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.store.DecoratorStore;
+import org.finos.calm.testutil.LogCapture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,8 +26,12 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Level;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -66,6 +71,28 @@ class TestDecoratorWriteServiceShould {
         lenient().when(mockConfig.reserved()).thenReturn(Map.of("control-evaluation", reserved));
         lenient().when(mockSchemaValidator.validate(any())).thenReturn(List.of());
         service = new DecoratorWriteService(mockDecoratorStore, mockConfig, mockSchemaValidator);
+    }
+
+    @Test
+    void log_each_reserved_type_with_its_writer_count_at_startup() {
+        DecoratorConfig.ReservedType twoWriters = () -> List.of("system", "auditor");
+        DecoratorConfig.ReservedType oneWriter = () -> List.of(WRITER);
+        when(mockConfig.reserved()).thenReturn(Map.of("validation", twoWriters, "control-evaluation", oneWriter));
+
+        assertThat(infoLogs(() -> service.logReservedTypes(null)),
+                contains(allOf(containsString("Reserved decorator types"),
+                        containsString("control-evaluation (1 writers), validation (2 writers)"))));
+    }
+
+    @Test
+    void log_that_no_type_is_reserved_at_startup() {
+        when(mockConfig.reserved()).thenReturn(Map.of());
+
+        assertThat(infoLogs(() -> service.logReservedTypes(null)), contains("No decorator type is reserved"));
+    }
+
+    private static List<String> infoLogs(Runnable action) {
+        return LogCapture.messages(DecoratorWriteService.class, Level.INFO, action);
     }
 
     @Test
@@ -163,15 +190,15 @@ class TestDecoratorWriteServiceShould {
     }
 
     @Test
-    void refuse_updating_an_unreserved_entry_that_has_been_superseded() throws Exception {
+    void pass_on_that_an_unreserved_entry_has_been_superseded_without_reading_its_history() throws Exception {
         when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
-        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
-                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
+        doThrow(new DecoratorSupersededException())
+                .when(mockDecoratorStore).updateDecorator(NAMESPACE, 1, UNRESERVED_JSON);
 
         assertThrows(DecoratorSupersededException.class,
                 () -> service.updateDecorator("alice", NAMESPACE, 1, UNRESERVED_JSON));
 
-        verify(mockDecoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+        verify(mockDecoratorStore, never()).getDecoratorHistory(anyString(), anyInt());
     }
 
     @Test
@@ -203,91 +230,43 @@ class TestDecoratorWriteServiceShould {
     }
 
     @Test
-    void delete_a_reserved_decorator_for_a_configured_writer() throws Exception {
-        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
-
+    void delete_the_whole_history_through_its_current_decorator_without_a_writer_check() throws Exception {
         when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
-                new DecoratorHistoryEntry(1, null, null, decorator("control-evaluation"))));
+                new DecoratorHistoryEntry(2, 1, null, decorator("control-evaluation")),
+                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
 
-        service.deleteDecorator(WRITER, false, NAMESPACE, 1);
+        service.deleteDecorator(NAMESPACE, 1);
+
+        verify(mockDecoratorStore).deleteCurrentDecoratorHistory(NAMESPACE, 2);
+        verify(mockDecoratorStore, never()).getDecoratorById(anyString(), anyInt());
+    }
+
+    @Test
+    void require_a_current_head_also_for_an_entry_that_has_no_decorator() throws Exception {
+        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(1, null, null, null)));
+
+        service.deleteDecorator(NAMESPACE, 1);
 
         verify(mockDecoratorStore).deleteCurrentDecoratorHistory(NAMESPACE, 1);
     }
 
     @Test
-    void delete_only_the_history_that_was_authorized() throws Exception {
-        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
-        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
-                new DecoratorHistoryEntry(2, 1, null, decorator("control-evaluation")),
-                new DecoratorHistoryEntry(1, null, 2, decorator("control-evaluation"))));
+    void pass_on_that_a_decorator_to_delete_does_not_exist() throws Exception {
+        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenThrow(new DecoratorNotFoundException());
 
-        service.deleteDecorator(WRITER, false, NAMESPACE, 1);
+        assertThrows(DecoratorNotFoundException.class, () -> service.deleteDecorator(NAMESPACE, 1));
 
-        verify(mockDecoratorStore).deleteCurrentDecoratorHistory(NAMESPACE, 2);
-        verify(mockDecoratorStore, never()).deleteDecorator(anyString(), anyInt());
-    }
-
-    @Test
-    void refuse_a_delete_of_a_reserved_decorator_from_another_principal() throws Exception {
-        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("control-evaluation")));
-
-        assertThrows(ReservedDecoratorTypeException.class, () -> service.deleteDecorator("alice", false, NAMESPACE, 1));
-        verify(mockDecoratorStore, never()).deleteDecorator(anyString(), anyInt());
-    }
-
-    @Test
-    void refuse_deleting_reserved_history_through_an_unreserved_entry() throws Exception {
-        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
-        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
-                new DecoratorHistoryEntry(2, 1, null, decorator("control-evaluation")),
-                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
-
-        assertThrows(ReservedDecoratorTypeException.class, () -> service.deleteDecorator("alice", false, NAMESPACE, 1));
-
-        verify(mockDecoratorStore, never()).deleteDecorator(anyString(), anyInt());
-    }
-
-    @Test
-    void leave_a_missing_decorator_on_delete_to_the_store() throws Exception {
-        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.empty());
-
-        service.deleteDecorator("alice", false, NAMESPACE, 1);
-
-        verify(mockDecoratorStore).deleteDecorator(NAMESPACE, 1);
-    }
-
-    @Test
-    void delete_reserved_history_for_a_global_admin_who_is_not_a_writer() throws Exception {
-        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
-        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
-                new DecoratorHistoryEntry(2, 1, null, decorator("control-evaluation")),
-                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
-
-        service.deleteDecorator("admin", true, NAMESPACE, 1);
-
-        verify(mockDecoratorStore).deleteCurrentDecoratorHistory(NAMESPACE, 2);
-    }
-
-    @Test
-    void delete_a_history_with_an_entry_that_has_no_decorator() throws Exception {
-        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
-        when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
-                new DecoratorHistoryEntry(2, 1, null, null),
-                new DecoratorHistoryEntry(1, null, 2, decorator("threat-model"))));
-
-        service.deleteDecorator("alice", false, NAMESPACE, 1);
-
-        verify(mockDecoratorStore).deleteCurrentDecoratorHistory(NAMESPACE, 2);
+        verify(mockDecoratorStore, never()).deleteCurrentDecoratorHistory(anyString(), anyInt());
     }
 
     @Test
     void pass_on_a_delete_that_loses_to_a_supersede() throws Exception {
-        when(mockDecoratorStore.getDecoratorById(NAMESPACE, 1)).thenReturn(Optional.of(decorator("threat-model")));
         when(mockDecoratorStore.getDecoratorHistory(NAMESPACE, 1)).thenReturn(List.of(
                 new DecoratorHistoryEntry(1, null, null, decorator("threat-model"))));
         doThrow(new DecoratorSupersededException()).when(mockDecoratorStore).deleteCurrentDecoratorHistory(NAMESPACE, 1);
 
-        assertThrows(DecoratorSupersededException.class, () -> service.deleteDecorator("admin", true, NAMESPACE, 1));
+        assertThrows(DecoratorSupersededException.class, () -> service.deleteDecorator(NAMESPACE, 1));
     }
 
     @ParameterizedTest
@@ -347,7 +326,7 @@ class TestDecoratorWriteServiceShould {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"creationDateTime", "updateDateTime"})
+    @ValueSource(strings = {"creationDateTime", "updateDateTime", "supersededDateTime", "supersedes", "supersededBy"})
     void refuse_a_hub_owned_time_on_create_before_any_other_check(String field) {
         String json = "{\"type\": \"control-evaluation\", \"" + field + "\": \"2026-01-01T00:00:00.000Z\"}";
 
@@ -359,7 +338,7 @@ class TestDecoratorWriteServiceShould {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"creationDateTime", "updateDateTime"})
+    @ValueSource(strings = {"creationDateTime", "updateDateTime", "supersededDateTime", "supersedes", "supersededBy"})
     void refuse_a_hub_owned_time_on_update(String field) {
         String json = "{\"type\": \"threat-model\", \"" + field + "\": null}";
 

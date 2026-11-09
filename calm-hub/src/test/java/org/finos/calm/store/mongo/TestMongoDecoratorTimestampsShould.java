@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,7 +83,7 @@ class TestMongoDecoratorTimestampsShould {
     @Test
     void set_only_the_update_time_when_updating_in_place() throws Exception {
         UpdateResult updateResult = mock(UpdateResult.class);
-        when(updateResult.getModifiedCount()).thenReturn(1L);
+        when(updateResult.getMatchedCount()).thenReturn(1L);
         ArgumentCaptor<Bson> update = ArgumentCaptor.forClass(Bson.class);
         when(decoratorCollection.updateOne(any(Bson.class), update.capture())).thenReturn(updateResult);
 
@@ -96,6 +97,7 @@ class TestMongoDecoratorTimestampsShould {
 
     @Test
     void record_the_supersession_time_on_the_old_entry_and_new_times_on_the_successor() throws Exception {
+        when(decoratorCollection.countDocuments(any(Bson.class))).thenReturn(1L);
         when(counterStore.getNextDecoratorSequenceValue()).thenReturn(2);
         UpdateResult updateResult = mock(UpdateResult.class);
         when(updateResult.getModifiedCount()).thenReturn(1L);
@@ -149,6 +151,7 @@ class TestMongoDecoratorTimestampsShould {
 
     private void mockNamespaceDocument(Document... decorators) {
         when(decoratorCollection.find(any(Bson.class))).thenReturn(findIterable);
+        lenient().when(findIterable.projection(any(Bson.class))).thenReturn(findIterable);
         when(findIterable.first()).thenReturn(new Document("namespace", "finos").append("decorators", List.of(decorators)));
     }
 

@@ -105,6 +105,21 @@ class TestNitriteDecoratorTimestampsShould {
         assertThat(store.getDecoratorHistory(NAMESPACE, 7).getFirst().getSupersededDateTime(), is(nullValue()));
     }
 
+    // Hub does not know when an old decorator was created, so it does not invent a creation time.
+    @Test
+    void give_an_old_decorator_only_an_update_time_when_updating_it_in_place() throws Exception {
+        Document legacy = Document.createDocument("decoratorId", 7)
+                .put("decorator", Document.createDocument("unique-id", "legacy").put("type", "deployment"));
+        database.getCollection("decorators").insert(Document.createDocument("namespace", NAMESPACE)
+                .put("decorators", new ArrayList<>(List.of(legacy))));
+
+        store.updateDecorator(NAMESPACE, 7, decorator("changed"));
+
+        Decorator updated = store.getDecoratorById(NAMESPACE, 7).orElseThrow();
+        assertThat(updated.getCreationDateTime(), is(nullValue()));
+        assertThat(updated.getUpdateDateTime(), matchesPattern(UTC_MILLIS));
+    }
+
     private static String decorator(String uniqueId) {
         return """
                 {"unique-id": "%s", "type": "control-evaluation", "data": {"status": "met"}}

@@ -5,6 +5,7 @@ import io.quarkiverse.mcp.server.ToolResponse;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import org.finos.calm.domain.SchemaValidationLimits;
 import org.finos.calm.domain.extensions.ExtensionManifest;
 import org.finos.calm.extensions.ExtensionManifestLoader;
 import org.finos.calm.extensions.ExtensionPaths;
@@ -1276,7 +1277,7 @@ class TestExtensionToolsShould {
         ToolResponse response = extensionTools.call(ExtensionTools.tools(List.of(manifest)).getFirst(), arguments);
 
         String[] lines = text(response).split("\n");
-        assertThat(lines.length, is(1 + ExtensionTools.MAX_VALIDATION_ERRORS + 1));
+        assertThat(lines.length, is(1 + SchemaValidationLimits.MAX_ERRORS + 1));
         assertThat(lines[lines.length - 1].matches("- and \\d+ more"), is(true));
         verify(proxyService, never()).call(any(), any());
     }

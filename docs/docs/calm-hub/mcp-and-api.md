@@ -111,10 +111,12 @@ The decorator endpoints (`/api/calm/namespaces/{namespace}/decorators`) and the 
 |:-----|:-----|:-------|
 | Field types | `$schema`, `unique-id` or `type` is not a string, or `target`, `target-type` or `applies-to` is not an array of strings. Hub reads these fields, so it checks them also when there is no `$schema` | `400` |
 | Reserved type | The old or new decorator `type` is reserved, and the caller is not one of its writers. Applies to create and update | `403` |
-| Schema check | The decorator `$schema` is one that Hub knows, and the decorator does not match it. The body lists each error with its `location` (a JSON Pointer) | `400` |
-| Hub-owned times | The decorator has a top-level `creationDateTime` or `updateDateTime`. Hub sets these fields | `400` |
+| Schema check | The decorator `$schema` is one that Hub knows, and the decorator does not match it. The body lists the first 20 errors, each with its `location` (a JSON Pointer). If there are more, `moreErrors` gives how many. MCP gives the same list and "and n more" | `400` |
+| Hub-owned fields | The decorator has a top-level `creationDateTime`, `updateDateTime`, `supersededDateTime`, `supersedes` or `supersededBy`. Hub sets these fields and keeps them beside the decorator | `400` |
 
-Hub knows the calm-schema decorator Standards that it bundles (`deployment`, `kubernetes`, `control-evaluation`) and the base decorator definition (`https://calm.finos.org/release/<version>/meta/decorators.json#/defs/decorator`). Hub accepts a decorator with any other `$schema` without a check.
+Hub knows the calm-schema decorator Standards that it bundles (`deployment`, `kubernetes`, `control-evaluation`) and the base decorator definition (`https://calm.finos.org/release/<version>/meta/decorators.json#/defs/decorator`). Hub accepts a decorator with any other `$schema` without a check. At startup, Hub checks that each `$ref` to `calm.finos.org` in a bundled schema resolves, also a nested one. A schema with a `$ref` that does not resolve stays unknown, and Hub logs a warning.
+
+Hub stores the decorator as it checked it. A key such as `$numberInt` stays plain data. An integer larger than a 64-bit integer reads back with all of its digits, up to 34 digits on MongoDB. MongoDB stores a longer integer as a double, so it loses precision.
 
 No type is reserved by default. Reserve a type in `application.properties`:
 
@@ -125,7 +127,11 @@ calm.decorators.reserved."control-evaluation".writers=policy-engine
 
 A writer is a principal name, the same name that the audit log records for the caller.
 
-A reserved type is also append-only. An update of a reserved-type decorator does not change it. Hub stores a new decorator that supersedes the old one, returns `201` with the new `id` and a `Location` header, and keeps the old one. Hub stores the link in its own storage fields, not in the decorator `data`. Other types keep the in-place update (`200`).
+At startup, Hub logs each reserved type with its number of writers. Check this line after a change: a key with a typing error reserves a different type and leaves the intended type open.
+
+A reservation does not vouch for decorators of the type that already exist. Before the reservation, any caller with `write` could create one, and after it that decorator looks the same as one from a writer. Before you reserve a type, list its decorators (`GET .../decorators/values?type=<type>` in each namespace), and delete the ones that a writer did not create. The audit log records who created each one through REST. It does not record MCP tool calls, except extension commands.
+
+A reserved type is also append-only. An update of a reserved-type decorator does not change it. Hub stores a new decorator that supersedes the old one, returns `201` with the new `id` and a `Location` header, and keeps the old one. Hub stores the link in its own storage fields, not in the decorator `data`. For a REST update, the audit log records an `UPDATE` of the old id and a `CREATE` of the new id. The audit log does not record an MCP update. Other types keep the in-place update (`200`).
 
 | Request | Effect |
 |:--------|:-------|
@@ -147,7 +153,7 @@ Hub records when it writes each decorator. Every read returns the times: `GET ..
 | `updateDateTime` | Hub stores the decorator, and on each in-place update |
 | `supersededDateTime` (history entry) | A newer decorator supersedes this one. The old decorator keeps its own `updateDateTime`, so that time stays the time its content was last written |
 
-The times are UTC ISO-8601 strings with milliseconds, for example `2026-11-06T10:15:30.123Z`. Hub stores them in its own storage fields, not in the decorator. A decorator that Hub stored before it recorded times has no times: the fields are not in the response, and `supersededDateTime` is `null`. Hub does not add times to old decorators.
+The times are UTC ISO-8601 strings with milliseconds, for example `2026-11-06T10:15:30.123Z`. Hub stores them in its own storage fields, not in the decorator. A decorator that Hub stored before it recorded times has no times: the fields are not in the response, and `supersededDateTime` is `null`. Hub does not know when such a decorator was created, so it never adds a `creationDateTime`. An in-place update gives it an `updateDateTime` only.
 
 ### Access Control
 

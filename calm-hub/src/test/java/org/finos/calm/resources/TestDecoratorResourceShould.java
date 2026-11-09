@@ -846,19 +846,21 @@ public class TestDecoratorResourceShould {
 
     @Test
     void return_204_when_decorator_deleted_successfully() throws Exception {
+        when(decoratorStore.getDecoratorHistory("finos", 1)).thenReturn(List.of(
+                new DecoratorHistoryEntry(1, null, null, new Decorator.DecoratorBuilder().setType("deployment").build())));
+
         given()
                 .when()
                 .delete("/api/calm/namespaces/finos/decorators/1")
                 .then()
                 .statusCode(204);
 
-        verify(decoratorStore, times(1)).deleteDecorator("finos", 1);
+        verify(decoratorStore, times(1)).deleteCurrentDecoratorHistory("finos", 1);
     }
 
     @Test
     void return_404_when_decorator_not_found_for_delete() throws Exception {
-        doThrow(new DecoratorNotFoundException())
-                .when(decoratorStore).deleteDecorator(anyString(), anyInt());
+        when(decoratorStore.getDecoratorHistory(anyString(), anyInt())).thenThrow(new DecoratorNotFoundException());
 
         given()
                 .when()
@@ -870,8 +872,7 @@ public class TestDecoratorResourceShould {
 
     @Test
     void return_404_when_namespace_does_not_exist_for_delete_decorator() throws Exception {
-        doThrow(new NamespaceNotFoundException())
-                .when(decoratorStore).deleteDecorator(anyString(), anyInt());
+        when(decoratorStore.getDecoratorHistory(anyString(), anyInt())).thenThrow(new NamespaceNotFoundException());
 
         given()
                 .when()
@@ -966,6 +967,21 @@ public class TestDecoratorResourceShould {
                 .body(equalTo("Decorator field is set by Hub and may not be sent: updateDateTime"));
 
         verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void return_400_when_an_update_sends_a_hub_owned_history_link() throws Exception {
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\": \"deployment\", \"supersedes\": 3}")
+                .when()
+                .put("/api/calm/namespaces/finos/decorators/1")
+                .then()
+                .statusCode(400)
+                .body(equalTo("Decorator field is set by Hub and may not be sent: supersedes"));
+
+        verify(decoratorStore, never()).updateDecorator(anyString(), anyInt(), anyString());
+        verify(decoratorStore, never()).supersedeDecorator(anyString(), anyInt(), anyString());
     }
 
     // -Pserver-only and -Dskip.npm do not copy the meta-schemas that the decorator Standards reference.

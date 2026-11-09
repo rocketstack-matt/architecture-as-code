@@ -3,11 +3,14 @@ package org.finos.calm.store.mongo;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
 import jakarta.inject.Inject;
 import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.bson.types.Decimal128;
 import org.finos.calm.domain.Decorator;
 import org.finos.calm.domain.DecoratorHistoryEntry;
 import org.finos.calm.domain.exception.DecoratorNotFoundException;
@@ -15,12 +18,17 @@ import org.finos.calm.domain.exception.DecoratorSupersededException;
 import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.store.DecoratorStore;
 import org.finos.calm.store.util.DecoratorHistoryChain;
+import org.finos.calm.store.util.DecoratorJson;
 import org.finos.calm.store.util.DecoratorTimestamps;
 import org.finos.calm.store.util.MongoUpsertPush;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -43,6 +51,7 @@ public class MongoDecoratorStore implements DecoratorStore {
     // Hub-owned history links and times, stored beside the decorator rather than in it.
     private static final String SUPERSEDES_FIELD = "supersedes";
     private static final String SUPERSEDED_BY_FIELD = "supersededBy";
+    private static final int DECIMAL128_DIGITS = 34;
     private final MongoCollection<Document> decoratorCollection;
     private final MongoNamespaceStore namespaceStore;
     private final MongoCounterStore counterStore;
@@ -102,7 +111,10 @@ public class MongoDecoratorStore implements DecoratorStore {
     public Optional<Decorator> getDecoratorById(String namespace, int id) throws NamespaceNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
-        Document namespaceDocument = fetchNamespaceDocument(namespace);
+        // Fetch only the entry, not the whole namespace document, which can be up to 16 MB.
+        Document namespaceDocument = decoratorCollection.find(Filters.eq("namespace", namespace))
+                .projection(Projections.elemMatch("decorators", Filters.eq(DECORATOR_ID_FIELD, id)))
+                .first();
         if (namespaceDocument == null || namespaceDocument.isEmpty()) {
             return Optional.empty();
         }
@@ -113,7 +125,7 @@ public class MongoDecoratorStore implements DecoratorStore {
         }
 
         return decorators.stream()
-                .filter(decoratorDoc -> Integer.valueOf(id).equals(decoratorDoc.getInteger("decoratorId")))
+                .filter(decoratorDoc -> Integer.valueOf(id).equals(decoratorDoc.getInteger(DECORATOR_ID_FIELD)))
                 .filter(decoratorDoc -> decoratorDoc.get("decorator", Document.class) != null)
                 .map(MongoDecoratorStore::toDecorator)
                 .findFirst();
@@ -123,10 +135,10 @@ public class MongoDecoratorStore implements DecoratorStore {
     public int createDecorator(String namespace, String decoratorJson) throws NamespaceNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
-        Document parsedDecorator = Document.parse(decoratorJson);
+        Document parsedDecorator = toBsonDocument(DecoratorJson.parseObject(decoratorJson));
         int id = counterStore.getNextDecoratorSequenceValue();
         String now = DecoratorTimestamps.now();
-        Document decoratorDocument = new Document("decoratorId", id)
+        Document decoratorDocument = new Document(DECORATOR_ID_FIELD, id)
                 .append("decorator", parsedDecorator)
                 .append(CREATION_DATE_TIME_FIELD, now)
                 .append(UPDATE_DATE_TIME_FIELD, now);
@@ -140,21 +152,21 @@ public class MongoDecoratorStore implements DecoratorStore {
     }
 
     @Override
-    public void updateDecorator(String namespace, int id, String decoratorJson) throws NamespaceNotFoundException, DecoratorNotFoundException {
+    public void updateDecorator(String namespace, int id, String decoratorJson)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
         namespaceStore.requireNamespace(namespace);
 
-        Document parsedDecorator = Document.parse(decoratorJson);
+        Document parsedDecorator = toBsonDocument(DecoratorJson.parseObject(decoratorJson));
 
-        long modified = decoratorCollection.updateOne(
-                Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
-                        Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false)))),
+        long matched = decoratorCollection.updateOne(
+                currentEntryFilter(namespace, id),
                 Updates.combine(
                         Updates.set("decorators.$.decorator", parsedDecorator),
                         Updates.set("decorators.$." + UPDATE_DATE_TIME_FIELD, DecoratorTimestamps.now()))
-        ).getModifiedCount();
+        ).getMatchedCount();
 
-        if (modified == 0) {
-            throw new DecoratorNotFoundException();
+        if (matched == 0) {
+            throwSupersededOrNotFound(namespace, id);
         }
 
         LOG.debug("Updated decorator with ID {} in namespace '{}'", id, namespace);
@@ -165,7 +177,11 @@ public class MongoDecoratorStore implements DecoratorStore {
             throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
         namespaceStore.requireNamespace(namespace);
 
-        Document parsedDecorator = Document.parse(decoratorJson);
+        Document parsedDecorator = toBsonDocument(DecoratorJson.parseObject(decoratorJson));
+        // As in Nitrite, a refused supersede takes no ID, unless it loses a race to another write.
+        if (decoratorCollection.countDocuments(currentEntryFilter(namespace, id)) == 0) {
+            throwSupersededOrNotFound(namespace, id);
+        }
         int newId = counterStore.getNextDecoratorSequenceValue();
         String now = DecoratorTimestamps.now();
 
@@ -185,17 +201,10 @@ public class MongoDecoratorStore implements DecoratorStore {
         List<Document> update = List.of(new Document("$set", new Document("decorators",
                 new Document("$concatArrays", List.of(marked,
                         new Document("$literal", List.of(successor)))))));
-        long modified = decoratorCollection.updateOne(
-                Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
-                        Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false)))),
-                update
-        ).getModifiedCount();
+        long modified = decoratorCollection.updateOne(currentEntryFilter(namespace, id), update).getModifiedCount();
 
         if (modified == 0) {
-            if (getDecoratorById(namespace, id).isPresent()) {
-                throw new DecoratorSupersededException();
-            }
-            throw new DecoratorNotFoundException();
+            throwSupersededOrNotFound(namespace, id);
         }
 
         LOG.debug("Decorator with ID {} supersedes decorator {} in namespace '{}'", newId, id, namespace);
@@ -217,46 +226,38 @@ public class MongoDecoratorStore implements DecoratorStore {
     @Override
     public void deleteCurrentDecoratorHistory(String namespace, int currentId)
             throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
-        if (!deleteHistory(namespace, currentId, true)) {
-            if (getDecoratorById(namespace, currentId).isPresent()) {
-                throw new DecoratorSupersededException();
-            }
-            throw new DecoratorNotFoundException();
-        }
-    }
-
-    @Override
-    public void deleteDecorator(String namespace, int id) throws NamespaceNotFoundException, DecoratorNotFoundException {
-        if (!deleteHistory(namespace, id, false)) {
-            throw new DecoratorNotFoundException();
-        }
-    }
-
-    private boolean deleteHistory(String namespace, int id, boolean requireCurrent)
-            throws NamespaceNotFoundException, DecoratorNotFoundException {
         namespaceStore.requireNamespace(namespace);
 
-        List<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespace), id).stream()
+        List<Integer> ids = DecoratorHistoryChain.of(historyEntries(namespace), currentId).stream()
                 .map(DecoratorHistoryEntry::getId)
                 .toList();
         if (ids.isEmpty()) {
             throw new DecoratorNotFoundException();
         }
 
-        long modified = decoratorCollection.updateOne(
-                requireCurrent
-                        ? Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
-                                Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false))))
-                        : Filters.eq("namespace", namespace),
-                Updates.pull("decorators", Filters.in(DECORATOR_ID_FIELD, ids))
-        ).getModifiedCount();
+        long modified = decoratorCollection.updateOne(currentEntryFilter(namespace, currentId),
+                Updates.pull("decorators", Filters.in(DECORATOR_ID_FIELD, ids))).getModifiedCount();
 
         if (modified == 0) {
-            return false;
+            throwSupersededOrNotFound(namespace, currentId);
         }
 
-        LOG.debug("Deleted decorator with ID {} in namespace '{}'", id, namespace);
-        return true;
+        LOG.debug("Deleted decorator with ID {} and its history in namespace '{}'", currentId, namespace);
+    }
+
+    private static Bson currentEntryFilter(String namespace, int id) {
+        return Filters.and(Filters.eq("namespace", namespace), Filters.elemMatch("decorators",
+                Filters.and(Filters.eq(DECORATOR_ID_FIELD, id), Filters.exists(SUPERSEDED_BY_FIELD, false))));
+    }
+
+    // Called when a write that needs the current entry matched nothing.
+    private void throwSupersededOrNotFound(String namespace, int id) throws DecoratorNotFoundException, DecoratorSupersededException {
+        long withId = decoratorCollection.countDocuments(Filters.and(Filters.eq("namespace", namespace),
+                Filters.elemMatch("decorators", Filters.eq(DECORATOR_ID_FIELD, id))));
+        if (withId > 0) {
+            throw new DecoratorSupersededException();
+        }
+        throw new DecoratorNotFoundException();
     }
 
     /**
@@ -294,8 +295,50 @@ public class MongoDecoratorStore implements DecoratorStore {
                 .toList();
     }
 
+    // Not Document.parse, which decodes extended JSON: {"$numberInt": "1"} must stay the object that was validated.
+    static Document toBsonDocument(Map<?, ?> map) {
+        Document document = new Document();
+        map.forEach((key, value) -> document.append(key.toString(), toBsonValue(value)));
+        return document;
+    }
+
+    private static Object toBsonValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return toBsonDocument(map);
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(MongoDecoratorStore::toBsonValue).collect(Collectors.toCollection(ArrayList::new));
+        }
+        // BSON has no arbitrary-precision integer. Decimal128 keeps 34 digits exactly; a longer one becomes a double.
+        if (value instanceof BigInteger big) {
+            return big.abs().toString().length() <= DECIMAL128_DIGITS ? new Decimal128(new BigDecimal(big)) : big.doubleValue();
+        }
+        return value;
+    }
+
+    // Jackson cannot write a Decimal128, so data gets a JDK number again.
+    private static Object fromBsonValue(Object value) {
+        if (value instanceof Document document) {
+            Document copy = new Document();
+            document.forEach((key, item) -> copy.append(key, fromBsonValue(item)));
+            return copy;
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(MongoDecoratorStore::fromBsonValue).collect(Collectors.toCollection(ArrayList::new));
+        }
+        if (value instanceof Decimal128 decimal && decimal.isFinite()) {
+            try {
+                BigDecimal number = decimal.bigDecimalValue();
+                return number.scale() <= 0 ? number.toBigIntegerExact() : number;
+            } catch (ArithmeticException negativeZero) {
+                return BigDecimal.ZERO;
+            }
+        }
+        return value;
+    }
+
     private static Decorator toDecorator(Document entry) {
-        Decorator decorator = Decorator.fromDocument(entry.get("decorator", Document.class));
+        Decorator decorator = Decorator.fromDocument((Document) fromBsonValue(entry.get("decorator", Document.class)));
         return decorator == null ? null
                 : decorator.withTimestamps(entry.getString(CREATION_DATE_TIME_FIELD), entry.getString(UPDATE_DATE_TIME_FIELD));
     }

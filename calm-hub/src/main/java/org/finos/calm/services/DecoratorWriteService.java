@@ -1,10 +1,12 @@
 package org.finos.calm.services;
 
+import io.quarkus.runtime.StartupEvent;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.bson.json.JsonParseException;
 import org.finos.calm.config.DecoratorConfig;
@@ -18,17 +20,26 @@ import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.exception.ReservedDecoratorTypeException;
 import org.finos.calm.store.DecoratorStore;
 import org.finos.calm.store.util.DecoratorTimestamps;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /**
  * The write rules for decorators, shared by REST and MCP. A reserved type can only be written by
  * its configured principals, a decorator whose {@code $schema} Hub knows must match it, and a reserved
- * type is append-only. A client may not send the Hub-owned times.
+ * type is append-only. A client may not send the Hub-owned times or history links.
  */
 @ApplicationScoped
 public class DecoratorWriteService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DecoratorWriteService.class);
+    // Hub keeps these beside the decorator, so a client copy would be stored and never returned.
+    private static final List<String> HUB_OWNED_FIELDS = List.of(DecoratorTimestamps.CREATION_DATE_TIME_FIELD,
+            DecoratorTimestamps.UPDATE_DATE_TIME_FIELD, DecoratorTimestamps.SUPERSEDED_DATE_TIME_FIELD, "supersedes", "supersededBy");
 
     private final DecoratorStore decoratorStore;
     private final DecoratorConfig config;
@@ -39,6 +50,18 @@ public class DecoratorWriteService {
         this.decoratorStore = decoratorStore;
         this.config = config;
         this.schemaValidator = schemaValidator;
+    }
+
+    // A mistyped reserved-type key leaves the type open, so say which types are reserved.
+    void logReservedTypes(@Observes StartupEvent event) {
+        if (config.reserved().isEmpty()) {
+            LOG.info("No decorator type is reserved");
+            return;
+        }
+        String types = new TreeMap<>(config.reserved()).entrySet().stream()
+                .map(entry -> entry.getKey() + " (" + entry.getValue().writers().size() + " writers)")
+                .collect(Collectors.joining(", "));
+        LOG.info("Reserved decorator types: {}", types);
     }
 
     public static String principalName(SecurityIdentity identity) {
@@ -82,43 +105,25 @@ public class DecoratorWriteService {
         if (existing.isPresent() && (isReserved(existing.get().getType()) || isReserved(type))) {
             return decoratorStore.supersedeDecorator(namespace, id, decoratorJson);
         }
-        if (existing.isPresent() && decoratorStore.getDecoratorHistory(namespace, id).stream()
-                .anyMatch(entry -> entry.getId() == id && entry.getSupersededBy() != null)) {
-            throw new DecoratorSupersededException();
-        }
-        // A missing decorator is left to the store, which reports it in its own way (GitHub mode: 501).
+        // The store refuses a missing decorator (GitHub mode: 501) or a superseded one, also when a concurrent write
+        // supersedes it after the checks above.
         decoratorStore.updateDecorator(namespace, id, decoratorJson);
         return id;
     }
 
     /**
-     * Deletes a decorator with its whole history. A global admin may delete any history; any other caller
-     * must be a writer of each reserved type in it.
+     * Deletes a decorator with its whole history. Only a global admin may delete (the REST endpoint needs
+     * GLOBAL_ADMIN, and MCP has no delete tool), and a global admin need not be a writer of the reserved types.
+     * The delete fails if another write supersedes the current decorator first.
      */
-    public void deleteDecorator(String principal, boolean globalAdmin, String namespace, int id)
-            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException,
-            ReservedDecoratorTypeException {
-        Optional<Decorator> existing = decoratorStore.getDecoratorById(namespace, id);
-        if (existing.isPresent()) {
-            if (!globalAdmin) {
-                requireWriter(principal, existing.get().getType());
-            }
-            var history = decoratorStore.getDecoratorHistory(namespace, id);
-            if (!globalAdmin) {
-                for (var entry : history) {
-                    if (entry.getDecorator() != null) {
-                        requireWriter(principal, entry.getDecorator().getType());
-                    }
-                }
-            }
-            decoratorStore.deleteCurrentDecoratorHistory(namespace, history.getFirst().getId());
-            return;
-        }
-        decoratorStore.deleteDecorator(namespace, id);
+    public void deleteDecorator(String namespace, int id)
+            throws NamespaceNotFoundException, DecoratorNotFoundException, DecoratorSupersededException {
+        int currentId = decoratorStore.getDecoratorHistory(namespace, id).getFirst().getId();
+        decoratorStore.deleteCurrentDecoratorHistory(namespace, currentId);
     }
 
     private static void rejectHubOwnedFields(JsonObject decorator) throws HubOwnedDecoratorFieldException {
-        for (String field : List.of(DecoratorTimestamps.CREATION_DATE_TIME_FIELD, DecoratorTimestamps.UPDATE_DATE_TIME_FIELD)) {
+        for (String field : HUB_OWNED_FIELDS) {
             if (decorator.containsKey(field)) {
                 throw new HubOwnedDecoratorFieldException(field);
             }

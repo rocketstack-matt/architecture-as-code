@@ -32,6 +32,7 @@ import java.util.Optional;
  * via the Quarkiverse MCP server.
  */
 @ApplicationScoped
+@ReadOnlyHubGuard
 public class DecoratorTools {
 
     private static final Logger logger = LoggerFactory.getLogger(DecoratorTools.class);
@@ -122,7 +123,7 @@ public class DecoratorTools {
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards). Hub sets creationDateTime and updateDateTime; a decorator that sends either is refused.")
+    @Tool(description = "Create a new decorator in a namespace. Use this to store threat model results, deployments, or other decorator data. Returns the assigned decorator ID. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows (the calm-schema decorator Standards). Hub sets creationDateTime, updateDateTime, supersededDateTime, supersedes and supersededBy; a decorator that sends any of them is refused.")
     public ToolResponse createDecorator(
             @ToolArg(description = "The namespace to create the decorator in") String namespace,
             @ToolArg(description = "The decorator JSON payload (must include $schema, unique-id, type, target, target-type, applies-to, and data fields)") String decoratorJson) {
@@ -146,14 +147,14 @@ public class DecoratorTools {
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {
-            return reservedTypeError(e);
+            return reservedTypeError(namespace, null, e);
         } catch (DecoratorSchemaValidationException e) {
             return schemaError(e);
         }
     }
 
     @PermissionsAllowed(CalmHubScopes.WRITE)
-    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows, or sends the Hub-owned creationDateTime or updateDateTime. A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
+    @Tool(description = "Update an existing decorator in a namespace. Returns the updated decorator representation. Fails if $schema, unique-id or type is not a string, or target, target-type or applies-to is not an array of strings. Also fails if the old or new decorator type is reserved for other principals, or if the decorator does not match a $schema that Hub knows, or sends a Hub-owned field (creationDateTime, updateDateTime, supersededDateTime, supersedes or supersededBy). A reserved type is append-only: the update stores a new decorator that supersedes the old one, and returns the new ID.")
     public ToolResponse updateDecorator(
             @ToolArg(description = "The namespace containing the decorator") String namespace,
             @ToolArg(description = "The decorator numeric ID to update (positive integer)") int decoratorId,
@@ -170,7 +171,7 @@ public class DecoratorTools {
 
         try {
             int currentId = decoratorWriteService.updateDecorator(DecoratorWriteService.principalName(identity), namespace, decoratorId, decoratorJson);
-            logger.info("Decorator [{}] updated in namespace [{}]", decoratorId, namespace);
+            logger.info("Decorator [{}] updated in namespace [{}], current decorator [{}]", decoratorId, namespace, currentId);
             String outcome = currentId == decoratorId
                     ? "Decorator " + decoratorId + " updated successfully."
                     : "Decorator " + decoratorId + " superseded by new decorator " + currentId + " (reserved types are append-only).";
@@ -199,7 +200,7 @@ public class DecoratorTools {
         } catch (HubOwnedDecoratorFieldException e) {
             return ToolResponse.error("Error: Decorator field '" + e.getField() + "' is set by Hub and may not be sent.");
         } catch (ReservedDecoratorTypeException e) {
-            return reservedTypeError(e);
+            return reservedTypeError(namespace, decoratorId, e);
         } catch (DecoratorSchemaValidationException e) {
             return schemaError(e);
         }
@@ -242,8 +243,9 @@ public class DecoratorTools {
                 + (dec.getUpdateDateTime() == null ? "" : prefix + "updateDateTime: " + dec.getUpdateDateTime());
     }
 
-    private static ToolResponse reservedTypeError(ReservedDecoratorTypeException e) {
-        logger.warn("Refused a write of reserved decorator type");
+    // The decorator ID is null on create.
+    private static ToolResponse reservedTypeError(String namespace, Integer decoratorId, ReservedDecoratorTypeException e) {
+        logger.warn("Refused a write of reserved decorator type [{}] to decorator [{}] in namespace [{}]", e.getType(), decoratorId, namespace);
         return ToolResponse.error("Error: Decorator type '" + e.getType() + "' is reserved and the caller may not write it.");
     }
 
@@ -251,6 +253,9 @@ public class DecoratorTools {
         StringBuilder sb = new StringBuilder("Error: Decorator does not match its $schema:\n");
         e.getErrors().forEach(error -> sb.append("- ").append(error.location().isEmpty() ? "(root)" : error.location())
                 .append(": ").append(error.error()).append("\n"));
+        if (e.getMoreErrors() > 0) {
+            sb.append("- and ").append(e.getMoreErrors()).append(" more\n");
+        }
         return ToolResponse.error(sb.toString());
     }
 }

@@ -405,6 +405,10 @@ All four workflows:
 - **Gated by `calm.mcp.enabled`** (default `false`): when disabled, every `@Tool`
   method returns a disabled error, though the `/mcp` HTTP endpoint stays reachable
 - Enable with `-Dcalm.mcp.enabled=true` or `CALM_MCP_ENABLED=true`
+- **Read-only mode:** `/mcp` is a Vert.x route, so `ReadOnlyRequestFilter` never sees it. Put
+  `@ReadOnlyHubGuard` on each `*Tools` class: on a read-only Hub it refuses each `@Tool` that needs more
+  than a read scope. Its priority (`PLATFORM_BEFORE`) puts it before the `@PermissionsAllowed` check.
+  `TestMcpToolsReadOnlyShould` fails for a write tool in a class without it
 
 ### UI Customization
 - `config/UiConfig` (`@ConfigMapping(prefix = "calm.ui")`) holds the operator values that
@@ -655,6 +659,9 @@ is append-only (no `update`/`delete`) and follows the standard Mongo/Nitrite dua
 pattern. Toggle independently with `calm.audit.store.enabled` / `calm.audit.log.enabled` /
 `calm.audit.capture-source-ip` (all in `application.properties`). No REST API exposes the
 trail in this iteration — read it via direct DB access or ops tooling.
+
+A request gives one entry, except a decorator `PUT` that supersedes a reserved-type decorator
+(`201`). It gives an `UPDATE` of the old id and a `CREATE` of the new id from `Location`.
 
 GitHub storage mode (`calm.database.mode=github`) has no database, so it does not persist the
 trail: `GitHubAuditLogStore.query()` always returns an empty list, and the structured log line
