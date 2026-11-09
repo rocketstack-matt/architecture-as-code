@@ -407,7 +407,8 @@ All four workflows:
 - Enable with `-Dcalm.mcp.enabled=true` or `CALM_MCP_ENABLED=true`
 - **Read-only mode:** `/mcp` is a Vert.x route, so `ReadOnlyRequestFilter` never sees it. Put
   `@ReadOnlyHubGuard` on each `*Tools` class: on a read-only Hub it refuses each `@Tool` that needs more
-  than a read scope. `TestMcpToolsReadOnlyShould` fails for a write tool in a class without it
+  than a read scope. Its priority (`PLATFORM_BEFORE`) puts it before the `@PermissionsAllowed` check.
+  `TestMcpToolsReadOnlyShould` fails for a write tool in a class without it
 
 ### UI Customization
 - `config/UiConfig` (`@ConfigMapping(prefix = "calm.ui")`) holds the operator values that
