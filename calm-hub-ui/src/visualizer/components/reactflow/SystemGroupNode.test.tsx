@@ -8,6 +8,9 @@ import { DecisionOverlayContext } from '../../context/DecisionOverlayContext.js'
 import type { ElementEvaluation } from '../../contracts/contracts.js';
 import { DecoratorOverlayContext } from '../../context/DecoratorOverlayContext.js';
 import { fakeElement, fakeView } from '../../../test-support/fake-overlays.js';
+import { createMemoryStorage } from '../../../test-support/memory-storage.js';
+import { createDiagramTextScaleStore, DIAGRAM_TEXT_SCALE_KEY } from '../../../theme/useDiagramTextScale.js';
+import { createPresentationModeStore } from '../../../theme/usePresentationMode.js';
 
 vi.mock('reactflow', () => ({
     Handle: () => null,
@@ -111,5 +114,57 @@ describe('SystemGroupNode extension overlays', () => {
     it('hides only the extension whose view key the legend turned off', () => {
         renderWith(new Set(['ext-b/risk']));
         expect(screen.getAllByTestId('overlay-badge')).toHaveLength(1);
+    });
+});
+
+describe('SystemGroupNode diagram text size', () => {
+    function renderSized(stored: string | undefined, presenting = false, evaluations = new Map<string, ElementEvaluation>()) {
+        const storage = createMemoryStorage();
+        if (stored) storage.setItem(DIAGRAM_TEXT_SCALE_KEY, stored);
+        const presentationStore = createPresentationModeStore(createMemoryStorage());
+        presentationStore.set(presenting);
+        const props = { id: 'cluster', data: { label: 'Cluster', 'unique-id': 'cluster' } } as unknown as NodeProps;
+        render(
+            <EvaluationOverlayProvider value={evaluations}>
+                <SystemGroupNode
+                    {...props}
+                    textScaleStore={createDiagramTextScaleStore(storage)}
+                    presentationStore={presentationStore}
+                />
+            </EvaluationOverlayProvider>
+        );
+    }
+
+    it.each([
+        ['1.5', false, '18px'],
+        ['2', false, '24px'],
+        ['1.5', true, '33px'],
+        // Above 1.5x the presentation label does not fit above the children, which start 80px down.
+        ['2', true, '33px'],
+    ])('at scale %s, presenting %s, sizes the label %s', (stored, presenting, fontSize) => {
+        renderSized(stored, presenting);
+        expect(screen.getByText('Cluster').parentElement!.style.fontSize).toBe(fontSize);
+    });
+
+    it('sizes the badge with the label', () => {
+        renderSized('2', true, new Map([['cluster', evaluation('not-met')]]));
+        expect(screen.getByTestId('overlay-badge').style.fontSize).toBe('27px');
+    });
+
+    it('keeps a larger label on one line, with the full name in its tooltip, so it stays above the children', () => {
+        renderSized('1.15');
+        const label = screen.getByText('Cluster');
+        expect(label.style.whiteSpace).toBe('nowrap');
+        expect(label.style.textOverflow).toBe('ellipsis');
+        expect(label).toHaveAttribute('title', 'Cluster');
+        expect(label.parentElement!.style.maxWidth).toBe('calc(100% - 32px)');
+    });
+
+    it('lets the label wrap at the default size', () => {
+        renderSized(undefined);
+        const label = screen.getByText('Cluster');
+        expect(label.style.whiteSpace).toBe('');
+        expect(label).not.toHaveAttribute('title');
+        expect(label.parentElement!.style.maxWidth).toBe('');
     });
 });

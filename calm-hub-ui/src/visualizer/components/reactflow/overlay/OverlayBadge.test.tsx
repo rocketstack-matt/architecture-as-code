@@ -39,7 +39,7 @@ describe('OverlayBadge', () => {
         ['ok', 'completed', 'Completed'],
         ['error', 'failed', 'Failed'],
     ] as const)('draws a %s status in its text colour with the value as text', (status, value, text) => {
-        render(<OverlayBadge shown={shown(status, value)} presenting={false} />);
+        render(<OverlayBadge shown={shown(status, value)} presenting={false} scale={1} />);
         const badge = screen.getByTestId('overlay-badge');
         expect(badge).toHaveTextContent(text);
         expect(badge.getAttribute('aria-label')).toBe(`Deployments · Built-in: ${text}`);
@@ -49,17 +49,29 @@ describe('OverlayBadge', () => {
     });
 
     it('grows in presentation mode', () => {
-        render(<OverlayBadge shown={shown('ok', 'completed')} presenting />);
+        render(<OverlayBadge shown={shown('ok', 'completed')} presenting scale={1} />);
         expect(screen.getByTestId('overlay-badge').style.fontSize).toBe('18px');
+    });
+
+    it('follows the diagram text size', () => {
+        render(<OverlayBadge shown={shown('ok', 'completed')} presenting={false} scale={1.5} />);
+        const badge = screen.getByTestId('overlay-badge');
+        expect(badge.style.fontSize).toBe('18px');
+        expect(screen.getByTestId('overlay-marker').style.width).toBe('10.5px');
     });
 });
 
 describe('OverlayEdgeBadge', () => {
     it('shows the glyph and the value', () => {
-        render(<OverlayEdgeBadge shown={shown('warn', 'rolled-back')} presenting={false} />);
+        render(<OverlayEdgeBadge shown={shown('warn', 'rolled-back')} presenting={false} scale={1} />);
         const badge = screen.getByTestId('edge-overlay-badge');
         expect(badge).toHaveTextContent('! Rolled back');
         expect(badge.style.color).toBe(OVERLAY_STYLES.warn.text);
+    });
+
+    it('follows the diagram text size', () => {
+        render(<OverlayEdgeBadge shown={shown('warn', 'rolled-back')} presenting={false} scale={2} />);
+        expect(screen.getByTestId('edge-overlay-badge').style.fontSize).toBe('22px');
     });
 });
 
@@ -96,7 +108,7 @@ describe('OverlayBadge details', () => {
             <Flow onStore={(s) => { store = s; }}>
                 <DecoratorOverlayContext.Provider value={{ overlays: [], hiddenViews: new Set(), toggleView: vi.fn(), onOpenView }}>
                     <div onClick={onNodeClick}>
-                        <OverlayBadge shown={riskShown} presenting={false} />
+                        <OverlayBadge shown={riskShown} presenting={false} scale={1} />
                     </div>
                 </DecoratorOverlayContext.Provider>
             </Flow>
@@ -217,7 +229,7 @@ describe('OverlayBadge details', () => {
 
     it('marks a built-in view in the details', () => {
         const builtIn = { ...riskShown, view: fakeView('deployment', 'deployment', 'Deployments') };
-        render(<Flow><OverlayBadge shown={builtIn} presenting={false} /></Flow>);
+        render(<Flow><OverlayBadge shown={builtIn} presenting={false} scale={1} /></Flow>);
         fireEvent.click(screen.getByTestId('overlay-badge'));
         expect(screen.getByRole('dialog')).toHaveTextContent('Built-in (Deployments)');
     });
@@ -229,7 +241,7 @@ describe('OverlayBadge details in a React Flow node', () => {
         view,
         overlay: { status: 'error' as const, value: 'high', entries: [{ decorator: fakeDecorator('d1', {}), value: 'high', status: 'error' as const }] },
     };
-    const nodeTypes = { badged: () => <OverlayBadge shown={riskShown} presenting={false} /> };
+    const nodeTypes = { badged: () => <OverlayBadge shown={riskShown} presenting={false} scale={1} /> };
 
     function renderFlow() {
         const onNodeClick = vi.fn();

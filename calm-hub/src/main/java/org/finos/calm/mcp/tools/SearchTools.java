@@ -63,7 +63,7 @@ public class SearchTools {
                 () -> McpValidationHelper.validateMaxLength(query, MAX_QUERY_LENGTH, "Search query"));
         if (err.isPresent()) return err.get();
 
-        GroupedSearchResults groupedResults = searchStore.search(query, resolveReadableNamespaces());
+        GroupedSearchResults groupedResults = searchStore.search(query, resolveReadableNamespaces(), resolveReadableDomains());
         Map<String, List<SearchResult>> groups = toGroupMap(groupedResults);
 
         if (groups.values().stream().allMatch(List::isEmpty)) {
@@ -103,6 +103,11 @@ public class SearchTools {
     private Optional<Set<String>> resolveReadableNamespaces() {
         return ReadableScope.resolve(authEnabled, userAccessValidatorInstance, identity,
                 UserAccessValidator::getReadableNamespaces);
+    }
+
+    private Optional<Set<String>> resolveReadableDomains() {
+        return ReadableScope.resolve(authEnabled, userAccessValidatorInstance, identity,
+                UserAccessValidator::getReadableDomains);
     }
 
     private static Map<String, List<SearchResult>> toGroupMap(GroupedSearchResults results) {

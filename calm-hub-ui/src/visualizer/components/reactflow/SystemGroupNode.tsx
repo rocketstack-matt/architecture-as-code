@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { THEME } from './theme';
-import { usePresentationMode } from '../../../theme/usePresentationMode.js';
+import { usePresentationMode, type PresentationModeStore } from '../../../theme/usePresentationMode.js';
+import { scalePx, useDiagramTextScale, type DiagramTextScaleStore } from '../../../theme/useDiagramTextScale.js';
 import { useElementEvaluation, useElementOverlays } from '../../context/DecoratorOverlayContext.js';
 import { OverlayBadge } from './overlay/OverlayBadge.js';
 import { overlayOutline } from './overlay/overlayStyle.js';
@@ -10,8 +11,17 @@ import { useDecisionOverlay } from '../../context/DecisionOverlayContext.js';
 import { decisionSummary } from './utils/decisionSummary.js';
 import { DecisionCallout } from './DecisionCallout.js';
 
-function SystemGroupNodeComponent({ id, data }: NodeProps) {
-  const { presenting } = usePresentationMode();
+interface SystemGroupNodeProps extends NodeProps {
+  /** Injected for tests; default to the app-wide stores. */
+  textScaleStore?: DiagramTextScaleStore;
+  presentationStore?: PresentationModeStore;
+}
+
+function SystemGroupNodeComponent({ id, data, textScaleStore, presentationStore }: SystemGroupNodeProps) {
+  const { presenting } = usePresentationMode(presentationStore);
+  const { scale } = useDiagramTextScale(textScaleStore);
+  // The children start 80px down. Above 1.5x the presentation label does not fit in that space.
+  const labelScale = presenting ? Math.min(scale, 1.5) : scale;
   // A container's own controls, and those of the deployed-in and composed-of relationships it draws.
   const overlays = useElementOverlays(data['unique-id']);
   const outline = overlayOutline(worstStatus(overlays.map(({ overlay }) => overlay.status)));
@@ -47,18 +57,25 @@ function SystemGroupNodeComponent({ id, data }: NodeProps) {
           padding: presenting ? '6px 16px' : '4px 12px',
           borderRadius: '6px',
           fontWeight: 600,
-          fontSize: presenting ? '22px' : '12px',
+          fontSize: scalePx(presenting ? 22 : 12, labelScale),
           background: THEME.colors.backgroundSecondary,
           color: THEME.colors.group.label,
           border: `1px solid ${THEME.colors.border}`,
           pointerEvents: 'auto', // Re-enable pointer events for the label so it's clickable
+          ...(scale > 1 && { maxWidth: 'calc(100% - 32px)' }),
         }}
       >
-        <span>{data.label}</span>
-        {overlays.map((shown) => <OverlayBadge key={viewKey(shown.view)} shown={shown} presenting={presenting} />)}
+        {/* A larger label that wraps would reach the children, so it keeps to one line. */}
+        <span
+          style={scale > 1 ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}
+          title={scale > 1 ? data.label : undefined}
+        >
+          {data.label}
+        </span>
+        {overlays.map((shown) => <OverlayBadge key={viewKey(shown.view)} shown={shown} presenting={presenting} scale={labelScale} />)}
       </div>
       {/* Below the container, as below a node, so the callout does not cover the nodes inside it. */}
-      {summary && <DecisionCallout nodeId={id} summary={summary} presenting={presenting} width={presenting ? 320 : 220} />}
+      {summary && <DecisionCallout nodeId={id} summary={summary} presenting={presenting} scale={scale} width={presenting ? 320 : 220} />}
     </div>
   );
 }

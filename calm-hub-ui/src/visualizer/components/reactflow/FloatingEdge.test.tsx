@@ -6,6 +6,7 @@ import { FloatingEdge } from './FloatingEdge.js';
 import { THEME } from './theme.js';
 import { createPresentationModeStore } from '../../../theme/usePresentationMode.js';
 import { createMemoryStorage } from '../../../test-support/memory-storage.js';
+import { createDiagramTextScaleStore, DIAGRAM_TEXT_SCALE_KEY } from '../../../theme/useDiagramTextScale.js';
 import { mockOffsetSize } from '../../../test-support/layout-mocks.js';
 import { EvaluationOverlayProvider } from '../../../test-support/evaluation-overlay.js';
 import { DecisionOverlayContext, type CalloutSize } from '../../context/DecisionOverlayContext.js';
@@ -495,5 +496,42 @@ describe('FloatingEdge with extension overlays', () => {
             </DecoratorOverlayContext.Provider>
         );
         expect(screen.getAllByTestId('edge-overlay-badge')).toHaveLength(1);
+    });
+});
+
+describe('FloatingEdge diagram text size', () => {
+    it('scales the label', () => {
+        const storage = createMemoryStorage();
+        storage.setItem(DIAGRAM_TEXT_SCALE_KEY, '1.5');
+        render(
+            <svg>
+                <FloatingEdge
+                    {...edgeProps({ data: { 'unique-id': 'rel-1', description: 'writes' } })}
+                    presentationStore={createPresentationModeStore(createMemoryStorage())}
+                    textScaleStore={createDiagramTextScaleStore(storage)}
+                />
+            </svg>
+        );
+        expect(screen.getByText('writes').style.fontSize).toBe('15px');
+        expect(screen.getByText('writes').style.maxWidth).toBe('240px');
+    });
+
+    it('scales the extension overlay badges', () => {
+        edgeParams.mockReturnValue(FLOATING);
+        const storage = createMemoryStorage();
+        storage.setItem(DIAGRAM_TEXT_SCALE_KEY, '2');
+        const overlays = [{ view: fakeView('ext-a', 'risk'), elements: new Map([['rel-1', fakeElement('error')]]) }];
+        render(
+            <DecoratorOverlayContext.Provider value={{ overlays, hiddenViews: new Set(), toggleView: vi.fn() }}>
+                <svg>
+                    <FloatingEdge
+                        {...edgeProps({ data: { 'unique-id': 'rel-1', description: 'writes' } })}
+                        presentationStore={createPresentationModeStore(createMemoryStorage())}
+                        textScaleStore={createDiagramTextScaleStore(storage)}
+                    />
+                </svg>
+            </DecoratorOverlayContext.Provider>
+        );
+        expect(screen.getByTestId('edge-overlay-badge').style.fontSize).toBe('22px');
     });
 });

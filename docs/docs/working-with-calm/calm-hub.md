@@ -112,6 +112,7 @@ When you select an **Architecture** or **Pattern** artifact, CALM Hub renders th
 * **Minimap:** A floating overview panel in the bottom-right corner helps navigate larger diagrams.
 * **Component Search & Filtering:** Filter nodes dynamically using the search bar and type dropdown at the top right of the canvas.
 * **Details Sidebar:** Clicking any component opens a right-hand sidebar displaying its complete metadata, interfaces, and compliance controls. Its **Decorators** section lists the decorators whose `applies-to` contains the component.
+* **Image Export:** The export control (the image icon in the bottom-left diagram controls) saves the whole diagram as an SVG or PNG file, as it is drawn on screen, in the current theme. The image includes the decision overlay and the decorator overlay badges, but not the overlay legend. It is not available on mobile.
 
 ### Tab Views
 
