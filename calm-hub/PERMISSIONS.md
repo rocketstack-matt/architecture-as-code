@@ -139,3 +139,11 @@ READ, on every personal namespace. See [PERSONAL_NAMESPACES.md](PERSONAL_NAMESPA
 ## Domain-scoped access
 
 `hasDomainAccess`, `canReadByDomain`, etc. are **not** hierarchical — domain access remains flat. `UserAccess` records have either `namespace` or `domain` set, never both.
+
+---
+
+## Reserved decorator types
+
+`calm.decorators.reserved."<type>".writers` lists the principals that may create or update a decorator of a reserved type. `DecoratorWriteService` checks it after the `WRITE` permission check, for REST and MCP. Any other caller gets 403 from REST and a tool error from MCP. A namespace grant does not override it. No type is reserved by default.
+
+Delete needs `GLOBAL_ADMIN`, and MCP has no delete tool. A global admin does not have to be a writer of the reserved types in the history, so `DecoratorWriteService.deleteDecorator` has no writer check. It deletes the history only if its current decorator is still current. The audit log records the delete as for other deletes.
