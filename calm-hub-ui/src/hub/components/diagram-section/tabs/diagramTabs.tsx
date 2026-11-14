@@ -1,9 +1,10 @@
-import { IoCodeOutline, IoEyeOutline, IoGitNetworkOutline, IoPricetagsOutline, IoRocketOutline } from 'react-icons/io5';
+import { IoCodeOutline, IoLayersOutline, IoEyeOutline, IoGitNetworkOutline, IoPricetagsOutline, IoRocketOutline } from 'react-icons/io5';
 import { DeploymentPanel } from '../../../../visualizer/components/reactflow/DeploymentPanel.js';
 import { JsonRenderer } from '../../json-renderer/JsonRenderer.js';
 import { DecoratorsPanel } from '../decorators/DecoratorsPanel.js';
 import { UsedByPanel } from '../used-by/UsedByPanel.js';
 import { USED_BY_TOOLTIP, usedByLabel } from '../used-by/usedBy.js';
+import { C4Tab, C4_TAB_PARAMS } from '../c4/C4Tab.js';
 import { DEFAULT_DIAGRAM_TAB_ID, type DiagramTab } from './diagramTabRegistry.js';
 
 export const DEPLOYMENTS_TAB_ID = 'deployments';
@@ -19,6 +20,23 @@ export const DIAGRAM_TABS: readonly DiagramTab[] = [
         label: 'Diagram',
         icon: IoEyeOutline,
         render: ({ diagram }) => <div className="w-full h-full">{diagram}</div>,
+    },
+    {
+        id: 'c4',
+        label: 'C4',
+        title: 'C4 diagrams from the C4 mapping standard (prototype for #3728)',
+        icon: IoLayersOutline,
+        isVisible: ({ isArchitecture }) => isArchitecture,
+        searchParams: C4_TAB_PARAMS,
+        render: ({ data, searchParams, setTabParams }) => (
+            <C4Tab
+                architecture={data.calmType === 'Architectures' ? data.data : undefined}
+                namespace={data.name}
+                architectureName={/^\d+$/.test(data.id) ? undefined : data.id}
+                searchParams={searchParams}
+                setTabParams={setTabParams}
+            />
+        ),
     },
     {
         id: 'json',
