@@ -100,6 +100,27 @@ class TestGitHubConventionStoreShould {
     }
 
     @Test
+    void read_default_json_as_the_default_when_another_file_has_the_same_unique_id() throws Exception {
+        RegistryEntry copy = entry("acme", "conventions/c4-mapping/default.json");
+        when(registryService.listByType("finos", RegistryResourceType.CONVENTION)).thenReturn(List.of(ACME, copy));
+        when(fileReader.readContained("finos", ACME.filePath())).thenReturn("{\"unique-id\":\"acme\",\"nesting\":\"demote\"}");
+        when(fileReader.readContained("finos", copy.filePath())).thenReturn("{\"unique-id\":\"acme\",\"nesting\":\"strict\"}");
+
+        ConventionDefault conventionDefault = store.getDefault("finos", C4).orElseThrow();
+
+        assertThat(store.readDefault("finos", C4, conventionDefault), is("{\"unique-id\":\"acme\",\"nesting\":\"strict\"}"));
+    }
+
+    @Test
+    void report_a_missing_default_json_or_namespace_when_reading_the_default() {
+        ConventionDefault conventionDefault = new ConventionDefault("c4-mapping", "finos", id(ACME), SHA);
+        when(registryService.listByType("finos", RegistryResourceType.CONVENTION)).thenReturn(List.of(ACME));
+
+        assertThrows(ConventionNotFoundException.class, () -> store.readDefault("finos", C4, conventionDefault));
+        assertThrows(NamespaceNotFoundException.class, () -> store.readDefault("nope", C4, conventionDefault));
+    }
+
+    @Test
     void report_content_only_when_the_namespace_has_convention_files() {
         when(registryService.listByType("empty", RegistryResourceType.CONVENTION)).thenReturn(List.of());
 

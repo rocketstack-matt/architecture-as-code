@@ -43,6 +43,14 @@ public interface ConventionStore {
     Optional<ConventionDefault> getDefault(String namespace, ConventionType type);
 
     /**
+     * @return the JSON of the convention that {@code conventionDefault}, from {@link #getDefault}, names
+     */
+    default String readDefault(String namespace, ConventionType type, ConventionDefault conventionDefault)
+            throws NamespaceNotFoundException, ConventionNotFoundException, ConventionVersionNotFoundException {
+        return getConventionForVersion(namespace, type, conventionDefault.conventionId(), conventionDefault.version());
+    }
+
+    /**
      * Names a convention version in {@code namespace} as its default for {@code type}, in place of any earlier default.
      */
     ConventionDefault setDefault(String namespace, ConventionType type, int id, String version)

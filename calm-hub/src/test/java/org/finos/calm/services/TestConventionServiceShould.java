@@ -102,7 +102,8 @@ class TestConventionServiceShould {
     void skip_a_default_that_names_a_missing_version_and_use_the_parent() throws Exception {
         setDefault("org", 1, "1.0.0", "{\"unique-id\":\"org\"}");
         when(conventionStore.getDefault("org.ab", C4)).thenReturn(Optional.of(new ConventionDefault("c4-mapping", "org.ab", 2, "9.0.0")));
-        when(conventionStore.getConventionForVersion("org.ab", C4, 2, "9.0.0")).thenThrow(new ConventionVersionNotFoundException());
+        when(conventionStore.readDefault("org.ab", C4, new ConventionDefault("c4-mapping", "org.ab", 2, "9.0.0")))
+                .thenThrow(new ConventionVersionNotFoundException());
 
         assertThat(service.resolveDefault("org.ab", C4).orElseThrow().namespace(), is("org"));
     }
@@ -205,7 +206,8 @@ class TestConventionServiceShould {
     }
 
     private void setDefault(String namespace, int id, String version, String json) throws Exception {
-        when(conventionStore.getDefault(namespace, C4)).thenReturn(Optional.of(new ConventionDefault("c4-mapping", namespace, id, version)));
-        when(conventionStore.getConventionForVersion(namespace, C4, id, version)).thenReturn(json);
+        ConventionDefault conventionDefault = new ConventionDefault("c4-mapping", namespace, id, version);
+        when(conventionStore.getDefault(namespace, C4)).thenReturn(Optional.of(conventionDefault));
+        when(conventionStore.readDefault(namespace, C4, conventionDefault)).thenReturn(json);
     }
 }

@@ -88,8 +88,7 @@ public class ConventionService {
             }
             ConventionDefault conventionDefault = found.get();
             try {
-                String content = conventionStore.getConventionForVersion(candidate, type, conventionDefault.conventionId(),
-                        conventionDefault.version());
+                String content = conventionStore.readDefault(candidate, type, conventionDefault);
                 return Optional.of(new ResolvedConventionDefault(type.getName(), candidate, conventionDefault.conventionId(),
                         conventionDefault.version(), !candidate.equals(namespace), parse(content)));
             } catch (NamespaceNotFoundException | ConventionNotFoundException | ConventionVersionNotFoundException e) {

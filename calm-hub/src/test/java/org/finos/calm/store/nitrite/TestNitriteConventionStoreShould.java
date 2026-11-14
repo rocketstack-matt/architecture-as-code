@@ -88,6 +88,7 @@ class TestNitriteConventionStoreShould {
 
         assertThat(replaced.version(), is("1.1.0"));
         assertThat(store.getDefault("finos", C4), is(Optional.of(new ConventionDefault("c4-mapping", "finos", 7, "1.1.0"))));
+        assertThat(store.readDefault("finos", C4, replaced), is(V2.getConventionJson()));
         assertThat(store.getDefault("finos.child", C4).isPresent(), is(false));
     }
 

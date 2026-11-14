@@ -71,13 +71,7 @@ public class GitHubConventionStore extends AbstractReadOnlyGitHubStore implement
     public String getConventionForVersion(String namespace, ConventionType type, int id, String version)
             throws NamespaceNotFoundException, ConventionNotFoundException, ConventionVersionNotFoundException {
         verifyNamespace(namespace);
-        RegistryEntry entry = entry(namespace, type, id);
-        try {
-            return readAtVersion(namespace, entry, version).orElseThrow(ConventionVersionNotFoundException::new);
-        } catch (IOException e) {
-            LOG.error("Failed to read convention file: {}", entry.filePath(), e);
-            throw new ConventionVersionNotFoundException();
-        }
+        return read(namespace, entry(namespace, type, id), version);
     }
 
     @Override
@@ -92,10 +86,16 @@ public class GitHubConventionStore extends AbstractReadOnlyGitHubStore implement
         if (headSha == null) {
             return Optional.empty();
         }
-        return entries(namespace, type)
-                .filter(e -> ConventionFiles.isDefault(e.filePath()))
-                .findFirst()
-                .map(e -> new ConventionDefault(type.getName(), namespace, id(e), headSha));
+        return defaultEntry(namespace, type).map(e -> new ConventionDefault(type.getName(), namespace, id(e), headSha));
+    }
+
+    // Reads default.json itself: another file with the same unique-id has the same id.
+    @Override
+    public String readDefault(String namespace, ConventionType type, ConventionDefault conventionDefault)
+            throws NamespaceNotFoundException, ConventionNotFoundException, ConventionVersionNotFoundException {
+        verifyNamespace(namespace);
+        RegistryEntry entry = defaultEntry(namespace, type).orElseThrow(ConventionNotFoundException::new);
+        return read(namespace, entry, conventionDefault.version());
     }
 
     @Override
@@ -116,6 +116,19 @@ public class GitHubConventionStore extends AbstractReadOnlyGitHubStore implement
     private Stream<RegistryEntry> entries(String namespace, ConventionType type) {
         return registryService.listByType(namespace, RegistryResourceType.CONVENTION).stream()
                 .filter(e -> ConventionFiles.conventionType(e.filePath()).filter(type::equals).isPresent());
+    }
+
+    private Optional<RegistryEntry> defaultEntry(String namespace, ConventionType type) {
+        return entries(namespace, type).filter(e -> ConventionFiles.isDefault(e.filePath())).findFirst();
+    }
+
+    private String read(String namespace, RegistryEntry entry, String version) throws ConventionVersionNotFoundException {
+        try {
+            return readAtVersion(namespace, entry, version).orElseThrow(ConventionVersionNotFoundException::new);
+        } catch (IOException e) {
+            LOG.error("Failed to read convention file: {}", entry.filePath(), e);
+            throw new ConventionVersionNotFoundException();
+        }
     }
 
     private RegistryEntry entry(String namespace, ConventionType type, int id) throws ConventionNotFoundException {
