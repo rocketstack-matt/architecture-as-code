@@ -273,18 +273,18 @@ class TestCalmContentDetectorShould {
     }
 
     @Test
-    void detect_a_config_under_configs_and_its_registered_type_even_when_its_schema_names_another_type() {
+    void detect_a_convention_under_conventions_and_its_registered_type_even_when_its_schema_names_another_type() {
         String json = "{\"$schema\": \"https://example.com/flow-mapping.json\", \"unique-id\": \"acme\"}";
-        assertThat(detector.detect(json, Path.of("configs/c4-mapping/acme.json")),
-                equalTo(Optional.of(RegistryResourceType.CONFIG)));
-        assertThat(detector.detect(json, Path.of("team/configs/c4-mapping/default.json")),
-                equalTo(Optional.of(RegistryResourceType.CONFIG)));
+        assertThat(detector.detect(json, Path.of("conventions/c4-mapping/acme.json")),
+                equalTo(Optional.of(RegistryResourceType.CONVENTION)));
+        assertThat(detector.detect(json, Path.of("team/conventions/c4-mapping/default.json")),
+                equalTo(Optional.of(RegistryResourceType.CONVENTION)));
     }
 
     @Test
-    void not_detect_a_config_for_an_unregistered_type_or_a_file_directly_under_configs() {
+    void not_detect_a_convention_for_an_unregistered_type_or_a_file_directly_under_conventions() {
         String json = "{\"unique-id\": \"acme\"}";
-        assertThat(detector.detect(json, Path.of("configs/theme/acme.json")), equalTo(Optional.empty()));
-        assertThat(detector.detect(json, Path.of("configs/acme.json")), equalTo(Optional.empty()));
+        assertThat(detector.detect(json, Path.of("conventions/theme/acme.json")), equalTo(Optional.empty()));
+        assertThat(detector.detect(json, Path.of("conventions/acme.json")), equalTo(Optional.empty()));
     }
 }

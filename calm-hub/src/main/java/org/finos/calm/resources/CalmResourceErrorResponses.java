@@ -3,8 +3,8 @@ package org.finos.calm.resources;
 import jakarta.ws.rs.core.Response;
 import org.finos.calm.domain.ResourceType;
 import org.finos.calm.domain.SchemaValidationLimits;
-import org.finos.calm.domain.configs.ConfigType;
-import org.finos.calm.domain.exception.ConfigSchemaValidationException;
+import org.finos.calm.domain.conventions.ConventionType;
+import org.finos.calm.domain.exception.ConventionSchemaValidationException;
 import org.finos.calm.domain.exception.DecoratorKeyRefusedException;
 import org.finos.calm.domain.exception.DecoratorSchemaValidationException;
 
@@ -97,15 +97,15 @@ public class CalmResourceErrorResponses {
         return Response.status(Response.Status.BAD_REQUEST).entity(body).build();
     }
 
-    // The errors can quote config values, so each one is sanitized.
-    public static Response configSchemaValidationResponse(ConfigSchemaValidationException exception) {
+    // The errors can quote convention values, so each one is sanitized.
+    public static Response conventionSchemaValidationResponse(ConventionSchemaValidationException exception) {
         List<Map<String, String>> errors = exception.getErrors().stream()
                 .map(error -> Map.of(
                         "location", ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(error.location()),
                         "error", ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(error.error())))
                 .toList();
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("error", "Config does not match the schema of its type");
+        body.put("error", "Convention does not match the schema of its type");
         body.put("errors", errors);
         if (exception.getMoreErrors() > 0) {
             body.put("moreErrors", exception.getMoreErrors());
@@ -113,27 +113,27 @@ public class CalmResourceErrorResponses {
         return Response.status(Response.Status.BAD_REQUEST).entity(body).build();
     }
 
-    public static Response unknownConfigTypeResponse() {
+    public static Response unknownConventionTypeResponse() {
         return Response.status(Response.Status.BAD_REQUEST)
-                .entity("Unknown config type. GET /api/calm/config-types lists the config types")
+                .entity("Unknown convention type. GET /api/calm/convention-types lists the convention types")
                 .build();
     }
 
-    public static Response configNotFoundResponse(String namespace, int id) {
+    public static Response conventionNotFoundResponse(String namespace, int id) {
         return Response.status(Response.Status.NOT_FOUND)
-                .entity("Config " + id + " does not exist in namespace: "
+                .entity("Convention " + id + " does not exist in namespace: "
                         + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(namespace))
                 .build();
     }
 
-    public static Response configVersionNotFoundResponse(int id, String version) {
+    public static Response conventionVersionNotFoundResponse(int id, String version) {
         return Response.status(Response.Status.NOT_FOUND)
-                .entity("Config " + id + " has no version "
+                .entity("Convention " + id + " has no version "
                         + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(version))
                 .build();
     }
 
-    public static Response noConfigDefaultResponse(String namespace, ConfigType type) {
+    public static Response noConventionDefaultResponse(String namespace, ConventionType type) {
         return Response.status(Response.Status.NOT_FOUND)
                 .entity("No " + type.getName() + " default for namespace: "
                         + ResourceValidationConstants.STRICT_SANITIZATION_POLICY.sanitize(namespace))

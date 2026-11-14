@@ -36,7 +36,7 @@ final class LocationSegmentParser {
             // .../schemas/{version}/meta
             case SCHEMA -> new LocationIds(segmentBefore(segments, "meta"), null);
             // .../{plural}/{id}/versions/{version}
-            case ARCHITECTURE, PATTERN, FLOW, INTERFACE, STANDARD, DOCUMENT, CONFIG, TIMELINE ->
+            case ARCHITECTURE, PATTERN, FLOW, INTERFACE, STANDARD, DOCUMENT, CONVENTION, TIMELINE ->
                     new LocationIds(
                             segmentBefore(segments, "versions"),
                             segmentAfter(segments, "versions"));
@@ -61,7 +61,7 @@ final class LocationSegmentParser {
             // ExtensionProxyService records its own entries; the filter never parses one.
             case EXTENSION -> new LocationIds(null, null);
             // A default PUT returns 200 and a DELETE 204, with no Location header.
-            case CONFIG_DEFAULT -> new LocationIds(null, null);
+            case CONVENTION_DEFAULT -> new LocationIds(null, null);
         };
     }
 

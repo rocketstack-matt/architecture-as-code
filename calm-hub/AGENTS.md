@@ -339,7 +339,7 @@ CALM Hub includes an experimental [Model Context Protocol](https://modelcontextp
 
 Tool providers are in `src/main/java/org/finos/calm/mcp/tools/`:  
 `ArchitectureTools`, `PatternTools`, `ControlTools`, `DomainTools`, `InterfaceTools`,  
-`NamespaceTools`, `SearchTools`, `StandardTools`, `TimelineTools`, `AdrTools`, `ConfigTools`.
+`NamespaceTools`, `SearchTools`, `StandardTools`, `TimelineTools`, `AdrTools`, `ConventionTools`.
 
 Enable for development:
 ```bash
@@ -462,13 +462,13 @@ from; it fails if there is none.
   loopback backend for proxy tests
 - Try it: see `local-dev/extensions/example-services/README.md`
 
-### Configs
-- Versioned tool settings at `/api/calm/namespaces/{ns}/configs/{type}`, with a namespace default that child
-  namespaces inherit (`ConfigService.resolveDefault`). See ADR 0019
-- To add a config type: put its JSON Schema in `src/main/resources/META-INF/calm-config-types/` with the `$id`
-  that the new `ConfigType` constant names, and add the constant. `ConfigSchemaValidator` fails start-up if the
+### Conventions
+- Versioned tool settings at `/api/calm/namespaces/{ns}/conventions/{type}`, with a namespace default that child
+  namespaces inherit (`ConventionService.resolveDefault`). See ADR 0019
+- To add a convention type: put its JSON Schema in `src/main/resources/META-INF/calm-convention-types/` with the `$id`
+  that the new `ConventionType` constant names, and add the constant. `ConventionSchemaValidator` fails start-up if the
   file is missing or its `$id` differs. Storage, REST, MCP and GitHub mode need no change
-- GitHub mode reads `configs/<type>/*.json`. `configs/<type>/default.json` is the namespace default
+- GitHub mode reads `conventions/<type>/*.json`. `conventions/<type>/default.json` is the namespace default
 
 ### Read-Only Deployment Mode
 - `calm.readonly=true` opens Nitrite with `readOnly(true)` and installs

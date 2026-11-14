@@ -30,5 +30,5 @@ public enum RegistryResourceType {
     INTERFACE,
     TIMELINE,
     DECORATOR,
-    CONFIG
+    CONVENTION
 }

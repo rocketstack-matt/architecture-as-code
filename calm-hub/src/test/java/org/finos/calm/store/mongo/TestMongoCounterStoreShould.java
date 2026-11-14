@@ -249,12 +249,12 @@ public class TestMongoCounterStoreShould {
     }
 
     @Test
-    void return_the_next_value_in_sequence_for_configs() {
+    void return_the_next_value_in_sequence_for_conventions() {
         when(counterCollection.findOneAndUpdate(
-                        argThat(arg -> arg instanceof Document && "configStoreCounter".equals(((Document) arg).get("_id"))),
+                        argThat(arg -> arg instanceof Document && "conventionStoreCounter".equals(((Document) arg).get("_id"))),
                         any(Document.class),
                         any(FindOneAndUpdateOptions.class)))
                 .thenReturn(new Document("sequence_value", 4));
-        assertThat(counterStore.getNextConfigSequenceValue(), equalTo(4));
+        assertThat(counterStore.getNextConventionSequenceValue(), equalTo(4));
     }
 }

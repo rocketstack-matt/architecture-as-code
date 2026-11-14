@@ -19,7 +19,7 @@ import org.finos.calm.domain.audit.AuditLogEntry;
 import org.finos.calm.domain.audit.AuditOutcome;
 import org.finos.calm.resources.AdrResource;
 import org.finos.calm.resources.ArchitectureResource;
-import org.finos.calm.resources.ConfigResource;
+import org.finos.calm.resources.ConventionResource;
 import org.finos.calm.resources.ControlResource;
 import org.finos.calm.resources.CoreSchemaResource;
 import org.finos.calm.resources.DecoratorResource;
@@ -176,7 +176,7 @@ public class AuditRequestFilter implements ContainerResponseFilter {
             Map.entry(InterfaceResource.class, AuditEntityType.INTERFACE),
             Map.entry(StandardResource.class, AuditEntityType.STANDARD),
             Map.entry(DocumentResource.class, AuditEntityType.DOCUMENT),
-            Map.entry(ConfigResource.class, AuditEntityType.CONFIG),
+            Map.entry(ConventionResource.class, AuditEntityType.CONVENTION),
             Map.entry(TimelineResource.class, AuditEntityType.TIMELINE),
             Map.entry(AdrResource.class, AuditEntityType.ADR),
             Map.entry(DecoratorResource.class, AuditEntityType.DECORATOR),
@@ -195,9 +195,9 @@ public class AuditRequestFilter implements ContainerResponseFilter {
             Map.entry(AuditEntityType.INTERFACE, "interfaceId"),
             Map.entry(AuditEntityType.STANDARD, "standardId"),
             Map.entry(AuditEntityType.DOCUMENT, "id"),
-            Map.entry(AuditEntityType.CONFIG, "id"),
-            // A namespace has one default per config type, so the type identifies it.
-            Map.entry(AuditEntityType.CONFIG_DEFAULT, "configType"),
+            Map.entry(AuditEntityType.CONVENTION, "id"),
+            // A namespace has one default per convention type, so the type identifies it.
+            Map.entry(AuditEntityType.CONVENTION_DEFAULT, "conventionType"),
             Map.entry(AuditEntityType.TIMELINE, "timelineId"),
             Map.entry(AuditEntityType.ADR, "adrId"),
             Map.entry(AuditEntityType.DECORATOR, "id"),
@@ -314,8 +314,8 @@ public class AuditRequestFilter implements ContainerResponseFilter {
         if (resourceClass == MappingControllerResource.class) {
             return resolveMappingController(methodName, uriInfo, outcome, responseContext);
         }
-        if (resourceClass == ConfigResource.class && ("setDefault".equals(methodName) || "deleteDefault".equals(methodName))) {
-            return resolveGeneric(AuditEntityType.CONFIG_DEFAULT, uriInfo, method, outcome, responseContext);
+        if (resourceClass == ConventionResource.class && ("setDefault".equals(methodName) || "deleteDefault".equals(methodName))) {
+            return resolveGeneric(AuditEntityType.CONVENTION_DEFAULT, uriInfo, method, outcome, responseContext);
         }
 
         AuditEntityType entityType = RESOURCE_CLASS_TO_ENTITY_TYPE.get(resourceClass);

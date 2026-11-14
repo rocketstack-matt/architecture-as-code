@@ -81,11 +81,11 @@ class TestLocationSegmentParserShould {
     }
 
     @Test
-    void parse_config_id_and_version_around_the_versions_anchor() {
+    void parse_convention_id_and_version_around_the_versions_anchor() {
         LocationSegmentParser.LocationIds ids =
                 LocationSegmentParser.parse(
-                        AuditEntityType.CONFIG,
-                        "/api/calm/namespaces/finos/configs/c4-mapping/4/versions/1.0.0");
+                        AuditEntityType.CONVENTION,
+                        "/api/calm/namespaces/finos/conventions/c4-mapping/4/versions/1.0.0");
 
         assertThat(ids.entityId(), is("4"));
         assertThat(ids.version(), is("1.0.0"));
@@ -134,10 +134,10 @@ class TestLocationSegmentParserShould {
     }
 
     @ParameterizedTest
-    @EnumSource(value = AuditEntityType.class, names = {"LAYOUT", "PATTERN_LAYOUT", "EXTENSION", "CONFIG_DEFAULT"})
+    @EnumSource(value = AuditEntityType.class, names = {"LAYOUT", "PATTERN_LAYOUT", "EXTENSION", "CONVENTION_DEFAULT"})
     void take_no_ids_from_a_location_for_types_whose_writes_return_none(AuditEntityType type) {
         LocationSegmentParser.LocationIds ids =
-                LocationSegmentParser.parse(type, "/api/calm/namespaces/finos/configs/c4-mapping/default");
+                LocationSegmentParser.parse(type, "/api/calm/namespaces/finos/conventions/c4-mapping/default");
 
         assertThat(ids.entityId(), is(nullValue()));
         assertThat(ids.version(), is(nullValue()));

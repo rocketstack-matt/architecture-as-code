@@ -4,7 +4,7 @@ import org.finos.calm.domain.exception.NamespaceNotFoundException;
 import org.finos.calm.domain.namespaces.NamespaceResourceSummary;
 import org.finos.calm.store.AdrStore;
 import org.finos.calm.store.ArchitectureStore;
-import org.finos.calm.store.ConfigStore;
+import org.finos.calm.store.ConventionStore;
 import org.finos.calm.store.DecoratorStore;
 import org.finos.calm.store.FlowStore;
 import org.finos.calm.store.InterfaceStore;
@@ -54,7 +54,7 @@ class TestNamespaceContentServiceShould {
     @Mock
     PatternLayoutStore mockPatternLayoutStore;
     @Mock
-    ConfigStore mockConfigStore;
+    ConventionStore mockConventionStore;
 
     NamespaceContentService service;
 
@@ -63,7 +63,7 @@ class TestNamespaceContentServiceShould {
         service = new NamespaceContentService(
                 mockArchitectureStore, mockPatternStore, mockFlowStore, mockStandardStore,
                 mockAdrStore, mockInterfaceStore, mockTimelineStore, mockDecoratorStore, mockLayoutStore,
-                mockPatternLayoutStore, mockConfigStore);
+                mockPatternLayoutStore, mockConventionStore);
     }
 
     @Test
@@ -80,7 +80,7 @@ class TestNamespaceContentServiceShould {
         verify(mockDecoratorStore).getDecoratorsForNamespace(NAMESPACE, null, null);
         verify(mockLayoutStore).getArchitectureIdsWithLayoutForNamespace(NAMESPACE);
         verify(mockPatternLayoutStore).getPatternIdsWithLayoutForNamespace(NAMESPACE);
-        verify(mockConfigStore).hasContent(NAMESPACE);
+        verify(mockConventionStore).hasContent(NAMESPACE);
     }
 
     @Test
@@ -168,8 +168,8 @@ class TestNamespaceContentServiceShould {
     }
 
     @Test
-    void return_true_when_the_namespace_holds_only_configs_or_config_defaults() {
-        when(mockConfigStore.hasContent(NAMESPACE)).thenReturn(true);
+    void return_true_when_the_namespace_holds_only_conventions_or_convention_defaults() {
+        when(mockConventionStore.hasContent(NAMESPACE)).thenReturn(true);
 
         assertThat(service.hasContent(NAMESPACE), is(true));
     }
