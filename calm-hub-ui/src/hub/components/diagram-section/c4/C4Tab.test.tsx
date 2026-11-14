@@ -94,10 +94,10 @@ describe('C4Tab', () => {
     it('uses the mapping that the namespace inherits', async () => {
         const mappingService = mappingServiceReturning({
             namespace: 'org',
-            configId: 3,
+            conventionId: 3,
             version: '1.1.0',
             inherited: true,
-            config: {
+            convention: {
                 'unique-id': 'acme-c4-mapping',
                 extends: 'https://calm.finos.org/standards/c4/1.0/calm-default.c4-mapping.json',
                 'node-types': { 'acme:worker': 'container' },
@@ -107,7 +107,7 @@ describe('C4Tab', () => {
         renderTab({ level: 'container', scope: 'shop' }, undefined, shop, mappingService);
 
         expect(await screen.findByText('Every element mapped')).toBeInTheDocument();
-        expect(screen.getByText('acme-c4-mapping')).toHaveAttribute('title', 'The C4 mapping inherited from config 3 version 1.1.0 of namespace org');
+        expect(screen.getByText('acme-c4-mapping')).toHaveAttribute('title', 'The C4 mapping inherited from convention 3 version 1.1.0 of namespace org');
         expect(mappingService.fetchDefaultMapping).toHaveBeenCalledWith('shop');
     });
 
@@ -120,7 +120,7 @@ describe('C4Tab', () => {
     });
 
     it('shows the error and no diagram when the namespace mapping is not a valid mapping', async () => {
-        const invalid = { namespace: 'shop', configId: 1, version: '1.0.0', inherited: false, config: { 'node-types': {} } };
+        const invalid = { namespace: 'shop', conventionId: 1, version: '1.0.0', inherited: false, convention: { 'node-types': {} } };
 
         renderTab({}, undefined, shop, mappingServiceReturning(invalid));
 
@@ -130,7 +130,7 @@ describe('C4Tab', () => {
 
     it('shows the error and no diagram when a mapping that the namespace mapping extends does not load', async () => {
         const config = { 'unique-id': 'team', extends: 'https://example.com/org.json' };
-        const mappingService = mappingServiceReturning({ namespace: 'shop', configId: 1, version: '1.0.0', inherited: false, config });
+        const mappingService = mappingServiceReturning({ namespace: 'shop', conventionId: 1, version: '1.0.0', inherited: false, convention: config });
         vi.mocked(mappingService.fetchMappingAt).mockRejectedValue(new Error('Network Error'));
 
         renderTab({}, undefined, shop, mappingService);

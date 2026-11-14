@@ -14,31 +14,31 @@ afterEach(() => mock.reset());
 describe('C4MappingService', () => {
     describe('fetchDefaultMapping', () => {
         it('returns the default that applies to the namespace', async () => {
-            const body = { configType: 'c4-mapping', namespace: 'org', configId: 3, version: '1.1.0', inherited: true, config: { 'unique-id': 'acme' } };
-            mock.onGet('/api/calm/namespaces/org.team/configs/c4-mapping/default').reply(200, body);
+            const body = { conventionType: 'c4-mapping', namespace: 'org', conventionId: 3, version: '1.1.0', inherited: true, convention: { 'unique-id': 'acme' } };
+            mock.onGet('/api/calm/namespaces/org.team/conventions/c4-mapping/default').reply(200, body);
 
             await expect(service.fetchDefaultMapping('org.team')).resolves.toEqual(body);
         });
 
         it('returns undefined when no namespace in the chain sets a default', async () => {
-            mock.onGet('/api/calm/namespaces/org/configs/c4-mapping/default').reply(404, 'Not found');
+            mock.onGet('/api/calm/namespaces/org/conventions/c4-mapping/default').reply(404, 'Not found');
 
             await expect(service.fetchDefaultMapping('org')).resolves.toBeUndefined();
         });
 
         it('rejects on any other error', async () => {
             vi.spyOn(console, 'error').mockImplementation(() => {});
-            mock.onGet('/api/calm/namespaces/org/configs/c4-mapping/default').reply(500);
+            mock.onGet('/api/calm/namespaces/org/conventions/c4-mapping/default').reply(500);
 
             await expect(service.fetchDefaultMapping('org')).rejects.toThrow('Error fetching the C4 mapping of namespace org:');
         });
     });
 
     describe('fetchMappingAt', () => {
-        it('reads a config on this Hub through the API, with credentials', async () => {
-            mock.onGet('/api/calm/namespaces/org/configs/c4-mapping/3/versions/1.0.0').reply((config) => [200, { auth: config.headers?.Authorization }]);
+        it('reads a convention on this Hub through the API, with credentials', async () => {
+            mock.onGet('/api/calm/namespaces/org/conventions/c4-mapping/3/versions/1.0.0').reply((config) => [200, { auth: config.headers?.Authorization }]);
 
-            await expect(service.fetchMappingAt('https://hub.example.com/calm/namespaces/org/configs/c4-mapping/3/versions/1.0.0', 'hub.example.com')).resolves.toEqual({
+            await expect(service.fetchMappingAt('https://hub.example.com/calm/namespaces/org/conventions/c4-mapping/3/versions/1.0.0', 'hub.example.com')).resolves.toEqual({
                 auth: 'Bearer token',
             });
         });

@@ -2,17 +2,17 @@ import { AxiosInstance, isAxiosError } from 'axios';
 import { getAuthHeaders } from '../authService.js';
 import { apiClient } from './utils/api-client.js';
 
-/** The `c4-mapping` config that applies to a namespace (#3727). */
+/** The `c4-mapping` convention that applies to a namespace (#3727). */
 export interface NamespaceC4Mapping {
     /** The namespace that sets the default. Another namespace than the one asked for when `inherited`. */
     namespace: string;
-    configId: number;
+    conventionId: number;
     version: string;
     inherited: boolean;
-    config: unknown;
+    convention: unknown;
 }
 
-const HUB_CONFIG_PATH = /^(?:\/api)?\/calm\/namespaces\/[^/]+\/configs\/c4-mapping\/[^/]+\/versions\/[^/]+$/;
+const HUB_CONVENTION_PATH = /^(?:\/api)?\/calm\/namespaces\/[^/]+\/conventions\/c4-mapping\/[^/]+\/versions\/[^/]+$/;
 
 export class C4MappingService {
     private readonly ax: AxiosInstance;
@@ -25,7 +25,7 @@ export class C4MappingService {
     public async fetchDefaultMapping(namespace: string): Promise<NamespaceC4Mapping | undefined> {
         const headers = await getAuthHeaders();
         return this.ax
-            .get(`/api/calm/namespaces/${encodeURIComponent(namespace)}/configs/c4-mapping/default`, { headers })
+            .get(`/api/calm/namespaces/${encodeURIComponent(namespace)}/conventions/c4-mapping/default`, { headers })
             .then((res) => res.data as NamespaceC4Mapping)
             .catch((error) => {
                 if (isAxiosError(error) && error.response?.status === 404) return undefined;
@@ -36,12 +36,12 @@ export class C4MappingService {
     }
 
     /**
-     * The mapping at an `extends` URL. A config on this Hub is read through the API with the user's credentials.
+     * The mapping at an `extends` URL. A convention on this Hub is read through the API with the user's credentials.
      * Any other URL is fetched without them.
      */
     public async fetchMappingAt(url: string, hostname: string = window.location.hostname): Promise<unknown> {
         const parsed = new URL(url, window.location.origin);
-        const onThisHub = parsed.hostname === hostname && HUB_CONFIG_PATH.test(parsed.pathname);
+        const onThisHub = parsed.hostname === hostname && HUB_CONVENTION_PATH.test(parsed.pathname);
         const request = onThisHub
             ? this.ax.get(parsed.pathname.startsWith('/api/') ? parsed.pathname : `/api${parsed.pathname}`, { headers: await getAuthHeaders() })
             : this.ax.get(parsed.href);

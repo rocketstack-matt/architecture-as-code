@@ -24,7 +24,7 @@ interface C4ToolbarProps {
 
 function mappingTitle(source: C4ToolbarProps['mappingSource']): string {
     if (!source) return 'The default C4 mapping of the C4 standard';
-    const from = `config ${source.configId} version ${source.version} of namespace ${source.namespace}`;
+    const from = `convention ${source.conventionId} version ${source.version} of namespace ${source.namespace}`;
     return source.inherited ? `The C4 mapping inherited from ${from}` : `The C4 mapping of this namespace: ${from}`;
 }
 

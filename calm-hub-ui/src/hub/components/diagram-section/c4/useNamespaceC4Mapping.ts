@@ -6,7 +6,7 @@ export interface NamespaceC4MappingState {
     /** Undefined when the namespace's mapping did not resolve. The C4 standard forbids the default in its place. */
     mapping?: ResolvedC4Mapping;
     /** Where the mapping comes from. Undefined while it loads and when the built-in default applies. */
-    source?: Omit<NamespaceC4Mapping, 'config'>;
+    source?: Omit<NamespaceC4Mapping, 'convention'>;
     /** Set when the namespace's mapping, or a mapping that it extends, did not load or is not valid. */
     error?: string;
     loading: boolean;
@@ -28,8 +28,8 @@ export function useNamespaceC4Mapping(namespace: string, service?: C4MappingServ
             .fetchDefaultMapping(namespace)
             .then(async (found) => {
                 if (!found) return done({ mapping: DEFAULT_MAPPING });
-                const { config, ...source } = found;
-                const mapping = await resolveC4Mapping(config, (url) => mappingService.fetchMappingAt(url));
+                const { convention, ...source } = found;
+                const mapping = await resolveC4Mapping(convention, (url) => mappingService.fetchMappingAt(url));
                 done({ mapping, source });
             })
             .catch((error: Error) => done({ error: error.message }));
