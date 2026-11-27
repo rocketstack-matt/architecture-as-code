@@ -1,0 +1,88 @@
+# Scratch workflow, not for merge. It answers one question for finos/architecture-as-code#3871:
+# does the ~/.m2 that the integration build fills hold all that the other calm-hub builds need?
+name: Scratch - Maven cache superset check
+
+permissions:
+    contents: read
+
+on:
+    push:
+        branches:
+            - 'scratch/m2-superset-check'
+
+jobs:
+    superset:
+        name: Compare ~/.m2 of the calm-hub builds
+        runs-on: ubuntu-latest
+        timeout-minutes: 90
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+            - name: Set up JDK
+              uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+              with:
+                  distribution: 'temurin'
+                  java-version: '21'
+
+            - name: Set up Docker
+              uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+            - name: Start from an empty local repository
+              run: |
+                  mvn -v
+                  rm -rf ~/.m2/repository ~/.m2/wrapper
+                  ls -la ~/.m2 || true
+                  cat > "$RUNNER_TEMP/m2.sh" <<'SCRIPT'
+                  list() { (cd ~/.m2 && find . -type f | sort); }
+                  reset_to_baseline() { rm -rf ~/.m2; cp -a "$RUNNER_TEMP/m2-baseline" ~/.m2; }
+                  report() {
+                      list > "$RUNNER_TEMP/$1.txt"
+                      comm -13 "$RUNNER_TEMP/baseline.txt" "$RUNNER_TEMP/$1.txt" > "$RUNNER_TEMP/$1.new.txt"
+                      total=$(wc -l < "$RUNNER_TEMP/$1.new.txt")
+                      artifacts=$(grep -cE '\.(jar|pom|zip)$' "$RUNNER_TEMP/$1.new.txt" || true)
+                      echo "SUPERSET-RESULT $1: $total new files, $artifacts of them jar/pom/zip"
+                      echo "--- new files of $1 (first 400)"
+                      head -400 "$RUNNER_TEMP/$1.new.txt"
+                      echo "--- end of $1"
+                      echo "- \`$1\`: $total new files, $artifacts jar/pom/zip" >> "$GITHUB_STEP_SUMMARY"
+                  }
+                  SCRIPT
+
+            - name: Baseline, the integration build (build-calm-hub.yml)
+              id: baseline
+              working-directory: calm-hub
+              run: mvn -P integration clean verify
+
+            - name: Keep the baseline
+              id: keep
+              run: |
+                  . "$RUNNER_TEMP/m2.sh"
+                  cp -a ~/.m2 "$RUNNER_TEMP/m2-baseline"
+                  list > "$RUNNER_TEMP/baseline.txt"
+                  echo "SUPERSET-BASELINE $(wc -l < "$RUNNER_TEMP/baseline.txt") files, $(grep -cE '\.(jar|pom|zip)$' "$RUNNER_TEMP/baseline.txt") jar/pom/zip, $(du -sh ~/.m2 | cut -f1)"
+
+            - name: Coverage build (build-calm-hub-coverage.yml)
+              if: ${{ !cancelled() && steps.keep.outcome == 'success' }}
+              run: |
+                  . "$RUNNER_TEMP/m2.sh"
+                  reset_to_baseline
+                  (cd calm-hub && mvn clean verify) || echo "SUPERSET-BUILD-FAILED coverage"
+                  report coverage
+
+            - name: Image build (docker-publish-calm-hub.yml)
+              if: ${{ !cancelled() && steps.keep.outcome == 'success' }}
+              run: |
+                  . "$RUNNER_TEMP/m2.sh"
+                  reset_to_baseline
+                  (cd calm-hub && mvn -P integration clean package) || echo "SUPERSET-BUILD-FAILED image"
+                  report image
+
+            - name: Read-only image build (docker-publish-calm-hub-readonly.yml)
+              if: ${{ !cancelled() && steps.keep.outcome == 'success' }}
+              run: |
+                  . "$RUNNER_TEMP/m2.sh"
+                  reset_to_baseline
+                  bash calm-hub/build-readonly-image.sh --no-docker || echo "SUPERSET-BUILD-FAILED readonly-image"
+                  report readonly-image
