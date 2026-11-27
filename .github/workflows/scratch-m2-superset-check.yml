@@ -1,5 +1,7 @@
 # Scratch workflow, not for merge. It answers one question for finos/architecture-as-code#3871:
-# does the ~/.m2 that the integration build fills hold all that the other calm-hub builds need?
+# does the ~/.m2 that the integration build fills hold all that the other calm-hub JVM builds need?
+# Each consumer job is a new runner with a new checkout, and runs Maven offline (-o), so a missing
+# artifact fails the build.
 name: Scratch - Maven cache superset check
 
 permissions:
@@ -11,10 +13,10 @@ on:
             - 'scratch/m2-superset-check'
 
 jobs:
-    superset:
-        name: Compare ~/.m2 of the calm-hub builds
+    baseline:
+        name: Integration build from an empty ~/.m2 (build-calm-hub.yml)
         runs-on: ubuntu-latest
-        timeout-minutes: 90
+        timeout-minutes: 45
 
         steps:
             - name: Checkout
@@ -33,56 +35,74 @@ jobs:
               run: |
                   mvn -v
                   rm -rf ~/.m2/repository ~/.m2/wrapper
-                  ls -la ~/.m2 || true
-                  cat > "$RUNNER_TEMP/m2.sh" <<'SCRIPT'
-                  list() { (cd ~/.m2 && find . -type f | sort); }
-                  reset_to_baseline() { rm -rf ~/.m2; cp -a "$RUNNER_TEMP/m2-baseline" ~/.m2; }
-                  report() {
-                      list > "$RUNNER_TEMP/$1.txt"
-                      comm -13 "$RUNNER_TEMP/baseline.txt" "$RUNNER_TEMP/$1.txt" > "$RUNNER_TEMP/$1.new.txt"
-                      total=$(wc -l < "$RUNNER_TEMP/$1.new.txt")
-                      artifacts=$(grep -cE '\.(jar|pom|zip)$' "$RUNNER_TEMP/$1.new.txt" || true)
-                      echo "SUPERSET-RESULT $1: $total new files, $artifacts of them jar/pom/zip"
-                      echo "--- new files of $1 (first 400)"
-                      head -400 "$RUNNER_TEMP/$1.new.txt"
-                      echo "--- end of $1"
-                      echo "- \`$1\`: $total new files, $artifacts jar/pom/zip" >> "$GITHUB_STEP_SUMMARY"
-                  }
-                  SCRIPT
 
-            - name: Baseline, the integration build (build-calm-hub.yml)
-              id: baseline
+            - name: Build and Test
               working-directory: calm-hub
               run: mvn -P integration clean verify
 
-            - name: Keep the baseline
-              id: keep
+            - name: Pack ~/.m2
               run: |
-                  . "$RUNNER_TEMP/m2.sh"
-                  cp -a ~/.m2 "$RUNNER_TEMP/m2-baseline"
-                  list > "$RUNNER_TEMP/baseline.txt"
-                  echo "SUPERSET-BASELINE $(wc -l < "$RUNNER_TEMP/baseline.txt") files, $(grep -cE '\.(jar|pom|zip)$' "$RUNNER_TEMP/baseline.txt") jar/pom/zip, $(du -sh ~/.m2 | cut -f1)"
+                  echo "SUPERSET-BASELINE $(find ~/.m2 -type f | wc -l) files, $(du -sh ~/.m2 | cut -f1), wrapper present: $([ -d ~/.m2/wrapper ] && echo yes || echo no)"
+                  tar -C ~ -cf "$RUNNER_TEMP/m2.tar" .m2
 
-            - name: Coverage build (build-calm-hub-coverage.yml)
-              if: ${{ !cancelled() && steps.keep.outcome == 'success' }}
-              run: |
-                  . "$RUNNER_TEMP/m2.sh"
-                  reset_to_baseline
-                  (cd calm-hub && mvn clean verify) || echo "SUPERSET-BUILD-FAILED coverage"
-                  report coverage
+            - name: Upload ~/.m2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+              with:
+                  name: m2-baseline
+                  path: ${{ runner.temp }}/m2.tar
+                  retention-days: 1
 
-            - name: Image build (docker-publish-calm-hub.yml)
-              if: ${{ !cancelled() && steps.keep.outcome == 'success' }}
-              run: |
-                  . "$RUNNER_TEMP/m2.sh"
-                  reset_to_baseline
-                  (cd calm-hub && mvn -P integration clean package) || echo "SUPERSET-BUILD-FAILED image"
-                  report image
+    consumer:
+        name: Offline ${{ matrix.build }}
+        needs: baseline
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - build: coverage (build-calm-hub-coverage.yml)
+                      command: mvn -o clean verify
+                    - build: image (docker-publish-calm-hub.yml)
+                      command: mvn -o -P integration clean package
+                    - build: read-only image (docker-publish-calm-hub-readonly.yml)
+                      command: mvn -o package -DskipITs && bash build-readonly-image.sh --no-maven --no-docker
 
-            - name: Read-only image build (docker-publish-calm-hub-readonly.yml)
-              if: ${{ !cancelled() && steps.keep.outcome == 'success' }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+            - name: Set up JDK
+              uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+              with:
+                  distribution: 'temurin'
+                  java-version: '21'
+
+            - name: Download ~/.m2
+              uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+              with:
+                  name: m2-baseline
+                  path: ${{ runner.temp }}
+
+            - name: Restore ~/.m2 as the cache step does
               run: |
-                  . "$RUNNER_TEMP/m2.sh"
-                  reset_to_baseline
-                  bash calm-hub/build-readonly-image.sh --no-docker || echo "SUPERSET-BUILD-FAILED readonly-image"
-                  report readonly-image
+                  rm -rf ~/.m2
+                  tar -C ~ -xf "$RUNNER_TEMP/m2.tar"
+                  (cd ~/.m2 && find . -type f | sort) > "$RUNNER_TEMP/before.txt"
+                  mvn -v
+
+            - name: Build offline
+              working-directory: calm-hub
+              env:
+                  COMMAND: ${{ matrix.command }}
+              run: |
+                  echo "SUPERSET-COMMAND $COMMAND"
+                  bash -c "set -euo pipefail; $COMMAND"
+
+            - name: Report
+              if: ${{ !cancelled() }}
+              run: |
+                  (cd ~/.m2 && find . -type f | sort) > "$RUNNER_TEMP/after.txt"
+                  comm -13 "$RUNNER_TEMP/before.txt" "$RUNNER_TEMP/after.txt" > "$RUNNER_TEMP/new.txt"
+                  echo "SUPERSET-RESULT $(wc -l < "$RUNNER_TEMP/new.txt") new files, $(grep -cE '\.(jar|pom|zip)$' "$RUNNER_TEMP/new.txt" || true) of them jar/pom/zip"
+                  head -200 "$RUNNER_TEMP/new.txt"
